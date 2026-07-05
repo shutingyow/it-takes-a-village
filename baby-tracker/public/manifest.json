@@ -1,0 +1,22 @@
+{
+  "name": "Baby Tracker - Postpartum Caregiver Log",
+  "short_name": "Baby Tracker",
+  "description": "Shared baby tracking app for caregivers - feeds, sleep, diapers, and more",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4A90E2",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
