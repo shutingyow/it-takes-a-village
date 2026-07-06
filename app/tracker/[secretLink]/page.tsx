@@ -11,6 +11,7 @@ import { HealthTab } from "@/app/components/tabs/HealthTab";
 import { NotesTab } from "@/app/components/tabs/NotesTab";
 import { UpcomingTab } from "@/app/components/tabs/UpcomingTab";
 import { HistoryTab } from "@/app/components/tabs/HistoryTab";
+import { SupplyAlertsBanner } from "@/app/components/SupplyAlertsBanner";
 
 type Tab = "home" | "log" | "health" | "notes" | "upcoming" | "history";
 
@@ -95,16 +96,13 @@ export default function TrackerPage({
         onChange={setSelectedCaregiver}
       />
 
-      {/* Supply Alerts Banner */}
-      {activeAlerts && activeAlerts.length > 0 && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-yellow-700 font-semibold">⚠️ Supply Alert</span>
-          </div>
-          <div className="text-sm text-yellow-700 mt-1">
-            {activeAlerts.map((alert) => alert.item).join(", ")} running low
-          </div>
-        </div>
+      {/* Supply Alerts */}
+      {activeAlerts && (
+        <SupplyAlertsBanner
+          trackerId={tracker._id}
+          selectedCaregiver={selectedCaregiver}
+          alerts={activeAlerts}
+        />
       )}
 
       {/* Content */}
@@ -116,7 +114,15 @@ export default function TrackerPage({
               lastDiaper={lastDiaper ?? undefined}
               lastPump={lastPump ?? undefined}
               activeSleep={activeSleep ?? undefined}
-              lastCompletedSleep={lastCompletedSleep ?? undefined}
+              lastCompletedSleep={
+                lastCompletedSleep?.endTime
+                  ? {
+                      startTime: lastCompletedSleep.startTime,
+                      endTime: lastCompletedSleep.endTime,
+                      caregiverName: lastCompletedSleep.caregiverName,
+                    }
+                  : undefined
+              }
             />
             <HomeTab
               trackerId={tracker._id}

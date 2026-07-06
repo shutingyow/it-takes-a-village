@@ -21,18 +21,30 @@ export const create = mutation({
 export const getUpcoming = query({
   args: {
     trackerId: v.id("trackers"),
+    now: v.number(),
   },
+  returns: v.array(
+    v.object({
+      _id: v.id("appointments"),
+      _creationTime: v.number(),
+      trackerId: v.id("trackers"),
+      caregiverName: v.string(),
+      title: v.string(),
+      date: v.number(),
+      location: v.optional(v.string()),
+      notes: v.optional(v.string()),
+    })
+  ),
   handler: async (ctx, args) => {
-    const now = Date.now();
-    
-    return await ctx.db
+    const results = await ctx.db
       .query("appointments")
-      .withIndex("by_tracker_and_date", (q) => 
+      .withIndex("by_tracker_and_date", (q) =>
         q.eq("trackerId", args.trackerId)
       )
-      .filter((q) => q.gte(q.field("date"), now))
       .order("asc")
       .collect();
+
+    return results.filter((appointment) => appointment.date >= args.now);
   },
 });
 

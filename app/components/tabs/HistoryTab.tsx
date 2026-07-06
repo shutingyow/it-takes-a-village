@@ -102,9 +102,17 @@ export function HistoryTab({ trackerId }: HistoryTabProps) {
                     {entry.entryType === "health" && (
                       <div>
                         <span className="text-sm font-medium">
-                          🏥 Health - {entry.type}
+                          🏥{" "}
+                          {entry.type === "temperature"
+                            ? `Temperature - ${entry.temperature?.toFixed(1)}°F`
+                            : entry.type === "medication"
+                              ? `Medication - ${entry.medicationName}`
+                              : `Weight - ${entry.weight?.toFixed(1)} lbs`}
                         </span>
                         <div className="text-xs text-gray-600">
+                          {entry.type === "medication" &&
+                            entry.dosage &&
+                            `${entry.dosage} • `}
                           by {entry.caregiverName}
                         </div>
                       </div>
