@@ -85,7 +85,7 @@ export default function TrackerPage({
       {/* Header */}
       <div className="bg-blue-500 text-white">
         <div className="px-4 py-4">
-          <h1 className="text-2xl font-bold">👶 Baby Tracker</h1>
+          <h1 className="text-2xl font-bold">🏡 It Takes a Village</h1>
         </div>
       </div>
 

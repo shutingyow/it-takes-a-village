@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Baby Tracker - Postpartum Caregiver Log",
-  description: "Shared baby tracking app for caregivers - feeds, sleep, diapers, and more",
+  title: "It Takes a Village - Shared Caregiver Log",
+  description: "Shared baby tracking app for caregivers — feeds, sleep, diapers, and more",
   manifest: "/manifest.json",
   themeColor: "#4A90E2",
   viewport: {
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Baby Tracker",
+    title: "It Takes a Village",
   },
 };
 

@@ -33,7 +33,7 @@ export default function Home() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">👶 Baby Tracker</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">🏡 It Takes a Village</h1>
           <p className="text-gray-600">Shared caregiver log for your little one</p>
         </div>
 

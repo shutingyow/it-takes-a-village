@@ -1,4 +1,4 @@
-# Baby Tracker
+# It Takes a Village
 
 A shared caregiver log for tracking feeds, sleep, diapers, pumping, health, notes, and appointments. No login required — share a secret link with everyone helping care for your baby.
 

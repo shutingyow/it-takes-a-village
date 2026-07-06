@@ -1,6 +1,6 @@
 {
-  "name": "Baby Tracker - Postpartum Caregiver Log",
-  "short_name": "Baby Tracker",
+  "name": "It Takes a Village - Shared Caregiver Log",
+  "short_name": "Village",
   "description": "Shared baby tracking app for caregivers - feeds, sleep, diapers, and more",
   "start_url": "/",
   "display": "standalone",
