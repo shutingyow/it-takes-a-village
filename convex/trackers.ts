@@ -32,6 +32,7 @@ export const getBySecret = query({
   returns: v.union(
     v.object({
       _id: v.id("trackers"),
+      _creationTime: v.number(),
       secretLink: v.string(),
       caregiverNames: v.array(v.string()),
       createdAt: v.number(),
