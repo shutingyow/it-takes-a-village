@@ -78,6 +78,7 @@ export const getPhotoUrl = query({
   args: {
     storageId: v.id("_storage"),
   },
+  returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
     return await ctx.storage.getUrl(args.storageId);
   },

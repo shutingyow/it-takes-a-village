@@ -6,6 +6,8 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 import { AppointmentModal } from "../modals/AppointmentModal";
 import { formatDateTime } from "@/app/lib/utils";
+import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
+import { IconCalendar, IconLocation } from "../icons";
 
 interface UpcomingTabProps {
   trackerId: Id<"trackers">;
@@ -13,6 +15,7 @@ interface UpcomingTabProps {
 }
 
 export function UpcomingTab({ trackerId, selectedCaregiver }: UpcomingTabProps) {
+  const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
   const [now] = useState(() => Date.now());
   const upcoming = useQuery(api.appointments.getUpcoming, { trackerId, now });
@@ -20,32 +23,34 @@ export function UpcomingTab({ trackerId, selectedCaregiver }: UpcomingTabProps) 
 
   return (
     <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm text-gray-600">Upcoming appointments</h2>
+      <div className="flex items-center justify-between mb-3">
+        <p className="section-label mb-0">{t("upcomingAppointments")}</p>
         <button
+          type="button"
           onClick={() => setShowModal(true)}
-          className="text-sm font-semibold text-blue-600 hover:underline"
+          className="text-sm font-semibold text-primary"
         >
-          + Add
+          + {t("add")}
         </button>
       </div>
 
       {!upcoming ? (
-        <div className="text-center text-gray-500 py-8">Loading...</div>
+        <div className="text-center text-muted py-8 text-sm">{t("loading")}</div>
       ) : upcoming.length === 0 ? (
-        <div className="bg-blue-50 rounded-lg p-6 text-center">
-          <div className="text-4xl mb-3">📅</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            No upcoming appointments
+        <div className="bg-primary-light rounded-xl p-8 text-center card-shadow border border-primary/10">
+          <div className="w-12 h-12 rounded-xl bg-surface flex items-center justify-center mx-auto mb-3 text-primary">
+            <IconCalendar size={24} />
+          </div>
+          <h3 className="text-lg font-semibold text-foreground mb-2">
+            {t("noAppointments")}
           </h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Track pediatrician visits and vaccinations
-          </p>
+          <p className="text-sm text-muted mb-4">{t("appointmentsHint")}</p>
           <button
+            type="button"
             onClick={() => setShowModal(true)}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg"
+            className="btn-primary w-auto inline-block px-6"
           >
-            Add Appointment
+            {t("addAppointment")}
           </button>
         </div>
       ) : (
@@ -53,37 +58,37 @@ export function UpcomingTab({ trackerId, selectedCaregiver }: UpcomingTabProps) 
           {upcoming.map((appointment) => (
             <div
               key={appointment._id}
-              className="bg-white border border-gray-200 rounded-lg p-4"
+              className="bg-surface border border-border rounded-2xl p-4 card-shadow"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-foreground">
                     {appointment.title}
                   </h3>
-                  <p className="text-sm text-blue-700 mt-1">
+                  <p className="text-sm text-primary mt-1 font-medium">
                     {formatDateTime(appointment.date)}
                   </p>
                   {appointment.location && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      📍 {appointment.location}
+                    <p className="text-sm text-muted mt-1 flex items-center gap-1.5">
+                      <IconLocation size={14} className="shrink-0" />
+                      {appointment.location}
                     </p>
                   )}
                   {appointment.notes && (
-                    <p className="text-sm text-gray-600 mt-2">
-                      {appointment.notes}
-                    </p>
+                    <p className="text-sm text-muted mt-2">{appointment.notes}</p>
                   )}
-                  <p className="text-xs text-gray-500 mt-2">
-                    Added by {appointment.caregiverName}
+                  <p className="text-xs text-muted mt-2">
+                    {t("addedBy", { name: appointment.caregiverName })}
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() =>
                     removeAppointment({ appointmentId: appointment._id })
                   }
-                  className="text-xs text-red-600 hover:underline shrink-0"
+                  className="text-xs text-[#c45c5c] hover:underline shrink-0"
                 >
-                  Delete
+                  {t("delete")}
                 </button>
               </div>
             </div>

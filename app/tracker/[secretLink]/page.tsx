@@ -1,19 +1,46 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { use, useState } from "react";
-import { CaregiverSelector } from "@/app/components/CaregiverSelector";
-import { StatusStrip } from "@/app/components/StatusStrip";
+import { use, useEffect, useState } from "react";
+import { CaregiverLockScreen } from "@/app/components/CaregiverLockScreen";
+import { LockedCaregiverBadge } from "@/app/components/LockedCaregiverBadge";
 import { HomeTab } from "@/app/components/tabs/HomeTab";
-import { LogTab } from "@/app/components/tabs/LogTab";
-import { HealthTab } from "@/app/components/tabs/HealthTab";
-import { NotesTab } from "@/app/components/tabs/NotesTab";
-import { UpcomingTab } from "@/app/components/tabs/UpcomingTab";
-import { HistoryTab } from "@/app/components/tabs/HistoryTab";
+import { InsightsTab } from "@/app/components/tabs/InsightsTab";
+import {
+  ProfileTab,
+  type ProfileView,
+} from "@/app/components/tabs/ProfileTab";
+import {
+  SettingsTab,
+  type SettingsView,
+} from "@/app/components/tabs/SettingsTab";
 import { SupplyAlertsBanner } from "@/app/components/SupplyAlertsBanner";
+import { LogSheet } from "@/app/components/LogSheet";
+import {
+  TrackerBottomNav,
+  type TrackerTab,
+} from "@/app/components/TrackerBottomNav";
+import { FeedModal } from "@/app/components/modals/FeedModal";
+import { DiaperModal } from "@/app/components/modals/DiaperModal";
+import { PumpModal } from "@/app/components/modals/PumpModal";
+import { ActivityModal } from "@/app/components/modals/ActivityModal";
+import { NapModal } from "@/app/components/modals/NapModal";
+import { MomentModal } from "@/app/components/modals/MomentModal";
+import { IconLink } from "@/app/components/icons";
+import {
+  clearLockedCaregiver,
+  getLockedCaregiver,
+  setLockedCaregiver as saveLockedCaregiver,
+  type CaregiverInfo,
+} from "@/app/lib/trackerStorage";
+import { saveLastVisitedTracker } from "@/app/lib/trackerStorage";
+import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
+import { ReminderScheduler } from "@/app/components/ReminderScheduler";
+import { useAppShell } from "@/app/lib/appShell";
+import { cn } from "@/app/lib/utils";
 
-type Tab = "home" | "log" | "health" | "notes" | "upcoming" | "history";
+type LogType = "feed" | "diaper" | "pump" | "activity" | "nap" | "moment";
 
 export default function TrackerPage({
   params,
@@ -21,9 +48,21 @@ export default function TrackerPage({
   params: Promise<{ secretLink: string }>;
 }) {
   const { secretLink } = use(params);
-  const [activeTab, setActiveTab] = useState<Tab>("home");
-  const [selectedCaregiver, setSelectedCaregiver] = useState("");
+  const { t } = useLanguage();
+  const appShell = useAppShell();
+  const [activeTab, setActiveTab] = useState<TrackerTab>("today");
+  const [profileOpenView, setProfileOpenView] = useState<ProfileView | null>(
+    null
+  );
+  const [settingsOpenView, setSettingsOpenView] =
+    useState<SettingsView | null>(null);
+  const [showLogSheet, setShowLogSheet] = useState(false);
+  const [activeLogModal, setActiveLogModal] = useState<LogType | null>(null);
+  const [lockedCaregiver, setLockedCaregiver] = useState<string | null>(null);
+  const [needsPick, setNeedsPick] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
+  const ensureMigrated = useMutation(api.trackers.ensureMigrated);
   const tracker = useQuery(api.trackers.getBySecret, { secretLink });
   const lastFeed = useQuery(
     api.feedEntries.getLast,
@@ -33,135 +72,268 @@ export default function TrackerPage({
     api.diaperEntries.getLast,
     tracker ? { trackerId: tracker._id } : "skip"
   );
-  const lastPump = useQuery(
-    api.pumpEntries.getLast,
-    tracker ? { trackerId: tracker._id } : "skip"
-  );
-  const activeSleep = useQuery(
-    api.sleepEntries.getActive,
-    tracker ? { trackerId: tracker._id } : "skip"
-  );
-  const lastCompletedSleep = useQuery(
-    api.sleepEntries.getLast,
-    tracker ? { trackerId: tracker._id } : "skip"
-  );
   const activeAlerts = useQuery(
     api.supplyAlerts.getActive,
     tracker ? { trackerId: tracker._id } : "skip"
   );
 
-  if (tracker === undefined) {
+  useEffect(() => {
+    void ensureMigrated({ secretLink });
+  }, [secretLink, ensureMigrated]);
+
+  useEffect(() => {
+    if (tracker) {
+      saveLastVisitedTracker(secretLink, tracker.babyName);
+    }
+  }, [secretLink, tracker?.babyName, tracker?._id]);
+
+  useEffect(() => {
+    if (!tracker) return;
+    const saved = getLockedCaregiver(secretLink);
+    const validNames = tracker.caregivers.map((c) => c.name);
+    if (saved && validNames.includes(saved)) {
+      setLockedCaregiver(saved);
+      setNeedsPick(false);
+    } else {
+      setLockedCaregiver(null);
+      setNeedsPick(true);
+    }
+    setHydrated(true);
+  }, [secretLink, tracker?._id, tracker?.caregivers]);
+
+  useEffect(() => {
+    if (activeTab !== "profile") setProfileOpenView(null);
+    if (activeTab !== "settings") setSettingsOpenView(null);
+  }, [activeTab]);
+
+  const handleViewAllHistory = () => {
+    setProfileOpenView("history");
+    setActiveTab("profile");
+  };
+
+  const handleOpenReminders = () => {
+    setSettingsOpenView("reminders");
+    setActiveTab("settings");
+  };
+
+  const handleQuickLog = (type: LogType) => {
+    setActiveLogModal(type);
+  };
+
+  const handleConfirmCaregiver = (name: string) => {
+    setLockedCaregiver(name);
+    saveLockedCaregiver(secretLink, name);
+    setNeedsPick(false);
+  };
+
+  const handleSwitchCaregiver = () => {
+    clearLockedCaregiver(secretLink);
+    setLockedCaregiver(null);
+    setNeedsPick(true);
+  };
+
+  const handleLogSelect = (type: LogType) => {
+    setShowLogSheet(false);
+    setActiveLogModal(type);
+  };
+
+  const handleTabChange = (tab: TrackerTab) => {
+    if (tab === "log") {
+      setShowLogSheet(true);
+      return;
+    }
+    setActiveTab(tab);
+  };
+
+  const lockedInfo: CaregiverInfo | undefined = tracker?.caregivers.find(
+    (c) => c.name === lockedCaregiver
+  );
+
+  if (tracker === undefined || !hydrated) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-accent-diaper border-t-transparent animate-spin" />
+          <p className="text-muted text-sm">{t("loadingTracker")}</p>
+        </div>
       </div>
     );
   }
 
   if (tracker === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Tracker Not Found
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="text-center bg-surface rounded-2xl p-8 card-shadow max-w-sm border border-border">
+          <div className="w-12 h-12 rounded-xl bg-beige-light flex items-center justify-center mx-auto mb-4 text-accent-diaper">
+            <IconLink size={24} />
+          </div>
+          <h1 className="text-xl font-bold text-foreground mb-2">
+            {t("trackerNotFound")}
           </h1>
-          <p className="text-gray-600">This tracker link is invalid.</p>
+          <p className="text-muted text-sm">{t("invalidLink")}</p>
         </div>
       </div>
     );
   }
 
-  const tabs: { id: Tab; label: string; emoji: string }[] = [
-    { id: "home", label: "Home", emoji: "🏠" },
-    { id: "log", label: "Log", emoji: "📝" },
-    { id: "health", label: "Health", emoji: "🏥" },
-    { id: "notes", label: "Notes", emoji: "📋" },
-    { id: "upcoming", label: "Upcoming", emoji: "📅" },
-    { id: "history", label: "History", emoji: "🕐" },
-  ];
+  if (needsPick || !lockedCaregiver || !lockedInfo) {
+    return (
+      <CaregiverLockScreen
+        caregivers={tracker.caregivers}
+        onConfirm={handleConfirmCaregiver}
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <div className="bg-blue-500 text-white">
-        <div className="px-4 py-4">
-          <h1 className="text-2xl font-bold">🏡 It Takes a Village</h1>
-        </div>
-      </div>
+    <div className="relative h-dvh max-h-dvh flex flex-col tracker-shell app-shell overflow-hidden safe-top">
+      {/* Brand line only in browser tabs — native/PWA already has the app name */}
+      {!appShell && (
+        <header className="px-4 pt-1 pb-0.5 shrink-0">
+          <p className="text-[11px] font-medium text-muted/80 tracking-tight truncate">
+            {t("appName")}
+          </p>
+        </header>
+      )}
 
-      {/* Caregiver Selector */}
-      <CaregiverSelector
-        caregivers={tracker.caregiverNames}
-        value={selectedCaregiver}
-        onChange={setSelectedCaregiver}
+      {activeTab !== "today" && (
+        <header className="px-4 pt-1.5 pb-2 shrink-0">
+          <h1 className="text-[1.5rem] font-bold text-foreground tracking-tight truncate leading-tight">
+            {activeTab === "insights" && t("tabInsights")}
+            {activeTab === "profile" && t("tabProfile")}
+            {activeTab === "settings" && t("tabSettings")}
+          </h1>
+        </header>
+      )}
+
+      <LockedCaregiverBadge
+        caregiver={lockedInfo}
+        onSwitch={handleSwitchCaregiver}
       />
 
-      {/* Supply Alerts */}
-      {activeAlerts && (
+      {activeAlerts && activeAlerts.length > 0 && (
         <SupplyAlertsBanner
           trackerId={tracker._id}
-          selectedCaregiver={selectedCaregiver}
+          selectedCaregiver={lockedCaregiver}
           alerts={activeAlerts}
         />
       )}
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
-        {activeTab === "home" && (
-          <div>
-            <StatusStrip
-              lastFeed={lastFeed ?? undefined}
-              lastDiaper={lastDiaper ?? undefined}
-              lastPump={lastPump ?? undefined}
-              activeSleep={activeSleep ?? undefined}
-              lastCompletedSleep={
-                lastCompletedSleep?.endTime
-                  ? {
-                      startTime: lastCompletedSleep.startTime,
-                      endTime: lastCompletedSleep.endTime,
-                      caregiverName: lastCompletedSleep.caregiverName,
-                    }
-                  : undefined
-              }
-            />
-            <HomeTab
-              trackerId={tracker._id}
-              selectedCaregiver={selectedCaregiver}
-            />
-          </div>
+      <main className="flex-1 min-h-0 min-w-0 overflow-x-clip overflow-y-auto overscroll-y-contain pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))]">
+        {activeTab === "today" && (
+          <HomeTab
+            trackerId={tracker._id}
+            secretLink={secretLink}
+            selectedCaregiver={lockedCaregiver}
+            babyName={tracker.babyName}
+            birthDate={tracker.birthDate}
+            photoStorageId={tracker.photoStorageId}
+            lastFeed={lastFeed}
+            lastDiaper={lastDiaper}
+            pumpScheduleEnabled={tracker.pumpSchedule?.enabled}
+            onViewAllHistory={handleViewAllHistory}
+            onQuickLog={handleQuickLog}
+            onOpenReminders={handleOpenReminders}
+          />
         )}
-        {activeTab === "log" && (
-          <LogTab trackerId={tracker._id} selectedCaregiver={selectedCaregiver} />
+        <ReminderScheduler
+          trackerId={tracker._id}
+          secretLink={secretLink}
+          feedIntervalHours={tracker.feedIntervalHours}
+          notifyBeforeMinutes={tracker.notifyBeforeMinutes}
+          wakeWindowMinutes={tracker.wakeWindowMinutes}
+          pumpSchedule={tracker.pumpSchedule}
+        />
+        {activeTab === "insights" && (
+          <InsightsTab
+            trackerId={tracker._id}
+            babyName={tracker.babyName}
+            birthDate={tracker.birthDate}
+            secretLink={secretLink}
+            selectedCaregiver={lockedCaregiver}
+          />
         )}
-        {activeTab === "health" && (
-          <HealthTab trackerId={tracker._id} selectedCaregiver={selectedCaregiver} />
+        {activeTab === "profile" && (
+          <ProfileTab
+            trackerId={tracker._id}
+            secretLink={secretLink}
+            selectedCaregiver={lockedCaregiver}
+            openView={profileOpenView}
+          />
         )}
-        {activeTab === "notes" && (
-          <NotesTab trackerId={tracker._id} selectedCaregiver={selectedCaregiver} />
+        {activeTab === "settings" && (
+          <SettingsTab
+            trackerId={tracker._id}
+            secretLink={secretLink}
+            selectedCaregiver={lockedCaregiver}
+            caregivers={tracker.caregivers}
+            babyName={tracker.babyName}
+            birthDate={tracker.birthDate}
+            feedIntervalHours={tracker.feedIntervalHours}
+            notifyBeforeMinutes={tracker.notifyBeforeMinutes}
+            wakeWindowMinutes={tracker.wakeWindowMinutes}
+            medicationReminders={tracker.medicationReminders}
+            pumpSchedule={tracker.pumpSchedule}
+            openView={settingsOpenView}
+          />
         )}
-        {activeTab === "upcoming" && (
-          <UpcomingTab trackerId={tracker._id} selectedCaregiver={selectedCaregiver} />
-        )}
-        {activeTab === "history" && <HistoryTab trackerId={tracker._id} />}
-      </div>
+      </main>
 
-      {/* Bottom Navigation */}
-      <div className="bg-white border-t flex">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-3 text-center ${
-              activeTab === tab.id
-                ? "bg-blue-50 text-blue-600 border-t-2 border-blue-600"
-                : "text-gray-600"
-            }`}
-          >
-            <div className="text-lg">{tab.emoji}</div>
-            <div className="text-xs mt-1">{tab.label}</div>
-          </button>
-        ))}
-      </div>
+      <TrackerBottomNav
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onLogPress={() => setShowLogSheet(true)}
+      />
+
+      {showLogSheet && (
+        <LogSheet onSelect={handleLogSelect} onClose={() => setShowLogSheet(false)} />
+      )}
+
+      {activeLogModal === "feed" && (
+        <FeedModal
+          trackerId={tracker._id}
+          secretLink={secretLink}
+          selectedCaregiver={lockedCaregiver}
+          onClose={() => setActiveLogModal(null)}
+        />
+      )}
+      {activeLogModal === "diaper" && (
+        <DiaperModal
+          trackerId={tracker._id}
+          secretLink={secretLink}
+          selectedCaregiver={lockedCaregiver}
+          onClose={() => setActiveLogModal(null)}
+        />
+      )}
+      {activeLogModal === "pump" && (
+        <PumpModal
+          trackerId={tracker._id}
+          secretLink={secretLink}
+          selectedCaregiver={lockedCaregiver}
+          onClose={() => setActiveLogModal(null)}
+        />
+      )}
+      {activeLogModal === "activity" && (
+        <ActivityModal
+          secretLink={secretLink}
+          selectedCaregiver={lockedCaregiver}
+          onClose={() => setActiveLogModal(null)}
+        />
+      )}
+      {activeLogModal === "nap" && (
+        <NapModal
+          secretLink={secretLink}
+          selectedCaregiver={lockedCaregiver}
+          onClose={() => setActiveLogModal(null)}
+        />
+      )}
+      {activeLogModal === "moment" && (
+        <MomentModal
+          secretLink={secretLink}
+          selectedCaregiver={lockedCaregiver}
+          onClose={() => setActiveLogModal(null)}
+        />
+      )}
     </div>
   );
 }

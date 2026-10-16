@@ -10,6 +10,7 @@ export const create = mutation({
     side: v.optional(v.union(v.literal("left"), v.literal("right"), v.literal("both"))),
     timestamp: v.number(),
     notes: v.optional(v.string()),
+    photoIds: v.optional(v.array(v.id("_storage"))),
   },
   returns: v.id("pumpEntries"),
   handler: async (ctx, args) => {
@@ -25,7 +26,7 @@ export const getRecent = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50;
-    
+
     return await ctx.db
       .query("pumpEntries")
       .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
@@ -48,24 +49,32 @@ export const getLast = query({
   },
 });
 
-// Update a pump entry
+// Update a pump entry (full replace of editable fields)
 export const update = mutation({
   args: {
     entryId: v.id("pumpEntries"),
-    amount: v.optional(v.number()),
+    amount: v.number(),
     side: v.optional(v.union(v.literal("left"), v.literal("right"), v.literal("both"))),
-    timestamp: v.optional(v.number()),
+    timestamp: v.number(),
     notes: v.optional(v.string()),
+    photoIds: v.optional(v.array(v.id("_storage"))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { entryId, ...updates } = args;
-    
-    const cleanUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, value]) => value !== undefined)
-    );
+    const existing = await ctx.db.get(args.entryId);
+    if (!existing) {
+      throw new Error("Pump entry not found");
+    }
 
-    await ctx.db.patch(entryId, cleanUpdates);
+    await ctx.db.replace(args.entryId, {
+      trackerId: existing.trackerId,
+      caregiverName: existing.caregiverName,
+      amount: args.amount,
+      side: args.side,
+      timestamp: args.timestamp,
+      notes: args.notes,
+      photoIds: args.photoIds,
+    });
     return null;
   },
 });

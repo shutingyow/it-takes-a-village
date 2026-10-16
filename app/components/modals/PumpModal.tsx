@@ -4,150 +4,176 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
+import { BottomSheet } from "../ui/BottomSheet";
+import { cn } from "@/app/lib/utils";
+import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
+import { IconPump } from "../icons";
+import { EntryPhotoField } from "../EntryPhotoField";
+import { EntryTimeField } from "../EntryTimeField";
+import type { ActivityEntry } from "../ActivityEntryCard";
+
+type PumpEditEntry = Extract<ActivityEntry, { entryType: "pump" }>;
 
 interface PumpModalProps {
   trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
   onClose: () => void;
+  editEntry?: PumpEditEntry;
 }
 
 export function PumpModal({
   trackerId,
+  secretLink,
   selectedCaregiver,
   onClose,
+  editEntry,
 }: PumpModalProps) {
+  const { t } = useLanguage();
   const createPump = useMutation(api.pumpEntries.create);
-  const [amount, setAmount] = useState(150);
-  const [side, setSide] = useState<"left" | "right" | "both">("both");
-  const [notes, setNotes] = useState("");
+  const updatePump = useMutation(api.pumpEntries.update);
+  const isEditing = Boolean(editEntry);
+
+  const [amount, setAmount] = useState(editEntry?.amount ?? 150);
+  const [side, setSide] = useState<"left" | "right" | "both">(
+    editEntry?.side ?? "both"
+  );
+  const [notes, setNotes] = useState(editEntry?.notes ?? "");
+  const [photoIds, setPhotoIds] = useState<Id<"_storage">[]>(
+    editEntry?.photoIds ?? []
+  );
+  const [timestamp, setTimestamp] = useState(
+    () => editEntry?.timestamp ?? Date.now()
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     if (!selectedCaregiver) {
-      alert("Please select a caregiver");
+      alert(t("selectCaregiver"));
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await createPump({
-        trackerId,
-        caregiverName: selectedCaregiver,
+      const payload = {
         amount,
         side,
-        timestamp: Date.now(),
+        timestamp,
         notes: notes || undefined,
-      });
+        photoIds: photoIds.length > 0 ? photoIds : undefined,
+      };
+
+      if (editEntry) {
+        await updatePump({ entryId: editEntry._id, ...payload });
+      } else {
+        await createPump({
+          trackerId,
+          caregiverName: selectedCaregiver,
+          ...payload,
+        });
+      }
       onClose();
     } catch (error) {
-      console.error("Failed to create pump entry:", error);
+      console.error("Failed to save pump entry:", error);
+      alert(t("updateFailed"));
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">🤱 Pump Session</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Amount: {amount} ml
-            </label>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setAmount(Math.max(10, amount - 10))}
-                className="px-3 py-1 bg-gray-200 rounded"
-              >
-                −
-              </button>
-              <input
-                type="range"
-                min="10"
-                max="300"
-                step="10"
-                value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
-                className="flex-1"
-              />
-              <button
-                onClick={() => setAmount(Math.min(300, amount + 10))}
-                className="px-3 py-1 bg-gray-200 rounded"
-              >
-                +
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Side (optional):
-            </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setSide("left")}
-                className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                  side === "left"
-                    ? "border-blue-500 bg-blue-50 text-blue-900"
-                    : "border-gray-300 text-gray-700"
-                }`}
-              >
-                L
-              </button>
-              <button
-                onClick={() => setSide("right")}
-                className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                  side === "right"
-                    ? "border-blue-500 bg-blue-50 text-blue-900"
-                    : "border-gray-300 text-gray-700"
-                }`}
-              >
-                R
-              </button>
-              <button
-                onClick={() => setSide("both")}
-                className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                  side === "both"
-                    ? "border-blue-500 bg-blue-50 text-blue-900"
-                    : "border-gray-300 text-gray-700"
-                }`}
-              >
-                Both
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes (optional):
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any observations..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
-              rows={2}
+    <BottomSheet
+      title={isEditing ? t("editEntry") : t("pumpSession")}
+      icon={<IconPump size={20} />}
+      onClose={onClose}
+    >
+      <div className="space-y-4 pt-2">
+        <div>
+          <label className="label-field">{t("pumpAmount", { amount })}</label>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setAmount(Math.max(10, amount - 10))}
+              className="w-10 h-10 rounded-xl bg-[#f3ede7] font-semibold"
+            >
+              −
+            </button>
+            <input
+              type="range"
+              min="10"
+              max="300"
+              step="10"
+              value={amount}
+              onChange={(e) => setAmount(Number(e.target.value))}
+              className="flex-1 accent-primary"
             />
+            <button
+              type="button"
+              onClick={() => setAmount(Math.min(300, amount + 10))}
+              className="w-10 h-10 rounded-xl bg-[#f3ede7] font-semibold"
+            >
+              +
+            </button>
           </div>
-
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {isSubmitting ? "Saving..." : "SAVE ENTRY"}
-          </button>
         </div>
+
+        <div>
+          <label className="label-field">{t("pumpSide")}</label>
+          <div className="flex gap-2">
+            {(
+              [
+                { id: "left" as const, label: t("left") },
+                { id: "right" as const, label: t("right") },
+                { id: "both" as const, label: t("both") },
+              ] as const
+            ).map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSide(s.id)}
+                className={cn(
+                  "btn-option flex-1 py-2.5",
+                  side === s.id ? "btn-option-selected" : "btn-option-default"
+                )}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="label-field">{t("notesOptional")}</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder={t("observationsPlaceholder")}
+            className="textarea-field"
+            rows={2}
+          />
+        </div>
+
+        <EntryPhotoField
+          secretLink={secretLink}
+          selectedCaregiver={selectedCaregiver}
+          photoIds={photoIds}
+          onChange={setPhotoIds}
+        />
+
+        <EntryTimeField value={timestamp} onChange={setTimestamp} />
+
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="btn-primary"
+        >
+          {isSubmitting
+            ? t("saving")
+            : isEditing
+              ? t("saveChanges")
+              : t("saveEntry")}
+        </button>
       </div>
-    </div>
+    </BottomSheet>
   );
 }

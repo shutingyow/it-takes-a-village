@@ -4,6 +4,9 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
+import { BottomSheet } from "../ui/BottomSheet";
+import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
+import { IconCalendar } from "../icons";
 
 interface AppointmentModalProps {
   trackerId: Id<"trackers">;
@@ -23,6 +26,7 @@ export function AppointmentModal({
   selectedCaregiver,
   onClose,
 }: AppointmentModalProps) {
+  const { t } = useLanguage();
   const createAppointment = useMutation(api.appointments.create);
   const [title, setTitle] = useState("");
   const [dateTime, setDateTime] = useState(
@@ -34,12 +38,12 @@ export function AppointmentModal({
 
   const handleSubmit = async () => {
     if (!selectedCaregiver) {
-      alert("Please select a caregiver");
+      alert(t("selectCaregiver"));
       return;
     }
 
     if (!title.trim()) {
-      alert("Please enter an appointment title");
+      alert(t("appointmentTitleRequired"));
       return;
     }
 
@@ -61,79 +65,64 @@ export function AppointmentModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-auto">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">📅 Add Appointment</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            ✕
-          </button>
+    <BottomSheet
+      title={t("addAppointmentTitle")}
+      icon={<IconCalendar size={20} />}
+      onClose={onClose}
+    >
+      <div className="space-y-4 pt-2">
+        <div>
+          <label className="label-field">{t("title")}</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={t("titlePlaceholder")}
+            className="input-field"
+          />
         </div>
 
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Title:
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="2-month checkup, vaccination..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date & time:
-            </label>
-            <input
-              type="datetime-local"
-              value={dateTime}
-              onChange={(e) => setDateTime(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Location (optional):
-            </label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Pediatrician office..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes (optional):
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Bring vaccination card..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
-              rows={2}
-            />
-          </div>
-
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {isSubmitting ? "Saving..." : "SAVE APPOINTMENT"}
-          </button>
+        <div>
+          <label className="label-field">{t("dateTime")}</label>
+          <input
+            type="datetime-local"
+            value={dateTime}
+            onChange={(e) => setDateTime(e.target.value)}
+            className="input-field"
+          />
         </div>
+
+        <div>
+          <label className="label-field">{t("location")}</label>
+          <input
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder={t("locationPlaceholder")}
+            className="input-field"
+          />
+        </div>
+
+        <div>
+          <label className="label-field">{t("notesOptional")}</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder={t("appointmentNotesPlaceholder")}
+            className="textarea-field"
+            rows={2}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="btn-primary"
+        >
+          {isSubmitting ? t("saving") : t("saveAppointment")}
+        </button>
       </div>
-    </div>
+    </BottomSheet>
   );
 }

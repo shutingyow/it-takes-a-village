@@ -1,28 +1,93 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { formatTime, formatDate, formatDuration } from "@/app/lib/utils";
+import { formatTime, formatDate } from "@/app/lib/utils";
+import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
+import { ActivityEntryCard, type ActivityEntry } from "../ActivityEntryCard";
+import { FeedIntervalList } from "../FeedIntervalList";
+import { EditActivitySheet } from "../EditActivitySheet";
+import {
+  ActivityTypeFilter,
+  type ActivityFilterType,
+} from "../ActivityTypeFilter";
+import { useState } from "react";
 
 interface HistoryTabProps {
   trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
 }
 
-export function HistoryTab({ trackerId }: HistoryTabProps) {
+export function HistoryTab({
+  trackerId,
+  secretLink,
+  selectedCaregiver,
+}: HistoryTabProps) {
+  const { t } = useLanguage();
+  const [editingEntry, setEditingEntry] = useState<ActivityEntry | null>(null);
+  const [filter, setFilter] = useState<ActivityFilterType>("all");
+
+  const removeFeed = useMutation(api.feedEntries.remove);
+  const removeDiaper = useMutation(api.diaperEntries.remove);
+  const removePump = useMutation(api.pumpEntries.remove);
+  const removeHealth = useMutation(api.healthEntries.remove);
+  const removeSleep = useMutation(api.sleepEntries.remove);
+  const removeGrowth = useMutation(api.growthEntries.remove);
+  const removeActivity = useMutation(api.activityEntries.remove);
+  const removeMoment = useMutation(api.momentEntries.remove);
+
   const activity = useQuery(api.history.getActivity, {
     trackerId,
     limit: 100,
-    type: "all",
+    type: filter,
   });
+
+  const handleDelete = async (entry: ActivityEntry) => {
+    if (!confirm(t("confirmDeleteEntry"))) return;
+    try {
+      if (entry.entryType === "feed") {
+        await removeFeed({ entryId: entry._id });
+      } else if (entry.entryType === "diaper") {
+        await removeDiaper({ entryId: entry._id });
+      } else if (entry.entryType === "pump") {
+        await removePump({ entryId: entry._id });
+      } else if (entry.entryType === "health") {
+        await removeHealth({ entryId: entry._id });
+      } else if (entry.entryType === "sleep" || entry.entryType === "nap") {
+        await removeSleep({
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
+          entryId: entry._id,
+        });
+      } else if (entry.entryType === "growth") {
+        await removeGrowth({ entryId: entry._id });
+      } else if (entry.entryType === "activity") {
+        await removeActivity({
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
+          entryId: entry._id,
+        });
+      } else if (entry.entryType === "moment") {
+        await removeMoment({
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
+          entryId: entry._id,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to delete entry:", error);
+      alert(t("deleteFailed"));
+    }
+  };
 
   if (!activity) {
     return (
-      <div className="p-4 text-center text-gray-600">Loading history...</div>
+      <div className="p-4 text-center text-muted text-sm">{t("loadingHistory")}</div>
     );
   }
 
-  // Group by date
   const groupedByDate: Record<string, typeof activity> = {};
   activity.forEach((entry) => {
     const date = formatDate(entry.time);
@@ -33,102 +98,68 @@ export function HistoryTab({ trackerId }: HistoryTabProps) {
   });
 
   return (
-    <div className="p-4">
-      <div className="mb-4">
-        <h2 className="text-sm text-gray-600">Last 7 days</h2>
-      </div>
+    <div className="p-4 min-w-0">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">
+        {t("last7Days")}
+      </p>
+
+      <ActivityTypeFilter
+        value={filter}
+        onChange={setFilter}
+        className="mb-4"
+      />
 
       <div className="space-y-6">
         {Object.entries(groupedByDate).map(([date, entries]) => (
           <div key={date}>
-            <div className="text-sm font-semibold text-gray-900 mb-3 pb-2 border-b">
+            <div className="text-sm font-semibold text-foreground mb-3 pb-2 border-b border-border">
               {date}
             </div>
-            <div className="space-y-3">
-              {entries.map((entry) => (
-                <div key={entry._id} className="flex gap-3">
-                  <div className="text-sm text-gray-600 min-w-[60px]">
-                    {formatTime(entry.time)}
-                  </div>
-                  <div className="flex-1">
-                    {entry.entryType === "feed" && (
-                      <div>
-                        <span className="text-sm font-medium">
-                          🍼 {entry.type === "breast" ? "Breast" : "Bottle"} Feed
-                        </span>
-                        <div className="text-xs text-gray-600">
-                          {entry.type === "breast"
-                            ? entry.side && entry.duration
-                              ? `${entry.side} side, ${entry.duration}m`
-                              : "Breast feed"
-                            : `${entry.amount}ml`}
-                          {" • by "}{entry.caregiverName}
-                        </div>
-                      </div>
-                    )}
-                    {entry.entryType === "sleep" && (
-                      <div>
-                        <span className="text-sm font-medium">
-                          💤 Sleep {entry.endTime ? "Session" : "(Active)"}
-                        </span>
-                        <div className="text-xs text-gray-600">
-                          {entry.endTime
-                            ? formatDuration(entry.startTime, entry.endTime)
-                            : "Currently sleeping"}
-                          {" • by "}{entry.caregiverName}
-                        </div>
-                      </div>
-                    )}
-                    {entry.entryType === "diaper" && (
-                      <div>
-                        <span className="text-sm font-medium">
-                          💩 Diaper - {entry.type}
-                        </span>
-                        <div className="text-xs text-gray-600">
-                          by {entry.caregiverName}
-                        </div>
-                      </div>
-                    )}
-                    {entry.entryType === "pump" && (
-                      <div>
-                        <span className="text-sm font-medium">
-                          🤱 Pump - {entry.amount}ml
-                        </span>
-                        <div className="text-xs text-gray-600">
-                          {entry.side && `${entry.side} side • `}by {entry.caregiverName}
-                        </div>
-                      </div>
-                    )}
-                    {entry.entryType === "health" && (
-                      <div>
-                        <span className="text-sm font-medium">
-                          🏥{" "}
-                          {entry.type === "temperature"
-                            ? `Temperature - ${entry.temperature?.toFixed(1)}°F`
-                            : entry.type === "medication"
-                              ? `Medication - ${entry.medicationName}`
-                              : `Weight - ${entry.weight?.toFixed(1)} lbs`}
-                        </span>
-                        <div className="text-xs text-gray-600">
-                          {entry.type === "medication" &&
-                            entry.dosage &&
-                            `${entry.dosage} • `}
-                          by {entry.caregiverName}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            {filter === "feed" ? (
+              <div className="bg-surface border border-border rounded-2xl px-3 py-2 min-w-0 overflow-hidden">
+                <FeedIntervalList
+                  feeds={entries.filter(
+                    (
+                      entry
+                    ): entry is Extract<ActivityEntry, { entryType: "feed" }> =>
+                      entry.entryType === "feed"
+                  )}
+                  order="newest"
+                  onEdit={setEditingEntry}
+                  onDelete={handleDelete}
+                />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {entries.map((entry) => (
+                  <ActivityEntryCard
+                    key={entry._id}
+                    entry={entry}
+                    timeLabel={formatTime(entry.time)}
+                    onEdit={setEditingEntry}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
 
       {activity.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No entries yet. Start logging activities!
+        <div className="text-center py-8 text-muted text-sm bg-surface rounded-2xl border border-border">
+          {filter === "all" ? t("noEntriesYet") : t("noMatchingEntries")}
         </div>
+      )}
+
+      {editingEntry && (
+        <EditActivitySheet
+          entry={editingEntry}
+          trackerId={trackerId}
+          secretLink={secretLink}
+          selectedCaregiver={selectedCaregiver}
+          onClose={() => setEditingEntry(null)}
+        />
       )}
     </div>
   );

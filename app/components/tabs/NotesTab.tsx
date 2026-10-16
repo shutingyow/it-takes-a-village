@@ -3,9 +3,11 @@
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { NotePhoto } from "../NotePhoto";
 import { formatDateTime } from "@/app/lib/utils";
+import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
+import { IconCamera, IconNotes } from "../icons";
 
 interface NotesTabProps {
   trackerId: Id<"trackers">;
@@ -13,6 +15,7 @@ interface NotesTabProps {
 }
 
 export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
+  const { t } = useLanguage();
   const notes = useQuery(api.notes.getRecent, { trackerId, limit: 20 });
   const createNote = useMutation(api.notes.create);
   const generateUploadUrl = useMutation(api.notes.generateUploadUrl);
@@ -22,6 +25,8 @@ export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
   const [photoIds, setPhotoIds] = useState<Id<"_storage">[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const albumInputRef = useRef<HTMLInputElement>(null);
 
   const uploadPhoto = async (file: File) => {
     setIsUploading(true);
@@ -36,7 +41,7 @@ export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
       setPhotoIds((prev) => [...prev, storageId]);
     } catch (error) {
       console.error("Failed to upload photo:", error);
-      alert("Failed to upload photo");
+      alert(t("uploadFailed"));
     } finally {
       setIsUploading(false);
     }
@@ -44,12 +49,12 @@ export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
 
   const handleSubmit = async () => {
     if (!selectedCaregiver) {
-      alert("Please select a caregiver");
+      alert(t("selectCaregiver"));
       return;
     }
 
     if (!content.trim()) {
-      alert("Please enter a note");
+      alert(t("enterNote"));
       return;
     }
 
@@ -73,13 +78,16 @@ export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
 
   return (
     <div className="p-4 space-y-6">
-      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">📋 Handover Note</h3>
+      <div className="bg-surface border border-border rounded-2xl p-4 space-y-4 card-shadow">
+        <h3 className="text-base font-medium text-foreground flex items-center gap-2">
+          <IconNotes size={18} className="text-primary" />
+          {t("handoverNote")}
+        </h3>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Baby was fussy after last feed. Tummy time went well..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
+          placeholder={t("noteContentPlaceholder")}
+          className="textarea-field"
           rows={4}
         />
 
@@ -91,62 +99,92 @@ export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
           </div>
         )}
 
-        <div className="flex gap-2">
-          <label className="flex-1 cursor-pointer">
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              disabled={isUploading}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void uploadPhoto(file);
-                e.target.value = "";
-              }}
-            />
-            <span className="block text-center py-2 px-4 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
-              {isUploading ? "Uploading..." : "📷 Add Photo"}
-            </span>
-          </label>
+        <div className="flex flex-wrap gap-2">
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            disabled={isUploading}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void uploadPhoto(file);
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={albumInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={isUploading}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void uploadPhoto(file);
+              e.target.value = "";
+            }}
+          />
           <button
+            type="button"
+            disabled={isUploading}
+            onClick={() => cameraInputRef.current?.click()}
+            className="flex items-center justify-center gap-2 py-2.5 px-4 border border-border rounded-xl text-sm text-muted hover:bg-background transition-colors disabled:opacity-50"
+          >
+            <IconCamera size={16} />
+            {isUploading ? t("uploading") : t("takePhoto")}
+          </button>
+          <button
+            type="button"
+            disabled={isUploading}
+            onClick={() => albumInputRef.current?.click()}
+            className="flex items-center justify-center gap-2 py-2.5 px-4 border border-border rounded-xl text-sm text-muted hover:bg-background transition-colors disabled:opacity-50"
+          >
+            {isUploading ? t("uploading") : t("chooseFromAlbum")}
+          </button>
+          <button
+            type="button"
             onClick={handleSubmit}
             disabled={isSubmitting || isUploading}
-            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+            className="flex-1 btn-primary py-2.5 min-w-[7rem]"
           >
-            {isSubmitting ? "Saving..." : "Post Note"}
+            {isSubmitting ? t("saving") : t("postNote")}
           </button>
         </div>
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold text-gray-600 mb-3">Recent Notes</h3>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">
+          {t("recentNotes")}
+        </p>
         {!notes ? (
-          <div className="text-center text-gray-500 py-4">Loading...</div>
+          <div className="text-center text-muted py-4 text-sm">{t("loading")}</div>
         ) : notes.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            No handover notes yet.
+          <div className="text-center text-muted py-8 text-sm bg-surface rounded-2xl border border-border">
+            {t("noHandoverNotes")}
           </div>
         ) : (
           <div className="space-y-3">
             {notes.map((note) => (
               <div
                 key={note._id}
-                className="bg-blue-50 border border-blue-100 rounded-lg p-4"
+                className="bg-secondary-light border border-secondary/20 rounded-2xl p-4 card-shadow"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
-                    <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                    <p className="text-sm text-foreground whitespace-pre-wrap">
                       {note.content}
                     </p>
-                    <p className="text-xs text-gray-600 mt-2">
-                      {note.caregiverName} • {formatDateTime(note.timestamp)}
+                    <p className="text-xs text-muted mt-2">
+                      {note.caregiverName} · {formatDateTime(note.timestamp)}
                     </p>
                   </div>
                   <button
+                    type="button"
                     onClick={() => removeNote({ noteId: note._id })}
-                    className="text-xs text-red-600 hover:underline shrink-0"
+                    className="text-xs text-[#c45c5c] hover:underline shrink-0"
                   >
-                    Delete
+                    {t("delete")}
                   </button>
                 </div>
                 {note.photoIds.length > 0 && (

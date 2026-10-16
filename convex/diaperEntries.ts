@@ -7,8 +7,30 @@ export const create = mutation({
     trackerId: v.id("trackers"),
     caregiverName: v.string(),
     type: v.union(v.literal("wet"), v.literal("dirty"), v.literal("both")),
+    colour: v.optional(
+      v.union(
+        v.literal("yellow"),
+        v.literal("green"),
+        v.literal("brown"),
+        v.literal("black"),
+        v.literal("red"),
+        v.literal("white"),
+        v.literal("other")
+      )
+    ),
+    consistency: v.optional(
+      v.union(
+        v.literal("seedy"),
+        v.literal("loose"),
+        v.literal("firm"),
+        v.literal("watery"),
+        v.literal("mucous"),
+        v.literal("other")
+      )
+    ),
     timestamp: v.number(),
     notes: v.optional(v.string()),
+    photoIds: v.optional(v.array(v.id("_storage"))),
   },
   returns: v.id("diaperEntries"),
   handler: async (ctx, args) => {
@@ -24,7 +46,7 @@ export const getRecent = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50;
-    
+
     return await ctx.db
       .query("diaperEntries")
       .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
@@ -47,23 +69,54 @@ export const getLast = query({
   },
 });
 
-// Update a diaper entry
+// Update a diaper entry (full replace of editable fields)
 export const update = mutation({
   args: {
     entryId: v.id("diaperEntries"),
-    type: v.optional(v.union(v.literal("wet"), v.literal("dirty"), v.literal("both"))),
-    timestamp: v.optional(v.number()),
+    type: v.union(v.literal("wet"), v.literal("dirty"), v.literal("both")),
+    colour: v.optional(
+      v.union(
+        v.literal("yellow"),
+        v.literal("green"),
+        v.literal("brown"),
+        v.literal("black"),
+        v.literal("red"),
+        v.literal("white"),
+        v.literal("other")
+      )
+    ),
+    consistency: v.optional(
+      v.union(
+        v.literal("seedy"),
+        v.literal("loose"),
+        v.literal("firm"),
+        v.literal("watery"),
+        v.literal("mucous"),
+        v.literal("other")
+      )
+    ),
+    timestamp: v.number(),
     notes: v.optional(v.string()),
+    photoIds: v.optional(v.array(v.id("_storage"))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { entryId, ...updates } = args;
-    
-    const cleanUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, value]) => value !== undefined)
-    );
+    const existing = await ctx.db.get(args.entryId);
+    if (!existing) {
+      throw new Error("Diaper entry not found");
+    }
 
-    await ctx.db.patch(entryId, cleanUpdates);
+    const hasStool = args.type === "dirty" || args.type === "both";
+    await ctx.db.replace(args.entryId, {
+      trackerId: existing.trackerId,
+      caregiverName: existing.caregiverName,
+      type: args.type,
+      colour: hasStool ? args.colour : undefined,
+      consistency: hasStool ? args.consistency : undefined,
+      timestamp: args.timestamp,
+      notes: args.notes,
+      photoIds: args.photoIds,
+    });
     return null;
   },
 });

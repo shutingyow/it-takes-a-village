@@ -16,6 +16,22 @@ export const create = mutation({
   },
   returns: v.id("healthEntries"),
   handler: async (ctx, args) => {
+    if (args.type === "temperature") {
+      if (args.temperature === undefined) {
+        throw new Error("Temperature is required");
+      }
+      if (args.temperature < 35 || args.temperature > 42) {
+        throw new Error("Temperature must be between 35°C and 42°C");
+      }
+    }
+    if (args.type === "weight") {
+      if (args.weight === undefined) {
+        throw new Error("Weight is required");
+      }
+      if (args.weight < 1 || args.weight > 30) {
+        throw new Error("Weight must be between 1 kg and 30 kg");
+      }
+    }
     return await ctx.db.insert("healthEntries", args);
   },
 });
@@ -57,27 +73,61 @@ export const getByType = query({
   },
 });
 
-// Update a health entry
+// Update a health entry (full replace of editable fields)
 export const update = mutation({
   args: {
     entryId: v.id("healthEntries"),
-    type: v.optional(v.union(v.literal("temperature"), v.literal("medication"), v.literal("weight"))),
+    type: v.union(
+      v.literal("temperature"),
+      v.literal("medication"),
+      v.literal("weight")
+    ),
     temperature: v.optional(v.number()),
     medicationName: v.optional(v.string()),
     dosage: v.optional(v.string()),
     weight: v.optional(v.number()),
-    timestamp: v.optional(v.number()),
+    timestamp: v.number(),
     notes: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { entryId, ...updates } = args;
-    
-    const cleanUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, value]) => value !== undefined)
-    );
+    const existing = await ctx.db.get(args.entryId);
+    if (!existing) {
+      throw new Error("Health entry not found");
+    }
 
-    await ctx.db.patch(entryId, cleanUpdates);
+    if (args.type === "temperature") {
+      if (args.temperature === undefined) {
+        throw new Error("Temperature is required");
+      }
+      if (args.temperature < 35 || args.temperature > 42) {
+        throw new Error("Temperature must be between 35°C and 42°C");
+      }
+    }
+    if (args.type === "weight") {
+      if (args.weight === undefined) {
+        throw new Error("Weight is required");
+      }
+      if (args.weight < 1 || args.weight > 30) {
+        throw new Error("Weight must be between 1 kg and 30 kg");
+      }
+    }
+    if (args.type === "medication" && !args.medicationName?.trim()) {
+      throw new Error("Medication name is required");
+    }
+
+    await ctx.db.replace(args.entryId, {
+      trackerId: existing.trackerId,
+      caregiverName: existing.caregiverName,
+      type: args.type,
+      temperature: args.type === "temperature" ? args.temperature : undefined,
+      medicationName:
+        args.type === "medication" ? args.medicationName : undefined,
+      dosage: args.type === "medication" ? args.dosage : undefined,
+      weight: args.type === "weight" ? args.weight : undefined,
+      timestamp: args.timestamp,
+      notes: args.notes,
+    });
     return null;
   },
 });

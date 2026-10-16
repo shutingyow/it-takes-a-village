@@ -2,12 +2,22 @@
 
 import { formatTimeAgo, formatDuration } from "../lib/utils";
 import { useEffect, useState } from "react";
+import { cn } from "../lib/utils";
+import { useLanguage } from "../lib/i18n/LanguageProvider";
+import {
+  ActivityIcon,
+  IconFeed,
+  IconPump,
+  IconSleep,
+  IconSun,
+} from "./icons";
 
 interface StatusStripProps {
   lastFeed?: {
     type: "breast" | "bottle";
     amount?: number;
     side?: "left" | "right";
+    bottleMilk?: "formula" | "breastmilk";
     timestamp: number;
     caregiverName: string;
   } | null;
@@ -32,6 +42,41 @@ interface StatusStripProps {
   } | null;
 }
 
+function StatusCard({
+  type,
+  label,
+  value,
+  detail,
+  accentClass,
+}: {
+  type: "feed" | "diaper" | "pump";
+  label: string;
+  value: string;
+  detail?: string;
+  accentClass: string;
+}) {
+  return (
+    <div className="rounded-xl p-3 sm:p-4 card-shadow bg-surface border border-border min-w-0 sm:min-w-[140px] flex-1">
+      <div className="flex items-center gap-2 mb-2">
+        {type === "feed" && (
+          <IconFeed size={16} className={accentClass} />
+        )}
+        {type === "diaper" && (
+          <ActivityIcon type="diaper" size={16} className={accentClass} />
+        )}
+        {type === "pump" && (
+          <IconPump size={16} className={accentClass} />
+        )}
+        <span className="text-xs font-medium text-muted">{label}</span>
+      </div>
+      <p className="text-base font-semibold text-foreground">{value}</p>
+      {detail && (
+        <p className="text-xs text-muted mt-1 truncate">{detail}</p>
+      )}
+    </div>
+  );
+}
+
 export function StatusStrip({
   lastFeed,
   lastDiaper,
@@ -39,102 +84,117 @@ export function StatusStrip({
   activeSleep,
   lastCompletedSleep,
 }: StatusStripProps) {
+  const { t } = useLanguage();
   const [now, setNow] = useState(Date.now());
 
-  // Update every minute for live timers
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
-    }, 60000); // Update every minute
-
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
   const isAwake = !activeSleep;
-  const awakeTime = isAwake && lastCompletedSleep 
-    ? now - lastCompletedSleep.endTime 
-    : 0;
+  const awakeTime =
+    isAwake && lastCompletedSleep ? now - lastCompletedSleep.endTime : 0;
+
+  const diaperLabel = (type: "wet" | "dirty" | "both") => {
+    if (type === "wet") return t("wet");
+    if (type === "dirty") return t("dirty");
+    return t("wetDirty");
+  };
 
   return (
-    <div className="bg-white border-b">
-      <div className="px-4 py-3 bg-green-50 border-b border-green-200">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-green-700 uppercase">
-            🟢 Live Status
-          </span>
+    <div className="px-3 sm:px-4 pt-4 pb-2 min-w-0">
+      <p className="section-label">{t("liveStatus")}</p>
+
+      <div
+        className={cn(
+          "rounded-xl p-5 mb-3 card-shadow border",
+          activeSleep
+            ? "bg-accent-sleep-light border-accent-sleep/20"
+            : "bg-secondary-light border-secondary/20"
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2.5 mb-1">
+              {activeSleep ? (
+                <IconSleep size={20} className="text-accent-sleep" />
+              ) : (
+                <IconSun size={20} className="text-secondary" />
+              )}
+              <span className="text-sm font-medium text-foreground">
+                {activeSleep ? t("sleeping") : t("awake")}
+              </span>
+            </div>
+            <p className="text-2xl font-semibold text-foreground tracking-tight">
+              {activeSleep ? (
+                formatDuration(activeSleep.startTime)
+              ) : awakeTime > 0 ? (
+                formatDuration(now - awakeTime)
+              ) : (
+                "—"
+              )}
+            </p>
+            <p className="text-xs text-muted mt-1">
+              {activeSleep
+                ? t("startedBy", { name: activeSleep.caregiverName })
+                : lastCompletedSleep
+                  ? t("sinceLastNap", { name: lastCompletedSleep.caregiverName })
+                  : t("noSleepLogged")}
+            </p>
+          </div>
+          <div
+            className={cn(
+              "w-2.5 h-2.5 rounded-full",
+              activeSleep ? "bg-accent-sleep animate-pulse" : "bg-secondary"
+            )}
+          />
         </div>
       </div>
 
-      <div className="p-4 space-y-3">
-        {/* Sleep/Awake Status */}
-        <div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-gray-900">
-              {activeSleep ? "💤 Currently: SLEEPING" : "☀️ Currently: AWAKE"}
-            </span>
-          </div>
-          <div className="text-sm text-gray-600 mt-1">
-            {activeSleep ? (
-              <>For: {formatDuration(activeSleep.startTime)}</>
-            ) : awakeTime > 0 ? (
-              <>For: {formatDuration(now - awakeTime)}</>
-            ) : (
-              <>Status: Unknown</>
-            )}
-          </div>
-        </div>
-
-        {/* Last Feed */}
+      <div className="flex gap-2.5 sm:gap-3 overflow-x-auto overscroll-x-contain pb-1 -mx-0.5 px-0.5 max-w-full touch-pan-x">
         {lastFeed && (
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-900">
-                🍼 Last Feed: {formatTimeAgo(lastFeed.timestamp)}
-              </span>
-            </div>
-            <div className="text-sm text-gray-600 mt-1">
-              {lastFeed.type === "breast" ? (
-                <>
-                  Breast{lastFeed.side ? ` (${lastFeed.side})` : ""}
-                </>
-              ) : (
-                <>Bottle • {lastFeed.amount}ml</>
-              )}{" "}
-              • by {lastFeed.caregiverName}
-            </div>
-          </div>
+          <StatusCard
+            type="feed"
+            label={t("feed")}
+            value={formatTimeAgo(lastFeed.timestamp)}
+            detail={
+              lastFeed.type === "breast"
+                ? `${t("breast")}${lastFeed.side ? ` (${lastFeed.side})` : ""} · ${lastFeed.caregiverName}`
+                : `${t("bottle")}${
+                    lastFeed.bottleMilk === "formula"
+                      ? ` · ${t("formula")}`
+                      : lastFeed.bottleMilk === "breastmilk"
+                        ? ` · ${t("breastMilk")}`
+                        : ""
+                  } ${lastFeed.amount}ml · ${lastFeed.caregiverName}`
+            }
+            accentClass="text-accent-feed"
+          />
         )}
-
-        {/* Last Diaper */}
         {lastDiaper && (
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-900">
-                💩 Last Diaper: {formatTimeAgo(lastDiaper.timestamp)}
-              </span>
-            </div>
-            <div className="text-sm text-gray-600 mt-1">
-              {lastDiaper.type === "wet"
-                ? "Wet"
-                : lastDiaper.type === "dirty"
-                ? "Dirty"
-                : "Wet + Dirty"}{" "}
-              • by {lastDiaper.caregiverName}
-            </div>
-          </div>
+          <StatusCard
+            type="diaper"
+            label={t("diaper")}
+            value={formatTimeAgo(lastDiaper.timestamp)}
+            detail={`${diaperLabel(lastDiaper.type)} · ${lastDiaper.caregiverName}`}
+            accentClass="text-accent-diaper"
+          />
         )}
-
-        {/* Last Pump */}
         {lastPump && (
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-900">
-                🤱 Last Pump: {formatTimeAgo(lastPump.timestamp)}
-              </span>
-            </div>
-            <div className="text-sm text-gray-600 mt-1">
-              {lastPump.amount}ml • by {lastPump.caregiverName}
-            </div>
+          <StatusCard
+            type="pump"
+            label={t("pump")}
+            value={formatTimeAgo(lastPump.timestamp)}
+            detail={`${lastPump.amount}ml · ${lastPump.caregiverName}`}
+            accentClass="text-accent-pump"
+          />
+        )}
+        {!lastFeed && !lastDiaper && !lastPump && (
+          <div className="rounded-xl p-4 card-shadow bg-surface border border-border flex-1 text-center">
+            <p className="text-sm text-muted">{t("logActivityHint")}</p>
           </div>
         )}
       </div>

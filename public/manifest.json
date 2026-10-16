@@ -1,22 +1,30 @@
 {
-  "name": "It Takes a Village - Shared Caregiver Log",
+  "name": "It Takes A Village - Shared Caregiver Log",
   "short_name": "Village",
   "description": "Shared baby tracking app for caregivers - feeds, sleep, diapers, and more",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#4A90E2",
+  "background_color": "#FAFAF8",
+  "theme_color": "#5B8A7A",
   "orientation": "portrait",
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

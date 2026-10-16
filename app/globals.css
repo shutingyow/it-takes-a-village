@@ -1,26 +1,239 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #faf8f5;
+  --foreground: #3d3530;
+  --surface: #ffffff;
+  --primary: #8fa68f;
+  --primary-hover: #7d947d;
+  --primary-light: #eef2ee;
+  --secondary: #8fa4b8;
+  --secondary-light: #edf1f5;
+  --beige: #e8dfd4;
+  --beige-light: #ede6dc;
+  --terracotta: #c4846a;
+  --terracotta-light: #f5ebe6;
+  /* Home tiles + timetable: light red / yellow / blue / green (saturated for tile fill) */
+  --accent-sleep: #3d9a62;
+  --accent-sleep-light: #6fbf8a;
+  --accent-feed: #e05a5a;
+  --accent-feed-light: #f07878;
+  --accent-diaper: #d4a82a;
+  --accent-diaper-light: #efc84a;
+  --accent-pump: #4a9fd8;
+  --accent-pump-light: #6bb5e8;
+  --accent-health: #9a8f85;
+  --accent-health-light: #f0ede9;
+  --muted: #9a8f85;
+  --border: #e8dfd4;
+  --warning: #c9a84c;
+  --warning-light: #fbf6e8;
+  --app-shell-glow: #f3ebe3;
+  --shadow-soft: rgba(44, 42, 40, 0.04);
+  --shadow-card: rgba(44, 42, 40, 0.03);
+  --shadow-bar: rgba(44, 42, 40, 0.06);
+  --shadow-sheet: rgba(44, 42, 40, 0.08);
+}
+
+html.dark {
+  --background: #1c1a18;
+  --foreground: #ebe4dc;
+  --surface: #2a2623;
+  --primary: #9bb59b;
+  --primary-hover: #8aa68a;
+  --primary-light: #2f3830;
+  --secondary: #8fa4b8;
+  --secondary-light: #2a3138;
+  --beige: #3a342e;
+  --beige-light: #322c27;
+  --terracotta: #d49a82;
+  --terracotta-light: #3a2e28;
+  --accent-sleep: #5bb87a;
+  --accent-sleep-light: #2a4032;
+  --accent-feed: #e08a82;
+  --accent-feed-light: #3d2a28;
+  --accent-diaper: #d4b04a;
+  --accent-diaper-light: #3a3420;
+  --accent-pump: #6bb5e8;
+  --accent-pump-light: #243640;
+  --accent-health: #b0a59a;
+  --accent-health-light: #322e2a;
+  --muted: #a89e94;
+  --border: #3f3832;
+  --warning: #d4b45c;
+  --warning-light: #3a3420;
+  --app-shell-glow: #2a2420;
+  --shadow-soft: rgba(0, 0, 0, 0.2);
+  --shadow-card: rgba(0, 0, 0, 0.16);
+  --shadow-bar: rgba(0, 0, 0, 0.28);
+  --shadow-sheet: rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+  --color-secondary: var(--secondary);
+  --color-secondary-light: var(--secondary-light);
+  --color-accent-sleep: var(--accent-sleep);
+  --color-accent-sleep-light: var(--accent-sleep-light);
+  --color-accent-feed: var(--accent-feed);
+  --color-accent-feed-light: var(--accent-feed-light);
+  --color-accent-diaper: var(--accent-diaper);
+  --color-accent-diaper-light: var(--accent-diaper-light);
+  --color-accent-pump: var(--accent-pump);
+  --color-accent-pump-light: var(--accent-pump-light);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-warning: var(--warning);
+  --color-warning-light: var(--warning-light);
+  --color-beige: var(--beige);
+  --color-beige-light: var(--beige-light);
+  --color-terracotta: var(--terracotta);
+  --color-terracotta-light: var(--terracotta-light);
+  --color-accent-health: var(--accent-health);
+  --color-accent-health-light: var(--accent-health-light);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  overflow-x: clip;
+  min-width: 0;
+}
+
+html {
+  overflow-x: clip;
+}
+
+
+@keyframes sheet-enter {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes overlay-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sheet-enter {
+  animation: sheet-enter 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.overlay-enter {
+  animation: overlay-enter 0.2s ease-out;
+}
+
+.safe-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.tracker-shell {
+  width: 100%;
+  max-width: 32rem;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+/* Capacitor / installed PWA: phone-app chrome */
+.app-shell {
+  max-width: 100%;
+  background:
+    radial-gradient(120% 60% at 50% -10%, var(--app-shell-glow) 0%, transparent 55%),
+    var(--background);
+}
+
+.app-tab-bar {
+  border-top: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  backdrop-filter: saturate(1.4) blur(16px);
+  -webkit-backdrop-filter: saturate(1.4) blur(16px);
+  box-shadow: 0 -8px 24px var(--shadow-bar);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .app-tab-bar {
+    background: var(--surface);
+  }
+}
+
+
+.card-shadow {
+  box-shadow: 0 1px 2px var(--shadow-soft), 0 2px 8px var(--shadow-card);
+}
+
+.sheet-shadow {
+  box-shadow: 0 -2px 16px var(--shadow-sheet);
+}
+
+.section-label {
+  @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted mb-2.5;
+}
+
+.timeline-line {
+  @apply absolute left-[15px] top-6 bottom-0 w-px bg-border;
+}
+
+.btn-primary {
+  @apply w-full bg-primary hover:bg-primary-hover text-white font-medium py-3.5 px-6 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply w-full bg-primary-light hover:opacity-90 text-primary font-medium py-3.5 px-6 rounded-xl transition-colors;
+}
+
+.btn-option {
+  @apply w-full py-3.5 px-4 rounded-xl border transition-colors font-medium;
+}
+
+.btn-option-selected {
+  @apply border-primary bg-primary-light text-primary;
+}
+
+.btn-option-default {
+  @apply border-border bg-surface text-foreground hover:border-muted;
+}
+
+.input-field {
+  @apply w-full px-4 py-3 border border-border rounded-xl bg-surface text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors;
+}
+
+.textarea-field {
+  @apply w-full px-4 py-3 border border-border rounded-xl bg-surface text-foreground placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors;
+}
+
+.label-field {
+  @apply block text-sm font-medium text-foreground mb-2;
+}
+
+.chip {
+  @apply text-xs px-3 py-1.5 bg-beige-light hover:opacity-90 rounded-full text-muted transition-colors;
+}
+
+.chip-selected {
+  @apply bg-primary-light text-primary ring-2 ring-primary/30;
+}
+
+.nav-pill-active {
+  @apply bg-primary-light text-primary;
 }

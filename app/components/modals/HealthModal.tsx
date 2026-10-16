@@ -4,195 +4,239 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
+import { BottomSheet } from "../ui/BottomSheet";
+import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
+import {
+  IconGrowth,
+  IconMedication,
+  IconTemperature,
+} from "../icons";
+import { EntryTimeField } from "../EntryTimeField";
+import type { ActivityEntry } from "../ActivityEntryCard";
 
 type HealthType = "temperature" | "medication" | "weight";
+type HealthEditEntry = Extract<ActivityEntry, { entryType: "health" }>;
 
 interface HealthModalProps {
   trackerId: Id<"trackers">;
   selectedCaregiver: string;
   healthType: HealthType;
   onClose: () => void;
+  editEntry?: HealthEditEntry;
 }
-
-const titles: Record<HealthType, string> = {
-  temperature: "🌡️ Log Temperature",
-  medication: "💊 Log Medication",
-  weight: "⚖️ Log Weight",
-};
 
 export function HealthModal({
   trackerId,
   selectedCaregiver,
   healthType,
   onClose,
+  editEntry,
 }: HealthModalProps) {
+  const { t } = useLanguage();
   const createHealth = useMutation(api.healthEntries.create);
-  const [temperature, setTemperature] = useState(98.6);
-  const [medicationName, setMedicationName] = useState("");
-  const [dosage, setDosage] = useState("");
-  const [weight, setWeight] = useState(10);
-  const [notes, setNotes] = useState("");
+  const updateHealth = useMutation(api.healthEntries.update);
+  const isEditing = Boolean(editEntry);
+  const resolvedType: HealthType = editEntry?.type ?? healthType;
+
+  const [temperature, setTemperature] = useState(
+    editEntry?.temperature ?? 37.0
+  );
+  const [medicationName, setMedicationName] = useState(
+    editEntry?.medicationName ?? ""
+  );
+  const [dosage, setDosage] = useState(editEntry?.dosage ?? "");
+  const [weight, setWeight] = useState(editEntry?.weight ?? 4.0);
+  const [notes, setNotes] = useState(editEntry?.notes ?? "");
+  const [timestamp, setTimestamp] = useState(
+    () => editEntry?.timestamp ?? Date.now()
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const titles: Record<
+    HealthType,
+    { label: string; icon: React.ReactNode }
+  > = {
+    temperature: {
+      label: t("logTemperature"),
+      icon: <IconTemperature size={20} />,
+    },
+    medication: {
+      label: t("logMedication"),
+      icon: <IconMedication size={20} />,
+    },
+    weight: {
+      label: t("weight"),
+      icon: <IconGrowth size={20} />,
+    },
+  };
 
   const handleSubmit = async () => {
     if (!selectedCaregiver) {
-      alert("Please select a caregiver");
+      alert(t("selectCaregiver"));
       return;
     }
 
-    if (healthType === "medication" && !medicationName.trim()) {
-      alert("Please enter a medication name");
+    if (resolvedType === "medication" && !medicationName.trim()) {
+      alert(t("medicationRequired"));
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await createHealth({
-        trackerId,
-        caregiverName: selectedCaregiver,
-        type: healthType,
-        temperature: healthType === "temperature" ? temperature : undefined,
+      const payload = {
+        type: resolvedType,
+        temperature: resolvedType === "temperature" ? temperature : undefined,
         medicationName:
-          healthType === "medication" ? medicationName.trim() : undefined,
-        dosage: healthType === "medication" ? dosage || undefined : undefined,
-        weight: healthType === "weight" ? weight : undefined,
-        timestamp: Date.now(),
+          resolvedType === "medication" ? medicationName.trim() : undefined,
+        dosage: resolvedType === "medication" ? dosage || undefined : undefined,
+        weight: resolvedType === "weight" ? weight : undefined,
+        timestamp,
         notes: notes || undefined,
-      });
+      };
+
+      if (editEntry) {
+        await updateHealth({ entryId: editEntry._id, ...payload });
+      } else {
+        await createHealth({
+          trackerId,
+          caregiverName: selectedCaregiver,
+          ...payload,
+        });
+      }
       onClose();
     } catch (error) {
-      console.error("Failed to create health entry:", error);
+      console.error("Failed to save health entry:", error);
+      alert(t("updateFailed"));
       setIsSubmitting(false);
     }
   };
 
+  const { label, icon } = titles[resolvedType];
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">{titles[healthType]}</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4 space-y-4">
-          {healthType === "temperature" && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Temperature: {temperature.toFixed(1)}°F
-              </label>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setTemperature(Math.max(95, temperature - 0.1))}
-                  className="px-3 py-1 bg-gray-200 rounded"
-                >
-                  −
-                </button>
-                <input
-                  type="range"
-                  min="95"
-                  max="105"
-                  step="0.1"
-                  value={temperature}
-                  onChange={(e) => setTemperature(Number(e.target.value))}
-                  className="flex-1"
-                />
-                <button
-                  onClick={() => setTemperature(Math.min(105, temperature + 0.1))}
-                  className="px-3 py-1 bg-gray-200 rounded"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          )}
-
-          {healthType === "medication" && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Medication name:
-                </label>
-                <input
-                  type="text"
-                  value={medicationName}
-                  onChange={(e) => setMedicationName(e.target.value)}
-                  placeholder="Vitamin D, Tylenol..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Dosage (optional):
-                </label>
-                <input
-                  type="text"
-                  value={dosage}
-                  onChange={(e) => setDosage(e.target.value)}
-                  placeholder="1 drop, 2.5ml..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-            </>
-          )}
-
-          {healthType === "weight" && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Weight: {weight.toFixed(1)} lbs
-              </label>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setWeight(Math.max(1, weight - 0.5))}
-                  className="px-3 py-1 bg-gray-200 rounded"
-                >
-                  −
-                </button>
-                <input
-                  type="range"
-                  min="1"
-                  max="50"
-                  step="0.5"
-                  value={weight}
-                  onChange={(e) => setWeight(Number(e.target.value))}
-                  className="flex-1"
-                />
-                <button
-                  onClick={() => setWeight(Math.min(50, weight + 0.5))}
-                  className="px-3 py-1 bg-gray-200 rounded"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          )}
-
+    <BottomSheet
+      title={isEditing ? t("editEntry") : label}
+      icon={icon}
+      onClose={onClose}
+    >
+      <div className="space-y-4 pt-2">
+        {resolvedType === "temperature" && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes (optional):
+            <label className="label-field">
+              {t("tempC")}: {temperature.toFixed(1)}°C
             </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any observations..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
-              rows={2}
-            />
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setTemperature(Math.max(36.0, temperature - 0.1))}
+                className="w-10 h-10 rounded-xl bg-[#f3ede7] font-semibold"
+              >
+                −
+              </button>
+              <input
+                type="range"
+                min="36"
+                max="40"
+                step="0.1"
+                value={temperature}
+                onChange={(e) => setTemperature(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+              <button
+                type="button"
+                onClick={() => setTemperature(Math.min(40.0, temperature + 0.1))}
+                className="w-10 h-10 rounded-xl bg-[#f3ede7] font-semibold"
+              >
+                +
+              </button>
+            </div>
           </div>
+        )}
 
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {isSubmitting ? "Saving..." : "SAVE ENTRY"}
-          </button>
+        {resolvedType === "medication" && (
+          <>
+            <div>
+              <label className="label-field">{t("medicationName")}</label>
+              <input
+                type="text"
+                value={medicationName}
+                onChange={(e) => setMedicationName(e.target.value)}
+                placeholder={t("medicationPlaceholder")}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="label-field">{t("dosage")}</label>
+              <input
+                type="text"
+                value={dosage}
+                onChange={(e) => setDosage(e.target.value)}
+                placeholder={t("dosagePlaceholder")}
+                className="input-field"
+              />
+            </div>
+          </>
+        )}
+
+        {resolvedType === "weight" && (
+          <div>
+            <label className="label-field">
+              {t("weight")}: {weight.toFixed(1)} kg
+            </label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setWeight(Math.max(1, Math.round((weight - 0.1) * 10) / 10))}
+                className="w-10 h-10 rounded-xl bg-[#f3ede7] font-semibold"
+              >
+                −
+              </button>
+              <input
+                type="range"
+                min="1"
+                max="30"
+                step="0.1"
+                value={weight}
+                onChange={(e) => setWeight(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+              <button
+                type="button"
+                onClick={() => setWeight(Math.min(30, Math.round((weight + 0.1) * 10) / 10))}
+                className="w-10 h-10 rounded-xl bg-[#f3ede7] font-semibold"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="label-field">{t("notesOptional")}</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder={t("observationsPlaceholder")}
+            className="textarea-field"
+            rows={2}
+          />
         </div>
+
+        <EntryTimeField value={timestamp} onChange={setTimestamp} />
+
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="btn-primary"
+        >
+          {isSubmitting
+            ? t("saving")
+            : isEditing
+              ? t("saveChanges")
+              : t("saveEntry")}
+        </button>
       </div>
-    </div>
+    </BottomSheet>
   );
 }
