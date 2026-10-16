@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { use, useEffect, useState } from "react";
 import { CaregiverLockScreen } from "@/app/components/CaregiverLockScreen";
@@ -50,6 +50,7 @@ export default function TrackerPage({
   const { secretLink } = use(params);
   const { t } = useLanguage();
   const appShell = useAppShell();
+  const { isAuthenticated } = useConvexAuth();
   const [activeTab, setActiveTab] = useState<TrackerTab>("today");
   const [profileOpenView, setProfileOpenView] = useState<ProfileView | null>(
     null
@@ -61,8 +62,12 @@ export default function TrackerPage({
   const [lockedCaregiver, setLockedCaregiver] = useState<string | null>(null);
   const [needsPick, setNeedsPick] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [claimMessage, setClaimMessage] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
 
   const ensureMigrated = useMutation(api.trackers.ensureMigrated);
+  const claimTracker = useMutation(api.trackers.claim);
   const tracker = useQuery(api.trackers.getBySecret, { secretLink });
   const lastFeed = useQuery(
     api.feedEntries.getLast,
@@ -132,6 +137,25 @@ export default function TrackerPage({
     setNeedsPick(true);
   };
 
+  const handleClaimVillage = async () => {
+    setClaiming(true);
+    setClaimError(null);
+    setClaimMessage(null);
+    try {
+      await claimTracker({ secretLink });
+      setClaimMessage(t("claimVillageDone"));
+    } catch (err) {
+      setClaimError(
+        err instanceof Error ? err.message : "Failed to add village"
+      );
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const canClaim =
+    isAuthenticated && tracker != null && tracker.ownerUserId === undefined;
+
   const handleLogSelect = (type: LogType) => {
     setShowLogSheet(false);
     setActiveLogModal(type);
@@ -176,12 +200,39 @@ export default function TrackerPage({
     );
   }
 
+  const claimBanner =
+    canClaim && !claimMessage ? (
+      <div className="mx-4 mt-2 mb-1 rounded-xl border border-border bg-surface px-4 py-3 space-y-2 card-shadow shrink-0">
+        <p className="text-sm text-foreground">{t("claimVillageHint")}</p>
+        {claimError && (
+          <p className="text-sm text-red-600" role="alert">
+            {claimError}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => void handleClaimVillage()}
+          disabled={claiming}
+          className="btn-primary w-full"
+        >
+          {claiming ? t("claimingVillage") : t("claimVillage")}
+        </button>
+      </div>
+    ) : claimMessage ? (
+      <div className="mx-4 mt-2 mb-1 rounded-xl border border-border bg-primary-light/40 px-4 py-2 shrink-0">
+        <p className="text-sm text-foreground font-medium">{claimMessage}</p>
+      </div>
+    ) : null;
+
   if (needsPick || !lockedCaregiver || !lockedInfo) {
     return (
-      <CaregiverLockScreen
-        caregivers={tracker.caregivers}
-        onConfirm={handleConfirmCaregiver}
-      />
+      <div className="min-h-screen flex flex-col bg-background safe-top">
+        {claimBanner}
+        <CaregiverLockScreen
+          caregivers={tracker.caregivers}
+          onConfirm={handleConfirmCaregiver}
+        />
+      </div>
     );
   }
 
@@ -195,6 +246,8 @@ export default function TrackerPage({
           </p>
         </header>
       )}
+
+      {claimBanner}
 
       {activeTab !== "today" && (
         <header className="px-4 pt-1.5 pb-2 shrink-0">

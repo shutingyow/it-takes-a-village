@@ -344,6 +344,7 @@ export default function Home() {
         className="input-field font-mono text-sm"
         disabled={isOpening}
       />
+      <p className="text-xs text-muted">{t("openExistingAdvancedHint")}</p>
       <button
         type="button"
         onClick={handleOpenExisting}

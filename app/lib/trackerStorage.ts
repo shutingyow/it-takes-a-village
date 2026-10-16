@@ -7,8 +7,8 @@ export type LastVisitedTracker = {
 };
 
 /**
- * Accept a full tracker URL, a /tracker/... path, or the raw secret code.
- * Secrets are nanoid(16) URL-safe strings.
+ * Accept a full tracker URL, a /tracker/... path, or just the path segment
+ * after /tracker/ (unguessable id). IDs are nanoid(16) URL-safe strings.
  */
 export function parseTrackerSecretInput(raw: string): string | null {
   const trimmed = raw.trim();

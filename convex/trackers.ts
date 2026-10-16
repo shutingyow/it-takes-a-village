@@ -116,6 +116,43 @@ export const listMine = query({
   },
 });
 
+/**
+ * Attach an unowned (legacy) tracker to the signed-in user via secret link.
+ * Safe: only when ownerUserId is missing, or already this user. Never steals.
+ */
+export const claim = mutation({
+  args: {
+    secretLink: v.string(),
+  },
+  returns: trackerReturnValidator,
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Sign in to add this village to your account");
+    }
+
+    const tracker = await getTrackerBySecret(ctx, args.secretLink);
+    if (!tracker) {
+      throw new Error("Tracker not found");
+    }
+
+    if (tracker.ownerUserId !== undefined && tracker.ownerUserId !== userId) {
+      throw new Error("This village already belongs to another account");
+    }
+
+    if (tracker.ownerUserId === userId) {
+      return normalizeTrackerForClient(tracker);
+    }
+
+    await ctx.db.patch(tracker._id, { ownerUserId: userId });
+    const updated = await ctx.db.get(tracker._id);
+    if (!updated) {
+      throw new Error("Tracker not found");
+    }
+    return normalizeTrackerForClient(updated);
+  },
+});
+
 // Migrate legacy caregiverNames to caregivers (idempotent)
 export const ensureMigrated = mutation({
   args: {
