@@ -101,6 +101,12 @@ interface TodayTimetableProps {
   onModeChange?: (mode: RangeMode) => void;
   /** Anchor date YYYY-MM-DD for day view or week containing this day. */
   dateKey?: string;
+  /**
+   * How to pick the 7-day window when mode is "week".
+   * - monday: calendar week Mon–Sun containing dateKey (default)
+   * - ending: rolling 7 days ending on dateKey (matches stats weekly)
+   */
+  weekAlign?: "monday" | "ending";
   /** Hide internal Day|Week control when parent already toggles range. */
   hideRangeToggle?: boolean;
   className?: string;
@@ -120,6 +126,7 @@ export function TodayTimetable({
   mode: controlledMode,
   onModeChange,
   dateKey: controlledDateKey,
+  weekAlign = "monday",
   hideRangeToggle = false,
   className,
 }: TodayTimetableProps) {
@@ -141,8 +148,11 @@ export function TodayTimetable({
   const todayKey = useMemo(() => getDateKeyInZone(now), [now]);
   const anchorKey = controlledDateKey ?? todayKey;
   const weekStartKey = useMemo(
-    () => mondayWeekStart(anchorKey),
-    [anchorKey]
+    () =>
+      weekAlign === "ending"
+        ? shiftDateKey(anchorKey, -6)
+        : mondayWeekStart(anchorKey),
+    [anchorKey, weekAlign]
   );
 
   const startDateKey = mode === "day" ? anchorKey : weekStartKey;

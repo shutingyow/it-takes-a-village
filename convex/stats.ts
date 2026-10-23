@@ -188,13 +188,20 @@ function buildDayStat(
   };
 }
 
+/**
+ * Rolling 7-day window ending on endDateKey (clamped to today).
+ * Pass today (or omit) for the current week; earlier end dates for history.
+ */
 export const getWeeklySummary = query({
   args: {
     trackerId: v.id("trackers"),
     now: v.number(),
+    /** Last day of the 7-day window (YYYY-MM-DD). Defaults to today. */
+    endDateKey: v.optional(v.string()),
   },
   returns: v.object({
     days: v.array(dayStatValidator),
+    endDateKey: v.string(),
     avgSleepMinutesPerDay: v.number(),
     longestStretchMinutes: v.number(),
     timezone: v.string(),
@@ -202,31 +209,45 @@ export const getWeeklySummary = query({
   handler: async (ctx, args) => {
     const timeZone = DEFAULT_TRACKER_TIMEZONE;
     const { dateKey: todayKey } = getTodayBoundsInZone(args.now, timeZone);
-    // Oldest day in the 7-day window (today − 6)
-    const rangeStartKey = shiftDateKey(todayKey, -6);
+    const endDateKey =
+      args.endDateKey && args.endDateKey <= todayKey
+        ? args.endDateKey
+        : todayKey;
+    // Oldest day in the 7-day window (end − 6)
+    const rangeStartKey = shiftDateKey(endDateKey, -6);
     const { dayStart: rangeStart } = getDayBoundsForDateKey(
       rangeStartKey,
       timeZone
     );
+    const { dayEnd: rangeEnd } = getDayBoundsForDateKey(endDateKey, timeZone);
 
     const feeds = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", rangeStart)
+        q
+          .eq("trackerId", args.trackerId)
+          .gte("timestamp", rangeStart)
+          .lt("timestamp", rangeEnd)
       )
       .collect();
 
     const diapers = await ctx.db
       .query("diaperEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", rangeStart)
+        q
+          .eq("trackerId", args.trackerId)
+          .gte("timestamp", rangeStart)
+          .lt("timestamp", rangeEnd)
       )
       .collect();
 
     const pumps = await ctx.db
       .query("pumpEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", rangeStart)
+        q
+          .eq("trackerId", args.trackerId)
+          .gte("timestamp", rangeStart)
+          .lt("timestamp", rangeEnd)
       )
       .collect();
 
@@ -236,13 +257,14 @@ export const getWeeklySummary = query({
         q
           .eq("trackerId", args.trackerId)
           .gte("startTime", rangeStart - 24 * 60 * 60 * 1000)
+          .lt("startTime", rangeEnd)
       )
       .collect();
 
     const days: DayStat[] = [];
 
     for (let i = 6; i >= 0; i--) {
-      const dateKey = shiftDateKey(todayKey, -i);
+      const dateKey = shiftDateKey(endDateKey, -i);
       const { dayStart, dayEnd } = getDayBoundsForDateKey(dateKey, timeZone);
       days.push(
         buildDayStat(
@@ -273,6 +295,7 @@ export const getWeeklySummary = query({
 
     return {
       days,
+      endDateKey,
       avgSleepMinutesPerDay,
       longestStretchMinutes,
       timezone: timeZone,

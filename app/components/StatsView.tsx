@@ -220,10 +220,14 @@ export function StatsView({
   const [rangeMode, setRangeMode] = useState<RangeMode>("daily");
   const todayKey = useMemo(() => getDateKeyInZone(now), [now]);
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
+  /** Last day of the rolling 7-day weekly window; defaults to today. */
+  const [selectedWeekEndKey, setSelectedWeekEndKey] = useState(todayKey);
 
   const weeklySummary = useQuery(
     api.stats.getWeeklySummary,
-    rangeMode === "weekly" ? { trackerId, now } : "skip"
+    rangeMode === "weekly"
+      ? { trackerId, now, endDateKey: selectedWeekEndKey }
+      : "skip"
   );
   const dailyStats = useQuery(
     api.stats.getDailyStats,
@@ -249,7 +253,8 @@ export function StatsView({
     { id: "pumps", labelKey: "pumps" },
   ];
 
-  const canGoNext = selectedDateKey < todayKey;
+  const canGoNextDay = selectedDateKey < todayKey;
+  const canGoNextWeek = selectedWeekEndKey < todayKey;
 
   const getCountValue = (day: {
     feedCount: number;
@@ -338,15 +343,15 @@ export function StatsView({
     : birthDate
       ? `${fullDate} · ${t("ageNotBornYet")}`
       : fullDate;
-  const weekStartKey = shiftDateKey(todayKey, -6);
+  const weekStartKey = shiftDateKey(selectedWeekEndKey, -6);
   const weeklyAgeLine = formatWeekAgeLine(
     birthDate,
     weekStartKey,
-    todayKey,
+    selectedWeekEndKey,
     language
   );
   const weekEndAge = birthDate
-    ? formatAgeOnDate(birthDate, todayKey, language)
+    ? formatAgeOnDate(birthDate, selectedWeekEndKey, language)
     : null;
 
   const wetOnly = day ? day.wetCount - day.bothCount : 0;
@@ -417,16 +422,16 @@ export function StatsView({
           <button
             type="button"
             onClick={() => {
-              if (!canGoNext) return;
+              if (!canGoNextDay) return;
               setSelectedDateKey((k) => {
                 const next = shiftDateKey(k, 1);
                 return next > todayKey ? todayKey : next;
               });
             }}
-            disabled={!canGoNext}
+            disabled={!canGoNextDay}
             className={cn(
               "px-3 py-2 text-sm font-semibold rounded-xl min-h-[44px] min-w-[44px] touch-manipulation",
-              canGoNext
+              canGoNextDay
                 ? "text-terracotta hover:bg-beige-light"
                 : "text-muted/40 cursor-not-allowed"
             )}
@@ -438,15 +443,47 @@ export function StatsView({
       )}
 
       {rangeMode === "weekly" && (
-        <div className="mb-4 bg-surface border border-border rounded-2xl px-3 py-3 card-shadow min-w-0">
-          <p className="text-sm font-semibold text-foreground break-words leading-snug text-center">
-            {weeklyAgeLine}
-          </p>
-          {birthDate && !weekEndAge && (
-            <p className="text-[11px] text-muted text-center mt-1 break-words">
-              {t("ageNotBornYet")}
+        <div className="flex items-center justify-between mb-4 bg-surface border border-border rounded-2xl px-1.5 sm:px-2 py-2 card-shadow min-w-0">
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedWeekEndKey((k) => shiftDateKey(k, -7))
+            }
+            className="px-3 py-2 text-sm font-semibold text-terracotta rounded-xl hover:bg-beige-light min-h-[44px] min-w-[44px] touch-manipulation"
+            aria-label={t("previousWeek")}
+          >
+            ‹
+          </button>
+          <div className="text-center min-w-0 flex-1 px-1">
+            <p className="text-sm font-semibold text-foreground break-words leading-snug">
+              {weeklyAgeLine}
             </p>
-          )}
+            {birthDate && !weekEndAge && (
+              <p className="text-[11px] text-muted mt-1 break-words">
+                {t("ageNotBornYet")}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (!canGoNextWeek) return;
+              setSelectedWeekEndKey((k) => {
+                const next = shiftDateKey(k, 7);
+                return next > todayKey ? todayKey : next;
+              });
+            }}
+            disabled={!canGoNextWeek}
+            className={cn(
+              "px-3 py-2 text-sm font-semibold rounded-xl min-h-[44px] min-w-[44px] touch-manipulation",
+              canGoNextWeek
+                ? "text-terracotta hover:bg-beige-light"
+                : "text-muted/40 cursor-not-allowed"
+            )}
+            aria-label={t("nextWeek")}
+          >
+            ›
+          </button>
         </div>
       )}
 
@@ -735,7 +772,8 @@ export function StatsView({
           <TodayTimetable
             trackerId={trackerId}
             mode="week"
-            dateKey={todayKey}
+            dateKey={selectedWeekEndKey}
+            weekAlign="ending"
             hideRangeToggle
             className="px-0 pb-4"
           />

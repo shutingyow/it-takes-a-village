@@ -3,6 +3,9 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { Capacitor } from "@capacitor/core";
+import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 import { useRef, useState } from "react";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { formatDateTime } from "@/app/lib/utils";
@@ -40,12 +43,39 @@ function rowsToCsv(
   return [header, ...lines].join("\n");
 }
 
+function downloadCsvWeb(csv: string, fileName: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function shareCsvNative(csv: string, fileName: string) {
+  const written = await Filesystem.writeFile({
+    path: fileName,
+    data: csv,
+    directory: Directory.Cache,
+    encoding: Encoding.UTF8,
+  });
+  await Share.share({
+    title: fileName,
+    files: [written.uri],
+    dialogTitle: fileName,
+  });
+}
+
 export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
   const { t } = useLanguage();
   const [days, setDays] = useState<7 | 30>(7);
   const [now] = useState(Date.now());
   const [copied, setCopied] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const isNative = Capacitor.isNativePlatform();
 
   const exportData = useQuery(api.export.getData, { trackerId, days, now });
 
@@ -57,16 +87,25 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownload = () => {
-    if (!exportData) return;
+  const handleDownload = async () => {
+    if (!exportData || exportBusy) return;
     const csv = rowsToCsv(exportData.rows);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `care-log-${days}d.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const fileName = `care-log-${days}d.csv`;
+    setExportError(false);
+
+    if (!isNative) {
+      downloadCsvWeb(csv, fileName);
+      return;
+    }
+
+    setExportBusy(true);
+    try {
+      await shareCsvNative(csv, fileName);
+    } catch {
+      setExportError(true);
+    } finally {
+      setExportBusy(false);
+    }
   };
 
   const handlePrint = () => {
@@ -153,12 +192,19 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
         </button>
         <button
           type="button"
-          onClick={handleDownload}
-          disabled={!exportData?.rows.length}
+          onClick={() => void handleDownload()}
+          disabled={!exportData?.rows.length || exportBusy}
           className="w-full py-3 rounded-xl border border-border bg-surface font-semibold text-sm"
         >
-          {t("downloadCsv")}
+          {exportBusy
+            ? t("loading")
+            : isNative
+              ? t("shareCsv")
+              : t("downloadCsv")}
         </button>
+        {exportError && (
+          <p className="text-xs text-center text-red-600">{t("exportFailed")}</p>
+        )}
         <button
           type="button"
           onClick={handlePrint}
