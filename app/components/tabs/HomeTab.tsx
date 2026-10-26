@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { TodayHeader } from "../TodayHeader";
 import {
   HomeCategoryGrid,
@@ -8,11 +8,9 @@ import {
   type HomeTileCategory,
 } from "../HomeCategoryGrid";
 import { HomeCategoryDetail } from "../HomeCategoryDetail";
-import { ReminderHomeCard } from "../ReminderHomeCard";
 import { WellnessTipCard } from "../WellnessTipCard";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
-import { getDeviceRemindersEnabled } from "@/app/lib/deviceNotifications";
 
 interface HomeTabProps {
   trackerId: Id<"trackers">;
@@ -25,8 +23,9 @@ interface HomeTabProps {
   lastDiaper?: Doc<"diaperEntries"> | null;
   pumpScheduleEnabled?: boolean;
   onViewAllHistory?: () => void;
+  onOpenMilestones?: () => void;
+  onOpenSettings?: () => void;
   onQuickLog?: (type: HomeCategory) => void;
-  onOpenReminders?: () => void;
 }
 
 export function HomeTab({
@@ -36,25 +35,12 @@ export function HomeTab({
   babyName,
   birthDate,
   photoStorageId,
+  onOpenMilestones,
+  onOpenSettings,
   onQuickLog,
-  onOpenReminders,
 }: HomeTabProps) {
   const { t } = useLanguage();
   const [category, setCategory] = useState<HomeCategory | null>(null);
-  const [remindersEnabled, setRemindersEnabled] = useState(false);
-
-  useEffect(() => {
-    const sync = () => setRemindersEnabled(getDeviceRemindersEnabled());
-    sync();
-    window.addEventListener("focus", sync);
-    window.addEventListener("deviceRemindersChanged", sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener("focus", sync);
-      window.removeEventListener("deviceRemindersChanged", sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
 
   const villageFallback =
     !birthDate && babyName ? t("babyVillage", { name: babyName }) : undefined;
@@ -93,16 +79,11 @@ export function HomeTab({
         }
       />
 
-      {onOpenReminders && (
-        <ReminderHomeCard
-          trackerId={trackerId}
-          secretLink={secretLink}
-          enabled={remindersEnabled}
-          onOpen={onOpenReminders}
-        />
-      )}
-
-      <WellnessTipCard />
+      <WellnessTipCard
+        birthDate={birthDate}
+        onOpenMilestones={onOpenMilestones}
+        onOpenSettings={onOpenSettings}
+      />
     </div>
   );
 }

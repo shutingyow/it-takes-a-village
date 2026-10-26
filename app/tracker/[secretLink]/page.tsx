@@ -11,10 +11,7 @@ import {
   ProfileTab,
   type ProfileView,
 } from "@/app/components/tabs/ProfileTab";
-import {
-  SettingsTab,
-  type SettingsView,
-} from "@/app/components/tabs/SettingsTab";
+import { SettingsTab } from "@/app/components/tabs/SettingsTab";
 import { SupplyAlertsBanner } from "@/app/components/SupplyAlertsBanner";
 import { LogSheet } from "@/app/components/LogSheet";
 import {
@@ -55,8 +52,6 @@ export default function TrackerPage({
   const [profileOpenView, setProfileOpenView] = useState<ProfileView | null>(
     null
   );
-  const [settingsOpenView, setSettingsOpenView] =
-    useState<SettingsView | null>(null);
   const [showLogSheet, setShowLogSheet] = useState(false);
   const [activeLogModal, setActiveLogModal] = useState<LogType | null>(null);
   const [lockedCaregiver, setLockedCaregiver] = useState<string | null>(null);
@@ -93,7 +88,21 @@ export default function TrackerPage({
   }, [secretLink, tracker?.babyName, tracker?._id]);
 
   useEffect(() => {
-    if (!tracker) return;
+    setHydrated(false);
+  }, [secretLink]);
+
+  useEffect(() => {
+    // Still waiting for Convex — keep loading spinner.
+    if (tracker === undefined) return;
+    // Missing / invalid secret: mark hydrated so "not found" can render.
+    // Depend on `tracker` itself — `tracker?._id` stays undefined for both
+    // undefined and null, so the effect would never re-run on "not found".
+    if (tracker === null) {
+      setLockedCaregiver(null);
+      setNeedsPick(false);
+      setHydrated(true);
+      return;
+    }
     const saved = getLockedCaregiver(secretLink);
     const validNames = tracker.caregivers.map((c) => c.name);
     if (saved && validNames.includes(saved)) {
@@ -104,11 +113,10 @@ export default function TrackerPage({
       setNeedsPick(true);
     }
     setHydrated(true);
-  }, [secretLink, tracker?._id, tracker?.caregivers]);
+  }, [secretLink, tracker]);
 
   useEffect(() => {
     if (activeTab !== "profile") setProfileOpenView(null);
-    if (activeTab !== "settings") setSettingsOpenView(null);
   }, [activeTab]);
 
   const handleViewAllHistory = () => {
@@ -116,8 +124,12 @@ export default function TrackerPage({
     setActiveTab("profile");
   };
 
-  const handleOpenReminders = () => {
-    setSettingsOpenView("reminders");
+  const handleOpenMilestones = () => {
+    setProfileOpenView("milestones");
+    setActiveTab("profile");
+  };
+
+  const handleOpenSettings = () => {
     setActiveTab("settings");
   };
 
@@ -285,8 +297,9 @@ export default function TrackerPage({
             lastDiaper={lastDiaper}
             pumpScheduleEnabled={tracker.pumpSchedule?.enabled}
             onViewAllHistory={handleViewAllHistory}
+            onOpenMilestones={handleOpenMilestones}
+            onOpenSettings={handleOpenSettings}
             onQuickLog={handleQuickLog}
-            onOpenReminders={handleOpenReminders}
           />
         )}
         <ReminderScheduler
@@ -327,7 +340,6 @@ export default function TrackerPage({
             wakeWindowMinutes={tracker.wakeWindowMinutes}
             medicationReminders={tracker.medicationReminders}
             pumpSchedule={tracker.pumpSchedule}
-            openView={settingsOpenView}
           />
         )}
       </main>

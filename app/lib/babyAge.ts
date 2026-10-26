@@ -15,6 +15,38 @@ export type AgeParts =
   | { kind: "weeks"; weeks: number; days: number }
   | { kind: "months"; months: number; days: number };
 
+/** Non-overlapping bands for age-tailored guidance (calendar days from birth). */
+export type AgeBandId =
+  | "newborn"
+  | "weeks_0_4"
+  | "weeks_4_8"
+  | "weeks_8_12"
+  | "months_3_6"
+  | "months_6_9"
+  | "months_9_12"
+  | "months_12_plus";
+
+export function ageBandFromTotalDays(totalDays: number): AgeBandId {
+  if (totalDays < 14) return "newborn"; // 0–2 weeks
+  if (totalDays < 28) return "weeks_0_4"; // 2–4 weeks
+  if (totalDays < 56) return "weeks_4_8";
+  if (totalDays < 84) return "weeks_8_12";
+  if (totalDays < 182) return "months_3_6"; // ~12 weeks – 6 months
+  if (totalDays < 273) return "months_6_9";
+  if (totalDays < 365) return "months_9_12";
+  return "months_12_plus";
+}
+
+export function getAgeBand(
+  birthDate: string,
+  onDate: string
+): AgeBandId | null {
+  if (!isValidBirthDate(birthDate) || !isValidBirthDate(onDate)) return null;
+  const totalDays = calendarDaysBetween(birthDate, onDate);
+  if (totalDays < 0) return null;
+  return ageBandFromTotalDays(totalDays);
+}
+
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export function isValidBirthDate(value: string): boolean {

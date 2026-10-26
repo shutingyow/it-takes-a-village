@@ -232,6 +232,12 @@ export function SettingsTab({
     adminOnly?: boolean;
   }[] = [
     {
+      id: "reminders",
+      icon: <IconReminders size={20} className="text-terracotta" />,
+      label: t("reminderSettings"),
+      description: t("reminderSettingsDesc"),
+    },
+    {
       id: "export",
       icon: <IconExport size={20} className="text-terracotta" />,
       label: t("exportData"),
@@ -242,12 +248,6 @@ export function SettingsTab({
       icon: <IconWarning size={20} className="text-warning" />,
       label: t("supplyAlerts"),
       description: t("supplyAlertsDesc"),
-    },
-    {
-      id: "reminders",
-      icon: <IconReminders size={20} />,
-      label: t("reminderSettings"),
-      description: t("reminderSettingsDesc"),
     },
     {
       id: "caregivers",
