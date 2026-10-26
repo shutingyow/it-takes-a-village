@@ -10,6 +10,7 @@ import { ActivityIcon } from "../icons";
 import { EntryTimeField } from "../EntryTimeField";
 import { DurationMinutesField } from "../DurationMinutesField";
 import type { ActivityEntry } from "../ActivityEntryCard";
+import { LoggedByHint } from "../LoggedByHint";
 import { ACTIVITY_KINDS, activityKindKey, type ActivityKind } from "@/app/lib/logKinds";
 
 type ActivityEditEntry = Extract<ActivityEntry, { entryType: "activity" }>;
@@ -89,6 +90,7 @@ export function ActivityModal({
       onClose={onClose}
     >
       <div className="space-y-4 pt-2 min-w-0">
+        {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
         <div>
           <label className="label-field">{t("activityKindLabel")}</label>
           <div className="grid grid-cols-2 gap-2">

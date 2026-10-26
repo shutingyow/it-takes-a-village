@@ -77,10 +77,11 @@ npm run cap:open:ios
 
 In Xcode:
 
-1. Select the **App** target → **Signing & Capabilities**
-2. Choose your **Team** (personal or organization)
-3. Confirm Bundle Identifier is `com.ittakesavillage.app`
-4. Pick a simulator or device → **Run**
+1. Scheme picker (top toolbar) → **App** (not **FeedLiveActivityExtension**)
+2. Select the **App** target → **Signing & Capabilities**
+3. Choose your **Team** (personal or organization); do the same Team on **FeedLiveActivityExtension**
+4. Confirm Bundle Identifier is `com.ittakesavillage.app`
+5. Pick your iPhone → **Run**
 
 The WebView loads production HTTPS. Convex realtime works the same as in Safari.
 
@@ -168,13 +169,30 @@ npm run cap:open:ios
 
 In Xcode:
 
-1. Select the **App** scheme (not only the widget)
+1. Select the **App** scheme (top toolbar scheme picker) — **never** **FeedLiveActivityExtension**
 2. Confirm **App** and **FeedLiveActivityExtension** both link **FeedCountdownShared** (Package Dependencies)
 3. Signing: same Team on App + extension; bundle IDs `com.ittakesavillage.app` and `com.ittakesavillage.app.FeedLiveActivity`
 4. Deployment target **iOS 17.0+** for both
 5. On the phone: **Settings → Face ID & Passcode / Live Activities** — allow for It Takes A Village
 6. In the app: **Settings → Reminders** → enable device reminders, with a feed interval set (needs a recent feed so “next due” exists)
 7. **Product → Clean Build Folder**, then **Run** — open the tracker, then lock the phone; you should see a ticking next-feed Live Activity
+
+### Troubleshooting: “FeedLiveActivity failed to launch / valid code signature”
+
+If Xcode says something like:
+
+> `com.ittakesavillage.app.FeedLiveActivity` failed to launch or exited before the debugger could attach… valid code signature…
+
+you almost always selected the **FeedLiveActivityExtension** scheme and hit ▶ Run. Live Activity / Widget extensions are **not** standalone apps — they only run when embedded in **App**.
+
+**Fix:**
+
+1. Top toolbar → scheme menu → choose **App** (not FeedLiveActivityExtension)
+2. Destination → your iPhone (“Shuting’s …”)
+3. **Product → Clean Build Folder**, then ▶ **Run**
+4. Optional check: TARGETS → **FeedLiveActivityExtension** → **Signing & Capabilities** → same **Team** as App, Automatic signing on
+
+That error is **different** from the earlier **Sign in with Apple** provisioning-profile mismatch (which fails at **build** time on the **App** target with “profile doesn’t include Sign In with Apple”).
 
 **Note:** The plugin is registered in `AppBridgeViewController` (not via `packageClassList`). After native changes you must rebuild from Xcode — a Vercel-only deploy will not pick up the bridge.
 

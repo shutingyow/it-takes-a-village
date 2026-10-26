@@ -13,6 +13,7 @@ import {
 } from "../icons";
 import { EntryTimeField } from "../EntryTimeField";
 import type { ActivityEntry } from "../ActivityEntryCard";
+import { LoggedByHint } from "../LoggedByHint";
 
 type HealthType = "temperature" | "medication" | "weight";
 type HealthEditEntry = Extract<ActivityEntry, { entryType: "health" }>;
@@ -120,6 +121,7 @@ export function HealthModal({
       onClose={onClose}
     >
       <div className="space-y-4 pt-2">
+        {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
         {resolvedType === "temperature" && (
           <div>
             <label className="label-field">

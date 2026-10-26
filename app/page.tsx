@@ -18,7 +18,7 @@ import {
 } from "@/app/lib/trackerStorage";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { cn } from "@/app/lib/utils";
-import { IconVillage } from "@/app/components/icons";
+import { IconReminders } from "@/app/components/icons";
 import { LanguageToggle } from "@/app/components/LanguageToggle";
 
 const CREATE_TIMEOUT_MS = 15_000;
@@ -598,8 +598,8 @@ export default function Home() {
       </div>
       <div className="max-w-md w-full bg-surface rounded-2xl card-shadow p-8 border border-border">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-xl bg-primary-light flex items-center justify-center mx-auto mb-4 text-primary">
-            <IconVillage size={28} />
+          <div className="w-14 h-14 rounded-xl bg-primary-light flex items-center justify-center mx-auto mb-4 p-2">
+            <IconReminders size={40} className="rounded-lg object-contain" />
           </div>
           <h1 className="text-2xl font-semibold text-foreground mb-2">
             {t("appName")}

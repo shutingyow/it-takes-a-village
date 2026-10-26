@@ -13,6 +13,7 @@ import {
   toDatetimeLocalValue,
 } from "../EntryTimeField";
 import type { ActivityEntry } from "../ActivityEntryCard";
+import { LoggedByHint } from "../LoggedByHint";
 
 type NapEditEntry = Extract<ActivityEntry, { entryType: "nap" }>;
 
@@ -139,6 +140,7 @@ export function NapModal({
       onClose={onClose}
     >
       <div className="space-y-4 pt-2 min-w-0">
+        {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
         <EntryTimeField
           value={startTime}
           onChange={handleStartChange}

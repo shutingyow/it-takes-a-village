@@ -13,39 +13,54 @@ import {
   shiftDateKey,
 } from "@/app/lib/utils";
 import { ActivityIcon, type ActivityType } from "./icons";
+import type { ActivityEntry } from "./ActivityEntryCard";
+import { EditActivitySheet } from "./EditActivitySheet";
 
 type RangeMode = "day" | "week";
 
 type EventKind = "feed" | "diaper" | "pump" | "nap";
 
+type TimetableEvent = {
+  id: string;
+  kind: EventKind;
+  startMs: number;
+  endMs?: number;
+  label?: string;
+  caregiverName?: string;
+};
+
 /** Soft fills + dark text for readability on colored blocks. */
 const KIND_STYLE: Record<
   EventKind,
-  { bg: string; text: string; icon: ActivityType; bar: string }
+  { bg: string; text: string; icon: ActivityType; bar: string; swatch: string }
 > = {
   feed: {
     bg: "bg-[#fde8e8]",
     text: "text-[#7a1f1a]",
     icon: "feed",
     bar: "bg-[#c43c3c]",
+    swatch: "#c43c3c",
   },
   diaper: {
     bg: "bg-[#fff4c2]",
     text: "text-[#5c4a00]",
     icon: "diaper",
     bar: "bg-[#c9a21a]",
+    swatch: "#c9a21a",
   },
   pump: {
     bg: "bg-[#dceefb]",
     text: "text-[#0f4f7a]",
     icon: "pump",
     bar: "bg-[#2f87c5]",
+    swatch: "#2f87c5",
   },
   nap: {
     bg: "bg-[#d8f0e0]",
     text: "text-[#145a32]",
     icon: "nap",
     bar: "bg-[#2f8f55]",
+    swatch: "#2f8f55",
   },
 };
 
@@ -57,6 +72,8 @@ const HOURS = Array.from(
   { length: DAY_END_HOUR - DAY_START_HOUR + 1 },
   (_, i) => DAY_START_HOUR + i
 );
+
+const KIND_ORDER: EventKind[] = ["feed", "diaper", "pump", "nap"];
 
 function msToDayOffset(ms: number, dayStart: number): number {
   return (ms - dayStart) / (1000 * 60 * 60);
@@ -94,6 +111,15 @@ function dayNum(dateKey: string): string {
   return dateKey.slice(8);
 }
 
+function countByKind(events: TimetableEvent[]): Record<EventKind, number> {
+  return {
+    feed: events.filter((e) => e.kind === "feed").length,
+    diaper: events.filter((e) => e.kind === "diaper").length,
+    pump: events.filter((e) => e.kind === "pump").length,
+    nap: events.filter((e) => e.kind === "nap").length,
+  };
+}
+
 interface TodayTimetableProps {
   trackerId: Id<"trackers">;
   /** Controlled day/week mode (e.g. Insights Daily|Weekly). */
@@ -110,6 +136,9 @@ interface TodayTimetableProps {
   /** Hide internal Day|Week control when parent already toggles range. */
   hideRangeToggle?: boolean;
   className?: string;
+  /** When set with selectedCaregiver, timetable entries open the edit/detail sheet. */
+  secretLink?: string;
+  selectedCaregiver?: string;
 }
 
 function mondayWeekStart(dateKey: string): string {
@@ -129,16 +158,25 @@ export function TodayTimetable({
   weekAlign = "monday",
   hideRangeToggle = false,
   className,
+  secretLink,
+  selectedCaregiver,
 }: TodayTimetableProps) {
   const { t, language } = useLanguage();
   const [internalMode, setInternalMode] = useState<RangeMode>("day");
   const [now, setNow] = useState(() => Date.now());
+  const [pendingOpen, setPendingOpen] = useState<{
+    id: string;
+    dateKey: string;
+  } | null>(null);
+  const [editingEntry, setEditingEntry] = useState<ActivityEntry | null>(null);
 
   const mode = controlledMode ?? internalMode;
   const setMode = (next: RangeMode) => {
     if (controlledMode === undefined) setInternalMode(next);
     onModeChange?.(next);
   };
+
+  const canOpenDetails = Boolean(secretLink && selectedCaregiver);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -165,6 +203,27 @@ export function TodayTimetable({
     now,
   });
 
+  const dayEntries = useQuery(
+    api.history.getActivityForDay,
+    pendingOpen
+      ? { trackerId, dateKey: pendingOpen.dateKey }
+      : "skip"
+  );
+
+  useEffect(() => {
+    if (!pendingOpen || dayEntries === undefined) return;
+    const found = dayEntries.find((entry) => entry._id === pendingOpen.id);
+    if (found) {
+      setEditingEntry(found);
+    }
+    setPendingOpen(null);
+  }, [pendingOpen, dayEntries]);
+
+  const handleEventClick = (eventId: string, dateKey: string) => {
+    if (!canOpenDetails) return;
+    setPendingOpen({ id: eventId, dateKey });
+  };
+
   const locale = language === "zh" ? "zh-CN" : "en-US";
   const gridHeight = HOURS.length * HOUR_PX;
   const { dayStart: todayBoundsStart } = useMemo(
@@ -181,10 +240,14 @@ export function TodayTimetable({
         })()
       : null;
 
+  const kindLabel = (kind: EventKind) => t(kind);
+
   return (
     <div className={cn("px-4 pb-6 min-w-0", className)}>
       <div className="flex items-center justify-between gap-2 mb-2">
-        <p className="section-label mb-0">{t("todaysSchedule")}</p>
+        <p className="section-label mb-0">
+          {mode === "week" ? t("scheduleWeekOverview") : t("todaysSchedule")}
+        </p>
         {!hideRangeToggle && (
           <div
             className="inline-flex rounded-full bg-beige-light p-0.5 shrink-0"
@@ -217,10 +280,11 @@ export function TodayTimetable({
       ) : mode === "day" ? (
         <DayView
           day={schedule.days[0]}
+          dateKey={anchorKey}
           gridHeight={gridHeight}
           nowTop={nowTop}
           emptyLabel={t("scheduleEmpty")}
-          kindLabel={(kind) => t(kind)}
+          kindLabel={kindLabel}
           diaperLabel={(type) =>
             type === "wet"
               ? t("wet")
@@ -228,14 +292,48 @@ export function TodayTimetable({
                 ? t("dirty")
                 : t("wetDirty")
           }
+          interactive={canOpenDetails}
+          onEventClick={handleEventClick}
         />
       ) : (
-        <WeekView
+        <WeekOverview
           days={schedule.days}
           todayKey={todayKey}
-          gridHeight={gridHeight}
           locale={locale}
           emptyLabel={t("scheduleEmpty")}
+          kindLabel={kindLabel}
+          diaperLabel={(type) =>
+            type === "wet"
+              ? t("wet")
+              : type === "dirty"
+                ? t("dirty")
+                : t("wetDirty")
+          }
+          interactive={canOpenDetails}
+          onEventClick={handleEventClick}
+          weekTotalsLabel={t("scheduleWeekTotals")}
+          countLabel={(kind, count) =>
+            t(
+              kind === "feed"
+                ? "scheduleCountFeeds"
+                : kind === "diaper"
+                  ? "scheduleCountDiapers"
+                  : kind === "pump"
+                    ? "scheduleCountPumps"
+                    : "scheduleCountNaps",
+              { count }
+            )
+          }
+        />
+      )}
+
+      {editingEntry && secretLink && selectedCaregiver && (
+        <EditActivitySheet
+          entry={editingEntry}
+          trackerId={trackerId}
+          secretLink={secretLink}
+          selectedCaregiver={selectedCaregiver}
+          onClose={() => setEditingEntry(null)}
         />
       )}
     </div>
@@ -268,32 +366,55 @@ function HourAxis() {
   );
 }
 
+function KindLegend({
+  kindLabel,
+}: {
+  kindLabel: (kind: EventKind) => string;
+}) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap px-1 pb-2" role="list">
+      {KIND_ORDER.map((kind) => (
+        <span
+          key={kind}
+          className="flex items-center gap-1.5 text-[11px] text-muted"
+        >
+          <span
+            className="w-2.5 h-2.5 rounded-sm shrink-0"
+            style={{ backgroundColor: KIND_STYLE[kind].swatch }}
+          />
+          {kindLabel(kind)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function DayView({
   day,
+  dateKey,
   gridHeight,
   nowTop,
   emptyLabel,
   kindLabel,
   diaperLabel,
+  interactive,
+  onEventClick,
 }: {
   day:
     | {
         dayStart: number;
         dayEnd: number;
-        events: Array<{
-          id: string;
-          kind: EventKind;
-          startMs: number;
-          endMs?: number;
-          label?: string;
-        }>;
+        events: TimetableEvent[];
       }
     | undefined;
+  dateKey: string;
   gridHeight: number;
   nowTop: number | null;
   emptyLabel: string;
   kindLabel: (kind: EventKind) => string;
   diaperLabel: (type: "wet" | "dirty" | "both") => string;
+  interactive: boolean;
+  onEventClick: (eventId: string, dateKey: string) => void;
 }) {
   if (!day) {
     return (
@@ -303,7 +424,10 @@ function DayView({
 
   return (
     <div className="rounded-2xl border border-border bg-surface overflow-hidden">
-      <div className="flex gap-1 px-2 py-3 min-w-0">
+      <div className="px-2 pt-2">
+        <KindLegend kindLabel={kindLabel} />
+      </div>
+      <div className="flex gap-1 px-2 pb-3 min-w-0">
         <HourAxis />
         <div className="relative flex-1 min-w-0" style={{ height: gridHeight }}>
           {HOURS.map((hour) => (
@@ -344,22 +468,26 @@ function DayView({
                 event.label === "both")
                 ? diaperLabel(event.label)
                 : event.label;
-            return (
-              <div
-                key={event.id}
-                className={cn(
-                  "absolute left-0 right-1 rounded-lg px-1.5 flex items-center gap-1 min-w-0 overflow-hidden z-10 border border-black/[0.04]",
-                  style.bg,
-                  isPoint && "min-h-[22px]"
-                )}
-                style={{
-                  top: block.top,
-                  height: isPoint
-                    ? Math.max(22, Math.min(block.height, 28))
-                    : block.height,
-                }}
-                title={`${kindLabel(event.kind)} ${formatTime(event.startMs)}`}
-              >
+            const titleParts = [
+              kindLabel(event.kind),
+              formatTime(event.startMs),
+              event.caregiverName ? event.caregiverName : null,
+            ].filter(Boolean);
+            const className = cn(
+              "absolute left-0 right-1 rounded-lg px-1.5 flex items-center gap-1 min-w-0 overflow-hidden z-10 border border-black/[0.04] text-left",
+              style.bg,
+              isPoint && "min-h-[22px]",
+              interactive &&
+                "cursor-pointer touch-manipulation active:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-terracotta"
+            );
+            const stylePos = {
+              top: block.top,
+              height: isPoint
+                ? Math.max(22, Math.min(block.height, 28))
+                : block.height,
+            };
+            const inner = (
+              <>
                 <span
                   className={cn(
                     "w-1 self-stretch rounded-full shrink-0",
@@ -381,6 +509,31 @@ function DayView({
                   {formatTime(event.startMs)}
                   {detail ? ` · ${detail}` : ""}
                 </span>
+              </>
+            );
+            if (interactive) {
+              return (
+                <button
+                  key={event.id}
+                  type="button"
+                  className={className}
+                  style={stylePos}
+                  title={titleParts.join(" · ")}
+                  aria-label={titleParts.join(", ")}
+                  onClick={() => onEventClick(event.id, dateKey)}
+                >
+                  {inner}
+                </button>
+              );
+            }
+            return (
+              <div
+                key={event.id}
+                className={className}
+                style={stylePos}
+                title={titleParts.join(" · ")}
+              >
+                {inner}
               </div>
             );
           })}
@@ -390,109 +543,169 @@ function DayView({
   );
 }
 
-function WeekView({
+function WeekOverview({
   days,
   todayKey,
-  gridHeight,
   locale,
   emptyLabel,
+  kindLabel,
+  diaperLabel,
+  interactive,
+  onEventClick,
+  weekTotalsLabel,
+  countLabel,
 }: {
   days: Array<{
     dateKey: string;
     dayStart: number;
     dayEnd: number;
-    events: Array<{
-      id: string;
-      kind: EventKind;
-      startMs: number;
-      endMs?: number;
-      label?: string;
-    }>;
+    events: TimetableEvent[];
   }>;
   todayKey: string;
-  gridHeight: number;
   locale: string;
   emptyLabel: string;
+  kindLabel: (kind: EventKind) => string;
+  diaperLabel: (type: "wet" | "dirty" | "both") => string;
+  interactive: boolean;
+  onEventClick: (eventId: string, dateKey: string) => void;
+  weekTotalsLabel: string;
+  countLabel: (kind: EventKind, count: number) => string;
 }) {
+  const weekCounts = useMemo(() => {
+    const all = days.flatMap((d) => d.events);
+    return countByKind(all);
+  }, [days]);
+
+  const hasAny = days.some((d) => d.events.length > 0);
+
   return (
     <div className="rounded-2xl border border-border bg-surface overflow-hidden">
-      <div className="overflow-x-auto overscroll-x-contain -mx-0 px-2 py-3">
-        <div
-          className="flex gap-1"
-          style={{ minWidth: Math.max(340, days.length * 56 + 40) }}
-        >
-          <HourAxis />
-          <div className="flex gap-1 flex-1">
-            {days.map((day) => (
-              <div key={day.dateKey} className="w-12 shrink-0 min-w-[3rem]">
-                <div
-                  className={cn(
-                    "text-center mb-1 pb-1",
-                    day.dateKey === todayKey && "text-accent-feed"
-                  )}
-                >
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted">
-                    {weekdayShort(day.dateKey, locale)}
-                  </p>
-                  <p
-                    className={cn(
-                      "text-sm font-semibold tabular-nums",
-                      day.dateKey === todayKey
-                        ? "text-accent-feed"
-                        : "text-foreground"
-                    )}
-                  >
-                    {dayNum(day.dateKey)}
-                  </p>
-                </div>
-                <div
-                  className="relative border-l border-border/60"
-                  style={{ height: gridHeight }}
-                >
-                  {HOURS.map((hour) => (
-                    <div
-                      key={hour}
-                      className="absolute left-0 right-0 border-t border-border/50"
-                      style={{ top: (hour - DAY_START_HOUR) * HOUR_PX }}
-                    />
-                  ))}
-                  {day.events.map((event) => {
-                    const block = clampBlock(
-                      event.startMs,
-                      event.endMs,
-                      day.dayStart,
-                      day.dayEnd
-                    );
-                    if (!block) return null;
-                    const style = KIND_STYLE[event.kind];
-                    const isNap = event.kind === "nap";
-                    return (
-                      <div
-                        key={event.id}
-                        className={cn(
-                          "absolute left-0.5 right-0.5 rounded-sm z-10",
-                          style.bar,
-                          !isNap && "opacity-90"
-                        )}
-                        style={{
-                          top: block.top,
-                          height: isNap
-                            ? block.height
-                            : Math.max(6, Math.min(block.height, 10)),
-                        }}
-                        title={`${event.kind} ${formatTime(event.startMs)}`}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        {days.every((d) => d.events.length === 0) && (
-          <p className="text-center text-sm text-muted py-4">{emptyLabel}</p>
+      <div className="px-3 pt-3">
+        <KindLegend kindLabel={kindLabel} />
+        {hasAny && (
+          <p className="text-[11px] text-muted mb-2 leading-snug">
+            <span className="font-medium text-foreground/80">
+              {weekTotalsLabel}
+            </span>
+            {": "}
+            {KIND_ORDER.filter((k) => weekCounts[k] > 0)
+              .map((k) => countLabel(k, weekCounts[k]))
+              .join(" · ")}
+          </p>
         )}
       </div>
+
+      {!hasAny ? (
+        <p className="text-center text-sm text-muted py-6 px-3">{emptyLabel}</p>
+      ) : (
+        <ul className="divide-y divide-border/70">
+          {days.map((day) => {
+            const counts = countByKind(day.events);
+            const isToday = day.dateKey === todayKey;
+            return (
+              <li key={day.dateKey} className="px-3 py-2.5">
+                <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                  <p
+                    className={cn(
+                      "text-sm font-semibold",
+                      isToday ? "text-accent-feed" : "text-foreground"
+                    )}
+                  >
+                    <span className="uppercase tracking-wide text-[11px] font-medium text-muted mr-1.5">
+                      {weekdayShort(day.dateKey, locale)}
+                    </span>
+                    {dayNum(day.dateKey)}
+                  </p>
+                  {day.events.length === 0 ? (
+                    <span className="text-[11px] text-muted/70">—</span>
+                  ) : (
+                    <span className="text-[11px] text-muted tabular-nums text-right">
+                      {KIND_ORDER.filter((k) => counts[k] > 0)
+                        .map((k) => `${counts[k]} ${kindLabel(k)}`)
+                        .join(" · ")}
+                    </span>
+                  )}
+                </div>
+
+                {day.events.length > 0 && (
+                  <ul className="space-y-1">
+                    {day.events.map((event) => {
+                      const style = KIND_STYLE[event.kind];
+                      const detail =
+                        event.kind === "diaper" &&
+                        (event.label === "wet" ||
+                          event.label === "dirty" ||
+                          event.label === "both")
+                          ? diaperLabel(event.label)
+                          : event.label;
+                      const titleParts = [
+                        kindLabel(event.kind),
+                        formatTime(event.startMs),
+                        event.caregiverName ?? null,
+                      ].filter(Boolean);
+                      const rowClass = cn(
+                        "w-full flex items-center gap-1.5 rounded-lg px-1.5 py-1 min-w-0 text-left",
+                        style.bg,
+                        interactive &&
+                          "cursor-pointer touch-manipulation active:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-terracotta"
+                      );
+                      const content = (
+                        <>
+                          <span
+                            className={cn(
+                              "w-1 self-stretch min-h-[14px] rounded-full shrink-0",
+                              style.bar
+                            )}
+                          />
+                          <ActivityIcon
+                            type={style.icon}
+                            size={12}
+                            strokeWidth={2.25}
+                            className={cn(style.text, "shrink-0")}
+                          />
+                          <span
+                            className={cn(
+                              "text-[11px] font-semibold truncate",
+                              style.text
+                            )}
+                          >
+                            {formatTime(event.startMs)}
+                            {" · "}
+                            {kindLabel(event.kind)}
+                            {detail ? ` · ${detail}` : ""}
+                          </span>
+                        </>
+                      );
+                      if (interactive) {
+                        return (
+                          <li key={event.id}>
+                            <button
+                              type="button"
+                              className={rowClass}
+                              title={titleParts.join(" · ")}
+                              aria-label={titleParts.join(", ")}
+                              onClick={() =>
+                                onEventClick(event.id, day.dateKey)
+                              }
+                            >
+                              {content}
+                            </button>
+                          </li>
+                        );
+                      }
+                      return (
+                        <li key={event.id} className={rowClass} title={titleParts.join(" · ")}>
+                          {content}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

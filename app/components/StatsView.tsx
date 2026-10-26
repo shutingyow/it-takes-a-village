@@ -512,6 +512,8 @@ export function StatsView({
           dateKey={selectedDateKey}
           hideRangeToggle
           className="px-0 pb-4"
+          secretLink={secretLink}
+          selectedCaregiver={selectedCaregiver}
         />
       )}
 
@@ -529,14 +531,16 @@ export function StatsView({
                   label={t("statsTotalFeeds")}
                   value={String(day.feedCount)}
                 />
-                <StatLine
-                  label={t("statsBreastfeeding")}
-                  value={String(day.breastCount)}
-                />
-                <StatLine
-                  label={t("statsBottle")}
-                  value={String(day.bottleCount)}
-                />
+                <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
+                  <StatLine
+                    label={t("statsBreastfeeding")}
+                    value={String(day.breastCount)}
+                  />
+                  <StatLine
+                    label={t("statsBottle")}
+                    value={String(day.bottleCount)}
+                  />
+                </div>
               </>
             )}
           </SummaryCard>
@@ -580,9 +584,11 @@ export function StatsView({
                   label={t("statsTotalDiapers")}
                   value={String(day.diaperCount)}
                 />
-                <StatLine label={t("wet")} value={String(wetOnly)} />
-                <StatLine label={t("dirty")} value={String(dirtyOnly)} />
-                <StatLine label={t("both")} value={String(day.bothCount)} />
+                <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
+                  <StatLine label={t("wet")} value={String(wetOnly)} />
+                  <StatLine label={t("dirty")} value={String(dirtyOnly)} />
+                  <StatLine label={t("both")} value={String(day.bothCount)} />
+                </div>
               </>
             )}
           </SummaryCard>
@@ -776,6 +782,8 @@ export function StatsView({
             weekAlign="ending"
             hideRangeToggle
             className="px-0 pb-4"
+            secretLink={secretLink}
+            selectedCaregiver={selectedCaregiver}
           />
         </>
       )}

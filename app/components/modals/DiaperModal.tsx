@@ -12,6 +12,7 @@ import type { TranslationKey } from "@/app/lib/i18n/en";
 import { EntryPhotoField } from "../EntryPhotoField";
 import { EntryTimeField } from "../EntryTimeField";
 import type { ActivityEntry } from "../ActivityEntryCard";
+import { LoggedByHint } from "../LoggedByHint";
 
 type DiaperEditEntry = Extract<ActivityEntry, { entryType: "diaper" }>;
 
@@ -138,6 +139,7 @@ export function DiaperModal({
       onClose={onClose}
     >
       <div className="space-y-4 pt-2">
+        {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
         <div>
           <label className="label-field">{t("type")}</label>
           <div className="space-y-2">

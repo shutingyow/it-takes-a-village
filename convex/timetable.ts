@@ -19,6 +19,7 @@ const timetableEventValidator = v.object({
   startMs: v.number(),
   endMs: v.optional(v.number()),
   label: v.optional(v.string()),
+  caregiverName: v.optional(v.string()),
 });
 
 /**
@@ -56,6 +57,7 @@ export const getSchedule = query({
         startMs: number;
         endMs?: number;
         label?: string;
+        caregiverName?: string;
       }>;
     }> = [];
 
@@ -108,6 +110,7 @@ export const getSchedule = query({
           id: e._id,
           kind: "feed" as const,
           startMs: e.timestamp,
+          caregiverName: e.caregiverName,
           ...(e.amount !== undefined ? { label: `${e.amount} ml` } : {}),
         })),
         ...diapers.map((e) => ({
@@ -115,18 +118,21 @@ export const getSchedule = query({
           kind: "diaper" as const,
           startMs: e.timestamp,
           label: e.type,
+          caregiverName: e.caregiverName,
         })),
         ...pumps.map((e) => ({
           id: e._id,
           kind: "pump" as const,
           startMs: e.timestamp,
           label: `${e.amount} ml`,
+          caregiverName: e.caregiverName,
         })),
         ...naps.map((e) => ({
           id: e._id,
           kind: "nap" as const,
           startMs: e.startTime,
           endMs: e.endTime ?? args.now,
+          caregiverName: e.caregiverName,
         })),
       ].sort((a, b) => a.startMs - b.startMs);
 

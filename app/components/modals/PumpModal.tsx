@@ -11,6 +11,7 @@ import { IconPump } from "../icons";
 import { EntryPhotoField } from "../EntryPhotoField";
 import { EntryTimeField } from "../EntryTimeField";
 import type { ActivityEntry } from "../ActivityEntryCard";
+import { LoggedByHint } from "../LoggedByHint";
 
 type PumpEditEntry = Extract<ActivityEntry, { entryType: "pump" }>;
 
@@ -87,6 +88,7 @@ export function PumpModal({
       onClose={onClose}
     >
       <div className="space-y-4 pt-2">
+        {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
         <div>
           <label className="label-field">{t("pumpAmount", { amount })}</label>
           <div className="flex items-center gap-3">

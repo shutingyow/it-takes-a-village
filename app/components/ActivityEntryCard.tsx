@@ -267,6 +267,16 @@ function getTitle(entry: ActivityEntry, t: TFunction): string {
   return t("health");
 }
 
+function appendLoggedBy(
+  parts: string[],
+  caregiverName: string | undefined,
+  t: TFunction
+): string | null {
+  const name = caregiverName?.trim();
+  if (name) parts.push(t("loggedBy", { name }));
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 function getSubtitle(entry: ActivityEntry, t: TFunction): string | null {
   if (entry.entryType === "feed") {
     const parts: string[] = [];
@@ -287,7 +297,7 @@ function getSubtitle(entry: ActivityEntry, t: TFunction): string | null {
     } else if (entry.type === "bottle" && entry.bottleTemperature === "warm40") {
       parts.push(t("bottleTempWarm40"));
     }
-    return parts.length > 0 ? parts.join(" · ") : null;
+    return appendLoggedBy(parts, entry.caregiverName, t);
   }
   if (entry.entryType === "sleep") {
     if (entry.endTime) {
@@ -307,30 +317,35 @@ function getSubtitle(entry: ActivityEntry, t: TFunction): string | null {
     } else if (!entry.endTime) {
       parts.push(t("nappingNow"));
     }
-    parts.push(t("loggedBy", { name: entry.caregiverName }));
-    return parts.join(" · ");
+    return appendLoggedBy(parts, entry.caregiverName, t);
   }
   if (entry.entryType === "activity") {
     const parts: string[] = [];
     if (entry.durationMinutes) {
       parts.push(t("feedDurationMinutes", { min: entry.durationMinutes }));
     }
-    parts.push(t("loggedBy", { name: entry.caregiverName }));
-    return parts.join(" · ");
+    return appendLoggedBy(parts, entry.caregiverName, t);
   }
   if (entry.entryType === "moment") {
-    return t("loggedBy", { name: entry.caregiverName });
+    return appendLoggedBy([], entry.caregiverName, t);
   }
   if (entry.entryType === "diaper") {
-    if (entry.type === "wet") return t("wetOnly");
-    if (entry.type === "dirty") return t("dirty");
-    return t("wetDirty");
+    const parts: string[] = [];
+    if (entry.type === "wet") parts.push(t("wetOnly"));
+    else if (entry.type === "dirty") parts.push(t("dirty"));
+    else parts.push(t("wetDirty"));
+    return appendLoggedBy(parts, entry.caregiverName, t);
   }
   if (entry.entryType === "pump") {
-    return entry.side ? `${entry.side} side` : null;
+    const parts: string[] = [];
+    if (entry.side) parts.push(`${entry.side} side`);
+    return appendLoggedBy(parts, entry.caregiverName, t);
   }
   if (entry.entryType === "health" && entry.type === "medication" && entry.dosage) {
-    return entry.dosage;
+    return appendLoggedBy([entry.dosage], entry.caregiverName, t);
+  }
+  if (entry.entryType === "health" || entry.entryType === "growth") {
+    return appendLoggedBy([], entry.caregiverName, t);
   }
   return null;
 }

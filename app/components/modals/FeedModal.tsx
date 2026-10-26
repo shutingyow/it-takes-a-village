@@ -16,6 +16,7 @@ import { EntryPhotoField } from "../EntryPhotoField";
 import { EntryTimeField } from "../EntryTimeField";
 import { FeedTimer } from "../FeedTimer";
 import type { ActivityEntry } from "../ActivityEntryCard";
+import { LoggedByHint } from "../LoggedByHint";
 
 type FeedEditEntry = Extract<ActivityEntry, { entryType: "feed" }>;
 
@@ -248,6 +249,7 @@ export function FeedModal({
       onClose={onClose}
     >
       <div className="space-y-4 pt-2">
+        {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
         {step === "type" && (
           <div className="space-y-3">
             <p className="text-sm text-muted">{t("selectFeedType")}</p>

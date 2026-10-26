@@ -9,6 +9,7 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ActivityIcon } from "../icons";
 import { EntryTimeField } from "../EntryTimeField";
 import type { ActivityEntry } from "../ActivityEntryCard";
+import { LoggedByHint } from "../LoggedByHint";
 import {
   MOMENT_PRESETS,
   momentPresetKey,
@@ -92,6 +93,7 @@ export function MomentModal({
       onClose={onClose}
     >
       <div className="space-y-4 pt-2 min-w-0">
+        {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
         <div>
           <label className="label-field">{t("momentPresetLabel")}</label>
           <div className="flex flex-wrap gap-2">

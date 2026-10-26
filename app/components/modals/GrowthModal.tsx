@@ -8,6 +8,7 @@ import { BottomSheet } from "../ui/BottomSheet";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconGrowth } from "../icons";
 import type { ActivityEntry } from "../ActivityEntryCard";
+import { LoggedByHint } from "../LoggedByHint";
 
 type GrowthEditEntry = Extract<ActivityEntry, { entryType: "growth" }>;
 
@@ -105,6 +106,7 @@ export function GrowthModal({
       onClose={onClose}
     >
       <div className="space-y-4 pt-2">
+        {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
         <div>
           <label className="label-field">{t("growthDate")}</label>
           <input

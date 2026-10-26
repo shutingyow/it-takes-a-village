@@ -10,6 +10,7 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconSleep } from "../icons";
 import { EntryPhotoField } from "../EntryPhotoField";
 import type { ActivityEntry } from "../ActivityEntryCard";
+import { LoggedByHint } from "../LoggedByHint";
 
 type SleepEditEntry = Extract<ActivityEntry, { entryType: "sleep" }>;
 
@@ -223,6 +224,7 @@ export function SleepModal({
         onClose={onClose}
       >
         <div className="space-y-4 pt-2">
+          <LoggedByHint name={editEntry.caregiverName} />
           <div>
             <label className="label-field">{t("sleepType")}</label>
             <div className="flex gap-2">
