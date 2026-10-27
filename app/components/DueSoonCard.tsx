@@ -34,7 +34,23 @@ type DueItem = {
   minutesUntilDue: number;
 };
 
-function HeroDueCard({
+function dueLabel(
+  item: DueItem | null,
+  emptyHint: string,
+  t: (key: "overdueBy" | "dueIn", vars: { time: string }) => string
+): string {
+  if (!item) return emptyHint;
+  if (item.status === "overdue") {
+    return t("overdueBy", {
+      time: formatMinutesCompact(item.minutesUntilDue),
+    });
+  }
+  return t("dueIn", {
+    time: formatMinutesCompact(item.minutesUntilDue),
+  });
+}
+
+function DueRow({
   kind,
   title,
   item,
@@ -47,98 +63,45 @@ function HeroDueCard({
 }) {
   const { t } = useLanguage();
   const isOverdue = item?.status === "overdue";
-  const isSoon = item?.status === "approaching";
-
-  let primary = emptyHint;
-  let secondary: string | null = null;
-
-  if (item) {
-    if (isOverdue) {
-      primary = t("overdueBy", {
-        time: formatMinutesCompact(item.minutesUntilDue),
-      });
-    } else if (item.minutesUntilDue < 60) {
-      primary = t("dueIn", {
-        time: formatMinutesCompact(item.minutesUntilDue),
-      });
-    } else {
-      primary = t("dueIn", {
-        time: formatMinutesCompact(item.minutesUntilDue),
-      });
-    }
-    secondary = t("dueAtClock", { time: formatTime(item.dueAt) });
-  }
+  const primary = dueLabel(item, emptyHint, t);
 
   return (
-    <div
-      className={cn(
-        "rounded-[1.35rem] px-4 py-4 card-shadow border min-w-0 flex-1",
-        !item && "bg-surface border-border",
-        !!item && isOverdue && "bg-terracotta-light border-terracotta/35",
-        !!item && isSoon && !isOverdue && "bg-warning-light border-warning/30",
-        !!item &&
-          !isSoon &&
-          !isOverdue &&
-          (kind === "feed"
-            ? "bg-accent-feed-light border-accent-feed/20"
-            : "bg-accent-pump-light border-accent-pump/25")
-      )}
-    >
-      <div className="flex items-start gap-3 min-w-0">
-        <span
-          className={cn(
-            "w-11 h-11 rounded-2xl flex items-center justify-center shrink-0",
-            !item && "bg-beige-light",
-            !!item && isOverdue && "bg-terracotta/20",
-            !!item && isSoon && !isOverdue && "bg-warning/20",
-            !!item &&
-              !isSoon &&
-              !isOverdue &&
-              kind === "feed" &&
-              "bg-accent-feed/15",
-            !!item &&
-              !isSoon &&
-              !isOverdue &&
-              kind === "pump" &&
-              "bg-accent-pump/20"
-          )}
-        >
-          {kind === "feed" ? (
-            <IconFeed
-              size={22}
-              className={cn(
-                isOverdue ? "text-terracotta" : "text-accent-feed"
-              )}
-            />
-          ) : (
-            <IconPump
-              size={22}
-              className={cn(
-                isOverdue ? "text-terracotta" : "text-accent-pump"
-              )}
-            />
-          )}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted truncate">
-            {title}
-          </p>
-          <p
-            className={cn(
-              "text-2xl font-bold tracking-tight mt-0.5 leading-tight break-words",
-              isOverdue ? "text-terracotta" : "text-foreground",
-              !item && "text-base font-semibold text-muted"
-            )}
-          >
-            {primary}
-          </p>
-          {secondary && (
-            <p className="text-sm font-medium text-muted mt-1 truncate">
-              {secondary}
-            </p>
-          )}
-        </div>
-      </div>
+    <div className="flex items-center gap-2.5 min-w-0 py-1.5">
+      <span
+        className={cn(
+          "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+          isOverdue ? "bg-terracotta/10" : "bg-beige-light"
+        )}
+      >
+        {kind === "feed" ? (
+          <IconFeed
+            size={15}
+            className={isOverdue ? "text-terracotta" : "text-accent-feed"}
+          />
+        ) : (
+          <IconPump
+            size={15}
+            className={isOverdue ? "text-terracotta" : "text-accent-pump"}
+          />
+        )}
+      </span>
+      <p className="text-xs font-semibold text-muted shrink-0 w-[4.5rem] truncate">
+        {title}
+      </p>
+      <p
+        className={cn(
+          "text-sm font-semibold tabular-nums min-w-0 flex-1 truncate",
+          isOverdue ? "text-terracotta" : "text-foreground",
+          !item && "font-medium text-muted"
+        )}
+      >
+        {primary}
+        {item && (
+          <span className="text-muted font-medium ml-1.5">
+            · {formatTime(item.dueAt)}
+          </span>
+        )}
+      </p>
     </div>
   );
 }
@@ -164,12 +127,8 @@ export function DueSoonCard({
 
   if (!dueStatus) {
     return (
-      <div className="px-3 sm:px-4 pb-5 min-w-0">
-        <p className="section-label">{t("whatsDue")}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <div className="h-24 rounded-2xl bg-beige-light animate-pulse" />
-          <div className="h-24 rounded-2xl bg-beige-light animate-pulse" />
-        </div>
+      <div className="px-4 pb-3 min-w-0">
+        <div className="h-14 rounded-xl bg-surface border border-border animate-pulse" />
       </div>
     );
   }
@@ -210,10 +169,12 @@ export function DueSoonCard({
   );
 
   return (
-    <div className="px-3 sm:px-4 pb-5 min-w-0">
-      <p className="section-label">{t("whatsDue")}</p>
-      <div className="grid grid-cols-1 gap-3">
-        <HeroDueCard
+    <div className="px-4 pb-3 min-w-0">
+      <div className="rounded-xl border border-border bg-white px-3 py-2 shadow-sm">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted mb-0.5">
+          {t("whatsDue")}
+        </p>
+        <DueRow
           kind="feed"
           title={
             dueStatus.usingNightInterval
@@ -224,82 +185,76 @@ export function DueSoonCard({
           emptyHint={t("logFeedForDue")}
         />
         {showPump && (
-          <HeroDueCard
-            kind="pump"
-            title={t("nextPumpDue")}
-            item={pumpItem}
-            emptyHint={t("noPumpDueYet")}
-          />
+          <>
+            <div className="border-t border-border/70" />
+            <DueRow
+              kind="pump"
+              title={t("nextPumpDue")}
+              item={pumpItem}
+              emptyHint={t("noPumpDueYet")}
+            />
+          </>
         )}
-      </div>
 
-      {lateLogged && lastFeed && feedItem && (
-        <div className="mt-2.5 flex items-start justify-between gap-2 rounded-xl bg-surface border border-border px-3 py-2.5">
-          <p className="text-xs font-medium text-muted leading-snug min-w-0">
-            {t("feedLateTimingPushed", {
-              time: formatTime(feedItem.dueAt),
-            })}
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              dismissLateFeedAck(lastFeed._id);
-              setAckTick((n) => n + 1);
-            }}
-            className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-primary px-1.5 py-0.5"
-          >
-            {t("gotIt")}
-          </button>
-        </div>
-      )}
+        {lateLogged && lastFeed && feedItem && (
+          <div className="mt-1.5 flex items-start justify-between gap-2 rounded-lg bg-beige-light/80 px-2 py-1.5">
+            <p className="text-[11px] font-medium text-muted leading-snug min-w-0">
+              {t("feedLateTimingPushed", {
+                time: formatTime(feedItem.dueAt),
+              })}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                dismissLateFeedAck(lastFeed._id);
+                setAckTick((n) => n + 1);
+              }}
+              className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-primary px-1"
+            >
+              {t("gotIt")}
+            </button>
+          </div>
+        )}
 
-      {medItems.length > 0 && (
-        <div className="space-y-2 mt-2.5">
-          {medItems.map((item, i) => {
-            const isOverdue = item.status === "overdue";
-            const timeText = isOverdue
-              ? t("overdueBy", {
-                  time: formatMinutesCompact(item.minutesUntilDue),
-                })
-              : t("dueIn", {
-                  time: formatMinutesCompact(item.minutesUntilDue),
-                });
-            return (
-              <div
-                key={`${item.label}-${i}`}
-                className={cn(
-                  "rounded-2xl px-4 py-3 card-shadow border flex items-center gap-3 min-h-[3.25rem]",
-                  isOverdue
-                    ? "bg-[#faf0f0] border-terracotta/30"
-                    : "bg-warning-light border-warning/25"
-                )}
-              >
-                <span
-                  className={cn(
-                    "w-9 h-9 rounded-full flex items-center justify-center shrink-0",
-                    isOverdue ? "bg-terracotta/15" : "bg-warning/15"
-                  )}
+        {medItems.length > 0 && (
+          <div className="mt-1.5 space-y-1 border-t border-border/70 pt-1.5">
+            {medItems.map((item, i) => {
+              const isOverdue = item.status === "overdue";
+              const timeText = isOverdue
+                ? t("overdueBy", {
+                    time: formatMinutesCompact(item.minutesUntilDue),
+                  })
+                : t("dueIn", {
+                    time: formatMinutesCompact(item.minutesUntilDue),
+                  });
+              return (
+                <div
+                  key={`${item.label}-${i}`}
+                  className="flex items-center gap-2 min-w-0 py-0.5"
                 >
-                  <IconMedication size={18} className="text-secondary" />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">
-                    {t("nextDoseDue")}: {item.label}
+                  <IconMedication
+                    size={14}
+                    className={
+                      isOverdue ? "text-terracotta shrink-0" : "text-secondary shrink-0"
+                    }
+                  />
+                  <p className="text-xs font-medium text-foreground truncate min-w-0 flex-1">
+                    {item.label}
                   </p>
                   <p
                     className={cn(
-                      "text-sm font-semibold mt-0.5",
-                      isOverdue ? "text-terracotta" : "text-[#8a7a50]"
+                      "text-xs font-semibold tabular-nums shrink-0",
+                      isOverdue ? "text-terracotta" : "text-muted"
                     )}
                   >
-                    {timeText} · {formatTime(item.dueAt)}
+                    {timeText}
                   </p>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
