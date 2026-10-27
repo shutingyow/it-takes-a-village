@@ -13,6 +13,10 @@ import {
   verifyCaregiver,
 } from "./lib/caregivers";
 import {
+  DEFAULT_NIGHT_FEED_INTERVAL_HOURS,
+  normalizeHhMm,
+} from "./lib/feedSchedule";
+import {
   DEFAULT_PUMP_AMOUNT_ML,
   DEFAULT_PUMP_INTERVAL_HOURS,
   DEFAULT_PUMP_TIMES,
@@ -47,6 +51,10 @@ const trackerReturnValidator = v.object({
   photoStorageId: v.optional(v.id("_storage")),
   caregivers: v.array(caregiverValidator),
   feedIntervalHours: v.optional(v.number()),
+  nightFeedIntervalEnabled: v.optional(v.boolean()),
+  nightFeedIntervalHours: v.optional(v.number()),
+  nightFeedWindowStart: v.optional(v.string()),
+  nightFeedWindowEnd: v.optional(v.string()),
   notifyBeforeMinutes: v.optional(v.number()),
   wakeWindowMinutes: v.optional(v.number()),
   medicationReminders: v.optional(v.array(medicationReminderValidator)),
@@ -277,6 +285,10 @@ export const updateReminderSettings = mutation({
     secretLink: v.string(),
     actingCaregiverName: v.string(),
     feedIntervalHours: v.optional(v.number()),
+    nightFeedIntervalEnabled: v.optional(v.boolean()),
+    nightFeedIntervalHours: v.optional(v.number()),
+    nightFeedWindowStart: v.optional(v.string()),
+    nightFeedWindowEnd: v.optional(v.string()),
     notifyBeforeMinutes: v.optional(v.number()),
     wakeWindowMinutes: v.optional(v.number()),
     medicationReminders: v.optional(
@@ -300,6 +312,10 @@ export const updateReminderSettings = mutation({
 
     const updates: {
       feedIntervalHours?: number;
+      nightFeedIntervalEnabled?: boolean;
+      nightFeedIntervalHours?: number;
+      nightFeedWindowStart?: string;
+      nightFeedWindowEnd?: string;
       notifyBeforeMinutes?: number;
       wakeWindowMinutes?: number;
       medicationReminders?: Array<{
@@ -322,6 +338,37 @@ export const updateReminderSettings = mutation({
         throw new Error("Feed interval must be between 0.5 and 24 hours");
       }
       updates.feedIntervalHours = args.feedIntervalHours;
+    }
+
+    if (args.nightFeedIntervalEnabled !== undefined) {
+      updates.nightFeedIntervalEnabled = args.nightFeedIntervalEnabled;
+    }
+
+    if (args.nightFeedIntervalHours !== undefined) {
+      if (
+        args.nightFeedIntervalHours < 0.5 ||
+        args.nightFeedIntervalHours > 24
+      ) {
+        throw new Error("Night feed interval must be between 0.5 and 24 hours");
+      }
+      updates.nightFeedIntervalHours = args.nightFeedIntervalHours;
+    } else if (
+      args.nightFeedIntervalEnabled === true &&
+      tracker.nightFeedIntervalHours === undefined
+    ) {
+      updates.nightFeedIntervalHours = DEFAULT_NIGHT_FEED_INTERVAL_HOURS;
+    }
+
+    if (args.nightFeedWindowStart !== undefined) {
+      const start = normalizeHhMm(args.nightFeedWindowStart);
+      if (!start) throw new Error("Invalid night window start time");
+      updates.nightFeedWindowStart = start;
+    }
+
+    if (args.nightFeedWindowEnd !== undefined) {
+      const end = normalizeHhMm(args.nightFeedWindowEnd);
+      if (!end) throw new Error("Invalid night window end time");
+      updates.nightFeedWindowEnd = end;
     }
 
     if (args.notifyBeforeMinutes !== undefined) {

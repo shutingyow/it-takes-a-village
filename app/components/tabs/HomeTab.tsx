@@ -8,6 +8,7 @@ import {
   type HomeTileCategory,
 } from "../HomeCategoryGrid";
 import { HomeCategoryDetail } from "../HomeCategoryDetail";
+import { NextFeedBanner } from "../NextFeedBanner";
 import { WellnessTipCard } from "../WellnessTipCard";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
@@ -68,6 +69,8 @@ export function HomeTab({
         photoStorageId={photoStorageId}
         villageFallback={villageFallback}
       />
+
+      <NextFeedBanner trackerId={trackerId} />
 
       <HomeCategoryGrid
         trackerId={trackerId}

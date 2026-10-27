@@ -49,10 +49,14 @@ export type DueNotificationPayload = {
   /** Minutes before due to fire the alert (0 = at due time). */
   notifyBeforeMinutes: number;
   feedTitle: string;
+  /** Title when the feed is already overdue (one-shot). */
+  feedTitleOverdue?: string;
   /** Body for lead-time alerts, e.g. "Feed due in 10 min". */
   feedBodyLead: (minutes: number) => string;
   /** Body when notifying at due time (lead = 0). */
   feedBodyAtDue: (clock: string) => string;
+  /** Body when already past due, e.g. "Feed overdue · was due around 2:30". */
+  feedBodyOverdue: (clock: string) => string;
   /** Body for countdown milestones, e.g. "Next feed in 30 min". */
   feedBodyCountdown: (minutes: number) => string;
   pumpTitle: string;
@@ -234,11 +238,19 @@ export async function syncDueNotifications(
       planned.push({ id, title, body, at: fireAt, tag });
       return;
     }
-    // Overdue: fire once soon, then remember so minute ticks don't re-spam.
+    // Past due / catch-up: arm ASAP. Do not mark "fired" on schedule — a
+    // cancel+resync within a few seconds (focus / settings) used to set the
+    // flag then cancel the pending alert, so the overdue notice never arrived.
     const firedKey = `deviceNotifFired:${tag}`;
+    const armKey = `deviceNotifArm:${tag}`;
     try {
       if (localStorage.getItem(firedKey) === "1") return;
-      localStorage.setItem(firedKey, "1");
+      const armedAt = localStorage.getItem(armKey);
+      if (armedAt && now - Number(armedAt) > 90_000) {
+        localStorage.setItem(firedKey, "1");
+        return;
+      }
+      if (!armedAt) localStorage.setItem(armKey, String(now));
     } catch {
       // ignore quota / private mode
     }
@@ -251,47 +263,73 @@ export async function syncDueNotifications(
     });
   };
 
-  const bodyFor = (
+  /** Minutes remaining at a scheduled fire time (ceil, never negative). */
+  const remainingMinutesAt = (dueAt: number, at: number) =>
+    Math.max(0, Math.ceil((dueAt - at) / 60_000));
+
+  /**
+   * Body must match real remaining time at fire — not the configured lead
+   * alone. Catch-up ASAP fires used to say “due in 10 min” when only 3 were left.
+   */
+  const bodyForDue = (
     dueAt: number,
+    fireAt: number,
     leadBody: (minutes: number) => string,
-    atDueBody: (clock: string) => string
+    atDueBody: (clock: string) => string,
+    overdueBody?: (clock: string) => string
   ) => {
-    if (lead <= 0) {
+    if (dueAt <= now) {
+      return (overdueBody ?? atDueBody)(payload.formatClock(dueAt));
+    }
+    const remaining = remainingMinutesAt(dueAt, Math.max(fireAt, now));
+    if (remaining <= 0) {
       return atDueBody(payload.formatClock(dueAt));
     }
-    return leadBody(lead);
+    return leadBody(remaining);
   };
 
   if (payload.feedDueAt !== null) {
     const feedDueAt = payload.feedDueAt;
     const fireAt = computeNotifyAt(feedDueAt, lead, now);
+    const overdue = feedDueAt <= now;
     planOnce(
       NOTIF_ID.feed,
-      payload.feedTitle,
-      bodyFor(feedDueAt, payload.feedBodyLead, payload.feedBodyAtDue),
+      overdue
+        ? (payload.feedTitleOverdue ?? payload.feedTitle)
+        : payload.feedTitle,
+      bodyForDue(
+        feedDueAt,
+        fireAt,
+        payload.feedBodyLead,
+        payload.feedBodyAtDue,
+        payload.feedBodyOverdue
+      ),
       fireAt,
       `feed-${feedDueAt}-lead${lead}`
     );
 
-    // Updating countdown: discrete milestone alerts before due.
+    // Countdown milestones only while still before due (never after a miss).
     // (True lock-screen ticking timer needs Live Activities — see feedLiveActivity.)
-    const leadMs = lead * 60_000;
-    FEED_COUNTDOWN_MILESTONES.forEach((minsLeft, index) => {
-      const id = NOTIF_ID.feedCountdown[index];
-      if (id === undefined) return;
-      // Skip milestones at/after the configured lead alert (avoid duplicates).
-      if (minsLeft <= lead) return;
-      const milestoneAt = feedDueAt - minsLeft * 60_000;
-      if (milestoneAt <= now) return;
-      if (milestoneAt >= feedDueAt - leadMs && lead > 0) return;
-      planOnce(
-        id,
-        payload.feedTitle,
-        payload.feedBodyCountdown(minsLeft),
-        milestoneAt,
-        `feed-countdown-${feedDueAt}-${minsLeft}`
-      );
-    });
+    if (!overdue) {
+      const leadMs = lead * 60_000;
+      FEED_COUNTDOWN_MILESTONES.forEach((minsLeft, index) => {
+        const id = NOTIF_ID.feedCountdown[index];
+        if (id === undefined) return;
+        // Skip milestones at/after the configured lead alert (avoid duplicates).
+        if (minsLeft <= lead) return;
+        const milestoneAt = feedDueAt - minsLeft * 60_000;
+        if (milestoneAt <= now) return;
+        if (milestoneAt >= feedDueAt - leadMs && lead > 0) return;
+        // Body uses the milestone’s own remaining minutes (= minsLeft at fire).
+        planOnce(
+          id,
+          payload.feedTitle,
+          payload.feedBodyCountdown(minsLeft),
+          milestoneAt,
+          `feed-countdown-${feedDueAt}-${minsLeft}`
+        );
+      });
+    }
   }
 
   payload.pumpDueAts.slice(0, NOTIF_ID.pump.length).forEach((dueAt, index) => {
@@ -301,7 +339,7 @@ export async function syncDueNotifications(
     planOnce(
       id,
       payload.pumpTitle,
-      bodyFor(dueAt, payload.pumpBodyLead, payload.pumpBodyAtDue),
+      bodyForDue(dueAt, fireAt, payload.pumpBodyLead, payload.pumpBodyAtDue),
       fireAt,
       `pump-${dueAt}-lead${lead}`
     );
@@ -318,7 +356,7 @@ export async function syncDueNotifications(
     planOnce(
       NOTIF_ID.nap,
       payload.napTitle,
-      bodyFor(napDueAt, payload.napBodyLead, payload.napBodyAtDue),
+      bodyForDue(napDueAt, fireAt, payload.napBodyLead, payload.napBodyAtDue),
       fireAt,
       `nap-${napDueAt}-lead${lead}`
     );

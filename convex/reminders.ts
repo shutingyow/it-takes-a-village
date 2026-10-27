@@ -1,6 +1,13 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import {
+  clampFeedAtForSkew,
+  computeFeedDueAt,
+  DEFAULT_FEED_INTERVAL_HOURS,
+  effectiveFeedIntervalHours as resolveEffectiveFeedIntervalHours,
+  resolveNightFeedSettings,
+} from "./lib/feedSchedule";
+import {
   computeIntervalPumpDueAt,
   computeNextPumpDueAt,
   DEFAULT_PUMP_INTERVAL_HOURS,
@@ -52,20 +59,35 @@ export const getDueStatus = query({
   },
   returns: v.object({
     feedIntervalHours: v.number(),
+    /** Interval actually used for the current next-feed due (day or night). */
+    effectiveFeedIntervalHours: v.number(),
+    nightFeedIntervalEnabled: v.boolean(),
+    nightFeedIntervalHours: v.number(),
+    nightFeedWindowStart: v.string(),
+    nightFeedWindowEnd: v.string(),
+    usingNightInterval: v.boolean(),
     notifyBeforeMinutes: v.number(),
     items: v.array(dueItemValidator),
   }),
   handler: async (ctx, args) => {
     const tracker = await ctx.db.get("trackers", args.trackerId);
+    const night = resolveNightFeedSettings(tracker ?? undefined);
     if (!tracker) {
       return {
-        feedIntervalHours: 2.5,
+        feedIntervalHours: DEFAULT_FEED_INTERVAL_HOURS,
+        effectiveFeedIntervalHours: DEFAULT_FEED_INTERVAL_HOURS,
+        nightFeedIntervalEnabled: night.enabled,
+        nightFeedIntervalHours: night.intervalHours,
+        nightFeedWindowStart: night.start,
+        nightFeedWindowEnd: night.end,
+        usingNightInterval: false,
         notifyBeforeMinutes: DEFAULT_NOTIFY_BEFORE_MINUTES,
         items: [],
       };
     }
 
-    const feedIntervalHours = tracker.feedIntervalHours ?? 2.5;
+    const feedIntervalHours =
+      tracker.feedIntervalHours ?? DEFAULT_FEED_INTERVAL_HOURS;
     const notifyBeforeMinutes =
       tracker.notifyBeforeMinutes ?? DEFAULT_NOTIFY_BEFORE_MINUTES;
     const items: Array<{
@@ -76,6 +98,9 @@ export const getDueStatus = query({
       minutesUntilDue: number;
     }> = [];
 
+    let effectiveFeedIntervalHours = feedIntervalHours;
+    let usingNightInterval = false;
+
     const lastFeed = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
@@ -83,16 +108,21 @@ export const getDueStatus = query({
       .first();
 
     if (lastFeed) {
-      // Always last feed + feedIntervalHours (default 2.5). Never a hardcoded 3h.
-      // Clamp tiny clock-skew / "now" picker drift so a feed logged a few seconds
-      // ahead still yields ~2h 30m, not ~2h 31m + confusion with "just now".
-      const CLOCK_SKEW_MS = 2 * 60 * 1000;
-      const feedAt =
-        lastFeed.timestamp > args.now &&
-        lastFeed.timestamp - args.now <= CLOCK_SKEW_MS
-          ? args.now
-          : lastFeed.timestamp;
-      const dueAt = feedAt + feedIntervalHours * 60 * 60 * 1000;
+      // last feed + day or night interval (never a hardcoded 3h).
+      const feedAt = clampFeedAtForSkew(lastFeed.timestamp, args.now);
+      effectiveFeedIntervalHours = resolveEffectiveFeedIntervalHours(
+        feedAt,
+        feedIntervalHours,
+        night
+      );
+      usingNightInterval =
+        night.enabled && effectiveFeedIntervalHours > feedIntervalHours + 1e-9;
+      const dueAt = computeFeedDueAt(
+        lastFeed.timestamp,
+        feedIntervalHours,
+        night,
+        { now: args.now }
+      );
       const due = computeDueStatus(dueAt, args.now);
       items.push({
         type: "feed",
@@ -178,6 +208,16 @@ export const getDueStatus = query({
 
     items.sort((a, b) => a.dueAt - b.dueAt);
 
-    return { feedIntervalHours, notifyBeforeMinutes, items };
+    return {
+      feedIntervalHours,
+      effectiveFeedIntervalHours,
+      nightFeedIntervalEnabled: night.enabled,
+      nightFeedIntervalHours: night.intervalHours,
+      nightFeedWindowStart: night.start,
+      nightFeedWindowEnd: night.end,
+      usingNightInterval,
+      notifyBeforeMinutes,
+      items,
+    };
   },
 });

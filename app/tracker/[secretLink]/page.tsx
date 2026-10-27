@@ -336,6 +336,10 @@ export default function TrackerPage({
             babyName={tracker.babyName}
             birthDate={tracker.birthDate}
             feedIntervalHours={tracker.feedIntervalHours}
+            nightFeedIntervalEnabled={tracker.nightFeedIntervalEnabled}
+            nightFeedIntervalHours={tracker.nightFeedIntervalHours}
+            nightFeedWindowStart={tracker.nightFeedWindowStart}
+            nightFeedWindowEnd={tracker.nightFeedWindowEnd}
             notifyBeforeMinutes={tracker.notifyBeforeMinutes}
             wakeWindowMinutes={tracker.wakeWindowMinutes}
             medicationReminders={tracker.medicationReminders}

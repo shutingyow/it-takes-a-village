@@ -21,6 +21,11 @@ import {
   setDeviceRemindersEnabled,
   type NotifPermission,
 } from "@/app/lib/deviceNotifications";
+import {
+  DEFAULT_NIGHT_FEED_END,
+  DEFAULT_NIGHT_FEED_INTERVAL_HOURS,
+  DEFAULT_NIGHT_FEED_START,
+} from "@/convex/lib/feedSchedule";
 
 const NOTIFY_BEFORE_OPTIONS = [0, 5, 10, 15, 20, 30] as const;
 const DEFAULT_WAKE_WINDOW_MINUTES = 90;
@@ -30,6 +35,10 @@ interface ReminderSettingsViewProps {
   selectedCaregiver: string;
   babyName?: string;
   feedIntervalHours?: number;
+  nightFeedIntervalEnabled?: boolean;
+  nightFeedIntervalHours?: number;
+  nightFeedWindowStart?: string;
+  nightFeedWindowEnd?: string;
   notifyBeforeMinutes?: number;
   wakeWindowMinutes?: number;
   medicationReminders?: Array<{
@@ -65,6 +74,10 @@ export function ReminderSettingsView({
   selectedCaregiver,
   babyName,
   feedIntervalHours: initialFeedHours,
+  nightFeedIntervalEnabled: initialNightEnabled,
+  nightFeedIntervalHours: initialNightHours,
+  nightFeedWindowStart: initialNightStart,
+  nightFeedWindowEnd: initialNightEnd,
   notifyBeforeMinutes: initialNotifyBefore,
   wakeWindowMinutes: initialWakeWindow,
   medicationReminders: initialMeds,
@@ -75,6 +88,18 @@ export function ReminderSettingsView({
   const updateSettings = useMutation(api.trackers.updateReminderSettings);
 
   const [feedHours, setFeedHours] = useState(String(initialFeedHours ?? 2.5));
+  const [nightEnabled, setNightEnabled] = useState(
+    initialNightEnabled ?? true
+  );
+  const [nightHours, setNightHours] = useState(
+    String(initialNightHours ?? DEFAULT_NIGHT_FEED_INTERVAL_HOURS)
+  );
+  const [nightStart, setNightStart] = useState(
+    initialNightStart ?? DEFAULT_NIGHT_FEED_START
+  );
+  const [nightEnd, setNightEnd] = useState(
+    initialNightEnd ?? DEFAULT_NIGHT_FEED_END
+  );
   const [notifyBefore, setNotifyBefore] = useState(
     String(initialNotifyBefore ?? DEFAULT_NOTIFY_BEFORE_MINUTES)
   );
@@ -169,6 +194,16 @@ export function ReminderSettingsView({
       if (isNaN(parsed) || parsed <= 0) {
         throw new Error("Invalid feed interval");
       }
+      const nightParsed = parseFloat(nightHours);
+      if (
+        nightEnabled &&
+        (isNaN(nightParsed) || nightParsed < 0.5 || nightParsed > 24)
+      ) {
+        throw new Error("Invalid night feed interval");
+      }
+      if (!nightStart || !nightEnd) {
+        throw new Error("Night window times required");
+      }
       const lead = parseInt(notifyBefore, 10);
       if (!(NOTIFY_BEFORE_OPTIONS as readonly number[]).includes(lead)) {
         throw new Error("Invalid notify-before minutes");
@@ -196,6 +231,12 @@ export function ReminderSettingsView({
         secretLink,
         actingCaregiverName: selectedCaregiver,
         feedIntervalHours: parsed,
+        nightFeedIntervalEnabled: nightEnabled,
+        nightFeedIntervalHours: nightEnabled
+          ? nightParsed
+          : parseFloat(nightHours) || DEFAULT_NIGHT_FEED_INTERVAL_HOURS,
+        nightFeedWindowStart: nightStart,
+        nightFeedWindowEnd: nightEnd,
         notifyBeforeMinutes: lead,
         wakeWindowMinutes: wakeMins,
         medicationReminders: meds,
@@ -329,7 +370,7 @@ export function ReminderSettingsView({
         <select
           value={notifyBefore}
           onChange={(e) => setNotifyBefore(e.target.value)}
-          className="input-field"
+          className="input-field mb-4"
         >
           {NOTIFY_BEFORE_OPTIONS.map((mins) => (
             <option key={mins} value={String(mins)}>
@@ -339,6 +380,66 @@ export function ReminderSettingsView({
             </option>
           ))}
         </select>
+
+        <div className="border-t border-border pt-3">
+          <label className="flex items-center justify-between gap-3 mb-2">
+            <span className="text-sm font-semibold text-foreground">
+              {t("nightFeedReminders")}
+            </span>
+            <input
+              type="checkbox"
+              checked={nightEnabled}
+              onChange={(e) => setNightEnabled(e.target.checked)}
+              className="size-4 accent-primary"
+            />
+          </label>
+          <p className="text-xs text-muted mb-3 leading-snug">
+            {t("nightFeedRemindersHint")}
+          </p>
+          {nightEnabled && (
+            <>
+              <label className="label-field">
+                {t("nightFeedIntervalHours")}
+              </label>
+              <input
+                type="number"
+                min="0.5"
+                max="24"
+                step="0.5"
+                value={nightHours}
+                onChange={(e) => setNightHours(e.target.value)}
+                className="input-field mb-3"
+              />
+              <p className="text-xs font-medium text-muted mb-2">
+                {t("nightFeedWindow")} · Asia/Singapore
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="label-field">
+                    {t("nightFeedWindowStart")}
+                  </label>
+                  <input
+                    type="time"
+                    value={nightStart}
+                    onChange={(e) => setNightStart(e.target.value)}
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="label-field">
+                    {t("nightFeedWindowEnd")}
+                  </label>
+                  <input
+                    type="time"
+                    value={nightEnd}
+                    onChange={(e) => setNightEnd(e.target.value)}
+                    className="input-field"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">

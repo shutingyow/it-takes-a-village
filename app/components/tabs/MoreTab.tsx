@@ -51,6 +51,10 @@ interface MoreTabProps {
   caregivers: CaregiverInfo[];
   babyName?: string;
   feedIntervalHours?: number;
+  nightFeedIntervalEnabled?: boolean;
+  nightFeedIntervalHours?: number;
+  nightFeedWindowStart?: string;
+  nightFeedWindowEnd?: string;
   notifyBeforeMinutes?: number;
   wakeWindowMinutes?: number;
   medicationReminders?: Array<{
@@ -76,6 +80,10 @@ export function MoreTab({
   caregivers,
   babyName,
   feedIntervalHours,
+  nightFeedIntervalEnabled,
+  nightFeedIntervalHours,
+  nightFeedWindowStart,
+  nightFeedWindowEnd,
   notifyBeforeMinutes,
   wakeWindowMinutes,
   medicationReminders,
@@ -276,6 +284,10 @@ export function MoreTab({
         selectedCaregiver={selectedCaregiver}
         babyName={babyName}
         feedIntervalHours={feedIntervalHours}
+        nightFeedIntervalEnabled={nightFeedIntervalEnabled}
+        nightFeedIntervalHours={nightFeedIntervalHours}
+        nightFeedWindowStart={nightFeedWindowStart}
+        nightFeedWindowEnd={nightFeedWindowEnd}
         notifyBeforeMinutes={notifyBeforeMinutes}
         wakeWindowMinutes={wakeWindowMinutes}
         medicationReminders={medicationReminders}

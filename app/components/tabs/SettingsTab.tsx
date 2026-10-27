@@ -39,6 +39,10 @@ interface SettingsTabProps {
   babyName?: string;
   birthDate?: string;
   feedIntervalHours?: number;
+  nightFeedIntervalEnabled?: boolean;
+  nightFeedIntervalHours?: number;
+  nightFeedWindowStart?: string;
+  nightFeedWindowEnd?: string;
   notifyBeforeMinutes?: number;
   wakeWindowMinutes?: number;
   medicationReminders?: Array<{
@@ -65,6 +69,10 @@ export function SettingsTab({
   babyName,
   birthDate,
   feedIntervalHours,
+  nightFeedIntervalEnabled,
+  nightFeedIntervalHours,
+  nightFeedWindowStart,
+  nightFeedWindowEnd,
   notifyBeforeMinutes,
   wakeWindowMinutes,
   medicationReminders,
@@ -109,6 +117,10 @@ export function SettingsTab({
         selectedCaregiver={selectedCaregiver}
         babyName={babyName}
         feedIntervalHours={feedIntervalHours}
+        nightFeedIntervalEnabled={nightFeedIntervalEnabled}
+        nightFeedIntervalHours={nightFeedIntervalHours}
+        nightFeedWindowStart={nightFeedWindowStart}
+        nightFeedWindowEnd={nightFeedWindowEnd}
         notifyBeforeMinutes={notifyBeforeMinutes}
         wakeWindowMinutes={wakeWindowMinutes}
         medicationReminders={medicationReminders}

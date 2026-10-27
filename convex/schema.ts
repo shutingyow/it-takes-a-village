@@ -59,6 +59,17 @@ export default defineSchema({
     ),
     caregiverNames: v.optional(v.array(v.string())), // legacy — migrated on read
     feedIntervalHours: v.optional(v.number()),
+    /**
+     * Longer overnight feed gap. When enabled, feeds logged inside the night
+     * window (local Asia/Singapore by default) use nightFeedIntervalHours.
+     * Defaults applied in feedSchedule when unset.
+     */
+    nightFeedIntervalEnabled: v.optional(v.boolean()),
+    nightFeedIntervalHours: v.optional(v.number()),
+    /** Local HH:mm inclusive start, e.g. "22:00". */
+    nightFeedWindowStart: v.optional(v.string()),
+    /** Local HH:mm exclusive end, e.g. "07:00". */
+    nightFeedWindowEnd: v.optional(v.string()),
     /** Minutes before due time to fire device notifications (0 = at due). Default 10. */
     notifyBeforeMinutes: v.optional(v.number()),
     /** Typical awake time after a nap ends before the next nap is due (minutes). */

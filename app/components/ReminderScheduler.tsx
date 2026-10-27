@@ -40,6 +40,9 @@ interface ReminderSchedulerProps {
  * Mount once on the open tracker (caregiver unlocked). Opt-in is localStorage.
  * Feed (and pump-in-interval-mode) fire at due − notifyBeforeMinutes.
  * Feed countdown is suppressed while a feed timer is actively recording.
+ *
+ * Resyncs when due timestamps / status / settings change — not every clock tick —
+ * so cancel+reschedule does not eat an overdue ASAP alert.
  */
 export function ReminderScheduler({
   trackerId,
@@ -86,11 +89,16 @@ export function ReminderScheduler({
     limit: 10,
   });
 
+  const feedItem = dueStatus?.items.find((item) => item.type === "feed");
+  const feedDueKey = feedItem
+    ? `${feedItem.dueAt}:${feedItem.status}`
+    : "none";
+  const hourBucket = Math.floor(now / 3_600_000);
+
   useEffect(() => {
     if (!dueStatus) return;
 
     const enabled = getDeviceRemindersEnabled();
-    const feedItem = dueStatus.items.find((item) => item.type === "feed");
     const lead =
       notifyBeforeProp ??
       dueStatus.notifyBeforeMinutes ??
@@ -103,7 +111,7 @@ export function ReminderScheduler({
         const dueAt = computeIntervalPumpDueAt(
           lastPump?.timestamp,
           pumpSchedule.intervalHours ?? DEFAULT_PUMP_INTERVAL_HOURS,
-          now
+          Date.now()
         );
         if (dueAt !== null) pumpDueAts = [dueAt];
       } else {
@@ -115,7 +123,7 @@ export function ReminderScheduler({
             timezone: pumpSchedule.timezone,
           },
           lastPump?.timestamp,
-          now,
+          Date.now(),
           6
         );
       }
@@ -135,15 +143,21 @@ export function ReminderScheduler({
       }
     }
 
+    const feedOverdue =
+      feedItem != null && feedItem.status === "overdue" && feedDueAt !== null;
+
     void syncDueNotifications({
       feedDueAt,
       pumpDueAts,
       napDueAt,
       notifyBeforeMinutes: lead,
       feedTitle: t("nextFeedDue"),
+      feedTitleOverdue: t("feedOverdueTitle"),
       feedBodyLead: (minutes) =>
         t("deviceNotifFeedLead", { minutes: String(minutes) }),
       feedBodyAtDue: (clock) => t("deviceNotifFeedBody", { time: clock }),
+      feedBodyOverdue: (clock) =>
+        t("deviceNotifFeedOverdue", { time: clock }),
       feedBodyCountdown: (minutes) =>
         t("deviceNotifFeedCountdown", { minutes: String(minutes) }),
       pumpTitle: t("nextPumpDue"),
@@ -158,13 +172,17 @@ export function ReminderScheduler({
     });
 
     void syncFeedLiveActivity({
-      enabled: enabled && !recording,
-      feedDueAt,
+      // Overdue: end the Live Activity (don't let the lock-screen timer count up).
+      enabled: enabled && !recording && !feedOverdue,
+      feedDueAt: feedOverdue ? null : feedDueAt,
       title: t("nextFeedDue"),
       subtitle: t("liveActivityFeedSubtitle"),
     });
   }, [
     dueStatus,
+    feedItem,
+    feedDueKey,
+    hourBucket,
     lastPump?.timestamp,
     recentSleep,
     pumpSchedule,
@@ -172,7 +190,6 @@ export function ReminderScheduler({
     notifyBeforeProp,
     wakeWindowMinutes,
     secretLink,
-    now,
     t,
     optInTick,
   ]);

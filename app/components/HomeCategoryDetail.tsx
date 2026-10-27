@@ -240,7 +240,11 @@ export function HomeCategoryDetail({
                       : "text-xs font-semibold uppercase tracking-wider text-muted mb-1"
                   }
                 >
-                  {category === "feed" ? t("nextFeedDue") : t("nextPumpDue")}
+                  {category === "feed"
+                    ? dueItem?.status === "overdue"
+                      ? t("feedOverdueTitle")
+                      : t("nextFeedDue")
+                    : t("nextPumpDue")}
                 </p>
                 {duePrimary ? (
                   <>

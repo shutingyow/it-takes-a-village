@@ -5,19 +5,14 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useMemo, useState } from "react";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
-import {
-  cn,
-  formatSleepTotal,
-  formatTime,
-  getDateKeyInZone,
-  shiftDateKey,
-} from "@/app/lib/utils";
+import { cn, formatTime, getDateKeyInZone, shiftDateKey } from "@/app/lib/utils";
 import {
   formatAgeOnDate,
   formatInsightDate,
   formatWeekAgeLine,
 } from "@/app/lib/babyAge";
 import { ExportView } from "./ExportView";
+import type { TranslationKey } from "@/app/lib/i18n/en";
 import { BirthDateField } from "./BirthDateField";
 import { TodayTimetable } from "./TodayTimetable";
 
@@ -31,82 +26,154 @@ interface StatsViewProps {
   title?: string;
 }
 
+type ChartMetric = "feeds" | "milk" | "diapers" | "pumps";
 type RangeMode = "daily" | "weekly";
 
-function weekdayShortFromKey(dateKey: string, locale: string): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  if (!y || !m || !d) return dateKey;
-  return new Date(y, m - 1, d).toLocaleDateString(locale, { weekday: "short" });
-}
+const METRIC_COLOURS: Record<"feeds" | "diapers" | "pumps", string> = {
+  feeds: "#c4846a",
+  diapers: "#8fa68f",
+  pumps: "#a89b8a",
+};
 
-function dayNumFromKey(dateKey: string): string {
-  const day = dateKey.split("-")[2];
-  return day ? String(Number(day)) : "";
-}
-
-function WeekFeedBars({
-  days,
-  todayKey,
-  locale,
-  legend,
-  onSelectDay,
-  viewDayAria,
+function BarChart({
+  data,
+  maxValue,
+  colour,
+  formatValue,
 }: {
-  days: Array<{ date: string; feedCount: number }>;
-  todayKey: string;
-  locale: string;
-  legend: string;
-  onSelectDay: (dateKey: string) => void;
-  viewDayAria: (dayLabel: string) => string;
+  data: Array<{ label: string; value: number }>;
+  maxValue: number;
+  colour: string;
+  formatValue?: (value: number) => string;
 }) {
-  const maxValue = Math.max(...days.map((d) => d.feedCount), 1);
-
   return (
-    <div className="bg-surface border border-border rounded-2xl p-4 card-shadow">
-      <p className="text-sm font-semibold text-foreground mb-3">{legend}</p>
-      <div className="flex items-end justify-between gap-1 h-36">
-        {days.map((d) => {
-          const pct = maxValue > 0 ? (d.feedCount / maxValue) * 100 : 0;
-          const dayLabel = weekdayShortFromKey(d.date, locale);
-          const isToday = d.date === todayKey;
-          return (
-            <button
-              key={d.date}
-              type="button"
-              onClick={() => onSelectDay(d.date)}
-              className={cn(
-                "flex-1 flex flex-col items-center gap-1 min-w-0 min-h-[44px] touch-manipulation rounded-xl py-1 transition-colors",
-                "hover:bg-beige-light/80 active:bg-beige-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-terracotta"
-              )}
-              aria-label={viewDayAria(dayLabel)}
-            >
-              <span className="text-[10px] font-medium text-muted tabular-nums h-3.5">
-                {d.feedCount > 0 ? d.feedCount : ""}
-              </span>
-              <div className="w-full flex items-end justify-center h-24">
-                <div
-                  className="w-full max-w-[28px] rounded-t-lg transition-all bg-terracotta"
-                  style={{
-                    height: `${Math.max(pct, d.feedCount > 0 ? 8 : 0)}%`,
-                    opacity: d.feedCount > 0 ? 1 : 0.15,
-                  }}
-                />
-              </div>
-              <span
-                className={cn(
-                  "text-[10px] truncate w-full text-center font-medium",
-                  isToday ? "text-terracotta" : "text-muted"
-                )}
+    <div className="flex items-end justify-between gap-1 h-28">
+      {data.map((d) => {
+        const pct = maxValue > 0 ? (d.value / maxValue) * 100 : 0;
+        const label =
+          d.value > 0
+            ? formatValue
+              ? formatValue(d.value)
+              : String(d.value)
+            : "";
+        return (
+          <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
+            <span className="text-[10px] font-medium text-muted">{label}</span>
+            <div className="w-full flex items-end justify-center h-20">
+              <div
+                className="w-full max-w-[28px] rounded-t-lg transition-all"
+                style={{
+                  height: `${Math.max(pct, d.value > 0 ? 8 : 0)}%`,
+                  backgroundColor: colour,
+                  opacity: d.value > 0 ? 1 : 0.15,
+                }}
+              />
+            </div>
+            <span className="text-[9px] text-muted truncate w-full text-center">
+              {d.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StackedBarChart({
+  data,
+  maxValue,
+  bottomColour,
+  topColour,
+  formatValue,
+}: {
+  data: Array<{
+    label: string;
+    bottom: number;
+    top: number;
+    total: number;
+  }>;
+  maxValue: number;
+  bottomColour: string;
+  topColour: string;
+  formatValue?: (value: number) => string;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-1 h-28">
+      {data.map((d) => {
+        const pct = maxValue > 0 ? (d.total / maxValue) * 100 : 0;
+        const parts = d.bottom + d.top;
+        const bottomShare = parts > 0 ? (d.bottom / parts) * 100 : 0;
+        const valueLabel =
+          d.total > 0
+            ? formatValue
+              ? formatValue(d.total)
+              : String(d.total)
+            : "";
+        return (
+          <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
+            <span className="text-[10px] font-medium text-muted">
+              {valueLabel}
+            </span>
+            <div className="w-full flex items-end justify-center h-20">
+              <div
+                className="w-full max-w-[28px] rounded-t-lg overflow-hidden transition-all flex flex-col-reverse"
+                style={{
+                  height: `${Math.max(pct, d.total > 0 ? 8 : 0)}%`,
+                  opacity: d.total > 0 ? 1 : 0.15,
+                  backgroundColor: d.total === 0 ? bottomColour : undefined,
+                }}
               >
-                {dayLabel}
-              </span>
-              <span className="text-[9px] text-muted/70 tabular-nums leading-none">
-                {dayNumFromKey(d.date)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                {d.total > 0 && (
+                  <>
+                    <div
+                      className="w-full"
+                      style={{
+                        height: `${bottomShare}%`,
+                        backgroundColor: bottomColour,
+                        minHeight: d.bottom > 0 ? 2 : 0,
+                      }}
+                    />
+                    <div
+                      className="w-full"
+                      style={{
+                        height: `${100 - bottomShare}%`,
+                        backgroundColor: topColour,
+                        minHeight: d.top > 0 ? 2 : 0,
+                      }}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
+            <span className="text-[9px] text-muted truncate w-full text-center">
+              {d.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ChartLegend({
+  items,
+}: {
+  items: Array<{ colour: string; label: string }>;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-4 mt-3 flex-wrap">
+      {items.map((item) => (
+        <span
+          key={item.label}
+          className="flex items-center gap-1.5 text-[11px] text-muted"
+        >
+          <span
+            className="w-2.5 h-2.5 rounded-sm shrink-0"
+            style={{ backgroundColor: item.colour }}
+          />
+          {item.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -149,12 +216,12 @@ export function StatsView({
   const { t, language } = useLanguage();
   const [now] = useState(Date.now());
   const [showExport, setShowExport] = useState(false);
+  const [metric, setMetric] = useState<ChartMetric>("feeds");
   const [rangeMode, setRangeMode] = useState<RangeMode>("daily");
   const todayKey = useMemo(() => getDateKeyInZone(now), [now]);
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
   /** Last day of the rolling 7-day weekly window; defaults to today. */
   const [selectedWeekEndKey, setSelectedWeekEndKey] = useState(todayKey);
-  const locale = language === "zh" ? "zh-CN" : "en-US";
 
   const weeklySummary = useQuery(
     api.stats.getWeeklySummary,
@@ -179,19 +246,93 @@ export function StatsView({
     );
   }
 
+  const segments: Array<{ id: ChartMetric; labelKey: TranslationKey }> = [
+    { id: "feeds", labelKey: "feeds" },
+    { id: "milk", labelKey: "milkMl" },
+    { id: "diapers", labelKey: "diapers" },
+    { id: "pumps", labelKey: "pumps" },
+  ];
+
   const canGoNextDay = selectedDateKey < todayKey;
   const canGoNextWeek = selectedWeekEndKey < todayKey;
+
+  const getCountValue = (day: {
+    feedCount: number;
+    diaperCount: number;
+    pumpCount: number;
+  }) => {
+    if (metric === "feeds") return day.feedCount;
+    if (metric === "diapers") return day.diaperCount;
+    if (metric === "pumps") return day.pumpCount;
+    return 0;
+  };
 
   const day = dailyStats?.day;
   const days = weeklySummary?.days;
 
-  const weekFeedTotal = days?.reduce((sum, d) => sum + d.feedCount, 0) ?? 0;
-  const weekDiaperTotal = days?.reduce((sum, d) => sum + d.diaperCount, 0) ?? 0;
-  const weekSleepMinutes = days?.reduce((sum, d) => sum + d.sleepMinutes, 0) ?? 0;
-  const hasWeekFeedData = days != null && !days.every((d) => d.feedCount === 0);
+  const totalCount =
+    rangeMode === "daily"
+      ? day
+        ? getCountValue(day)
+        : 0
+      : (days?.reduce((sum, d) => sum + getCountValue(d), 0) ?? 0);
+  const avgCountPerDay =
+    rangeMode === "weekly" && days && days.length > 0
+      ? Math.round((totalCount / days.length) * 10) / 10
+      : totalCount;
+  const countMax = Math.max(
+    ...(days?.map((d) => getCountValue(d)) ?? [0]),
+    1
+  );
+
+  const totalWet =
+    rangeMode === "daily"
+      ? (day?.wetCount ?? 0)
+      : (days?.reduce((sum, d) => sum + d.wetCount, 0) ?? 0);
+  const totalDirty =
+    rangeMode === "daily"
+      ? (day?.dirtyCount ?? 0)
+      : (days?.reduce((sum, d) => sum + d.dirtyCount, 0) ?? 0);
+
+  const totalFormulaMl =
+    rangeMode === "daily"
+      ? (day?.formulaMl ?? 0)
+      : (days?.reduce((sum, d) => sum + d.formulaMl, 0) ?? 0);
+  const totalBreastmilkMl =
+    rangeMode === "daily"
+      ? (day?.breastmilkMl ?? 0)
+      : (days?.reduce((sum, d) => sum + d.breastmilkMl, 0) ?? 0);
+  const totalMilkMl = totalFormulaMl + totalBreastmilkMl;
+  const avgMilkMlPerDay =
+    rangeMode === "weekly" && days && days.length > 0
+      ? Math.round(totalMilkMl / days.length)
+      : totalMilkMl;
+  const milkMax = Math.max(
+    ...(days?.map((d) => d.formulaMl + d.breastmilkMl) ?? [0]),
+    1
+  );
+
+  const chartTitleKey: TranslationKey =
+    metric === "feeds"
+      ? "feedsPerDay"
+      : metric === "milk"
+        ? "mlFedPerDay"
+        : metric === "diapers"
+          ? "diapersPerDay"
+          : "pumpsPerDay";
 
   const loading =
     rangeMode === "daily" ? dailyStats === undefined : weeklySummary === undefined;
+
+  const hasCountData =
+    rangeMode === "daily"
+      ? day != null && getCountValue(day) > 0
+      : days != null && !days.every((d) => getCountValue(d) === 0);
+  const hasMilkData =
+    rangeMode === "daily"
+      ? day != null && day.formulaMl + day.breastmilkMl > 0
+      : days != null &&
+        !days.every((d) => d.formulaMl + d.breastmilkMl === 0);
 
   const fullDate = formatInsightDate(selectedDateKey, language);
   const dayAge = birthDate
@@ -215,28 +356,6 @@ export function StatsView({
 
   const wetOnly = day ? day.wetCount - day.bothCount : 0;
   const dirtyOnly = day ? day.dirtyCount - day.bothCount : 0;
-
-  const openDayReport = (dateKey: string) => {
-    setSelectedDateKey(dateKey);
-    setRangeMode("daily");
-  };
-
-  const weekTotalsParts: string[] = [];
-  if (weekFeedTotal > 0) {
-    weekTotalsParts.push(
-      t("scheduleCountFeeds", { count: String(weekFeedTotal) })
-    );
-  }
-  if (weekDiaperTotal > 0) {
-    weekTotalsParts.push(
-      t("scheduleCountDiapers", { count: String(weekDiaperTotal) })
-    );
-  }
-  if (weekSleepMinutes > 0) {
-    weekTotalsParts.push(
-      t("scheduleCountSleep", { time: formatSleepTotal(weekSleepMinutes) })
-    );
-  }
 
   return (
     <div className="p-3 sm:p-4 min-w-0">
@@ -508,44 +627,172 @@ export function StatsView({
             )}
           </SummaryCard>
         </div>
-      ) : rangeMode === "weekly" && days ? (
-        <div className="space-y-3">
-          {weekTotalsParts.length > 0 && (
-            <p className="text-[12px] text-muted leading-snug px-0.5">
-              <span className="font-medium text-foreground/80">
-                {t("scheduleWeekTotals")}
-              </span>
-              {": "}
-              {weekTotalsParts.join(" · ")}
-            </p>
-          )}
+      ) : (
+        <>
+          <div className="grid grid-cols-4 gap-1 mb-4">
+            {segments.map((seg) => (
+              <button
+                key={seg.id}
+                type="button"
+                onClick={() => setMetric(seg.id)}
+                className={cn(
+                  "py-2 px-0.5 rounded-xl text-[10px] sm:text-xs font-semibold transition-colors touch-manipulation min-h-[40px] truncate",
+                  metric === seg.id
+                    ? "bg-terracotta text-white"
+                    : "bg-beige-light text-muted hover:text-foreground"
+                )}
+                aria-pressed={metric === seg.id}
+              >
+                {t(seg.labelKey)}
+              </button>
+            ))}
+          </div>
 
-          {!hasWeekFeedData ? (
-            <div className="bg-surface border border-border rounded-2xl p-4 card-shadow">
-              <p className="text-sm font-semibold text-foreground mb-2">
-                {t("feedsPerDay")}
-              </p>
-              <p className="text-sm text-muted text-center py-6">
-                {t("noDataYet")}
-              </p>
+          {metric === "milk" ? (
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                  {t("formulaMl")}
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {totalFormulaMl > 0 ? `${totalFormulaMl} ml` : "—"}
+                </p>
+              </div>
+              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                  {t("breastmilkMl")}
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {totalBreastmilkMl > 0 ? `${totalBreastmilkMl} ml` : "—"}
+                </p>
+              </div>
+              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow col-span-2">
+                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                  {t("avgMlPerDay")}
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {avgMilkMlPerDay > 0 ? `${avgMilkMlPerDay} ml` : "—"}
+                </p>
+              </div>
             </div>
           ) : (
-            <WeekFeedBars
-              days={days.map((d) => ({
-                date: d.date,
-                feedCount: d.feedCount,
-              }))}
-              todayKey={todayKey}
-              locale={locale}
-              legend={t("feedsPerDay")}
-              onSelectDay={openDayReport}
-              viewDayAria={(dayLabel) =>
-                t("viewDayReport", { day: dayLabel })
-              }
-            />
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                  {t(
+                    metric === "feeds"
+                      ? "feeds"
+                      : metric === "diapers"
+                        ? "diapers"
+                        : "pumps"
+                  )}
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {totalCount > 0 ? totalCount : "—"}
+                </p>
+              </div>
+              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                  {t(chartTitleKey)}
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {avgCountPerDay > 0 ? avgCountPerDay : "—"}
+                </p>
+              </div>
+            </div>
           )}
-        </div>
-      ) : null}
+
+          {days && (
+            <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+              <p className="text-sm font-semibold text-foreground mb-3">
+                {t(chartTitleKey)}
+              </p>
+
+              {metric === "milk" ? (
+                !hasMilkData ? (
+                  <p className="text-sm text-muted text-center py-4">
+                    {t("noDataYet")}
+                  </p>
+                ) : (
+                  <>
+                    <StackedBarChart
+                      data={days.map((d) => ({
+                        label: d.label,
+                        bottom: d.formulaMl,
+                        top: d.breastmilkMl,
+                        total: d.formulaMl + d.breastmilkMl,
+                      }))}
+                      maxValue={milkMax}
+                      bottomColour="#c4846a"
+                      topColour="#8fa4b8"
+                      formatValue={(v) => `${v}`}
+                    />
+                    <ChartLegend
+                      items={[
+                        {
+                          colour: "#c4846a",
+                          label: `${t("formula")}: ${totalFormulaMl} ml`,
+                        },
+                        {
+                          colour: "#8fa4b8",
+                          label: `${t("breastmilk")}: ${totalBreastmilkMl} ml`,
+                        },
+                      ]}
+                    />
+                  </>
+                )
+              ) : !hasCountData ? (
+                <p className="text-sm text-muted text-center py-4">
+                  {t("noDataYet")}
+                </p>
+              ) : metric === "diapers" ? (
+                <>
+                  <StackedBarChart
+                    data={days.map((d) => ({
+                      label: d.label,
+                      bottom: d.wetCount,
+                      top: d.dirtyCount,
+                      total: d.diaperCount,
+                    }))}
+                    maxValue={countMax}
+                    bottomColour="#8fa68f"
+                    topColour="#c9a84c"
+                  />
+                  <ChartLegend
+                    items={[
+                      { colour: "#8fa68f", label: `${t("wet")}: ${totalWet}` },
+                      {
+                        colour: "#c9a84c",
+                        label: `${t("dirty")}: ${totalDirty}`,
+                      },
+                    ]}
+                  />
+                </>
+              ) : (
+                <BarChart
+                  data={days.map((d) => ({
+                    label: d.label,
+                    value: getCountValue(d),
+                  }))}
+                  maxValue={countMax}
+                  colour={METRIC_COLOURS[metric]}
+                />
+              )}
+            </div>
+          )}
+
+          <TodayTimetable
+            trackerId={trackerId}
+            mode="week"
+            dateKey={selectedWeekEndKey}
+            weekAlign="ending"
+            hideRangeToggle
+            className="px-0 pb-4"
+            secretLink={secretLink}
+            selectedCaregiver={selectedCaregiver}
+          />
+        </>
+      )}
     </div>
   );
 }

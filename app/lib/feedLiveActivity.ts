@@ -84,7 +84,9 @@ export async function syncFeedLiveActivity(opts: {
   }
 
   const dueAt = opts.feedDueAt;
-  if (dueAt === null || dueAt <= Date.now() - 60_000) {
+  // End as soon as due passes — iOS Text(..., .timer) counts *up* after due,
+  // which looked like the countdown was silently extending when a feed was missed.
+  if (dueAt === null || dueAt <= Date.now()) {
     await endFeedLiveActivity();
     return "skipped";
   }
