@@ -186,7 +186,7 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
           type="button"
           onClick={handleCopy}
           disabled={!exportData?.rows.length}
-          className="btn-primary"
+          className="w-full py-3.5 px-6 rounded-xl font-medium text-sm bg-primary hover:bg-primary-hover text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {copied ? t("csvCopied") : t("copyCsv")}
         </button>
@@ -194,7 +194,7 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
           type="button"
           onClick={() => void handleDownload()}
           disabled={!exportData?.rows.length || exportBusy}
-          className="w-full py-3 rounded-xl border border-border bg-surface font-semibold text-sm"
+          className="w-full py-3.5 px-6 rounded-xl font-medium text-sm border border-border bg-surface text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {exportBusy
             ? t("loading")
@@ -209,7 +209,7 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
           type="button"
           onClick={handlePrint}
           disabled={!exportData?.rows.length}
-          className="w-full py-3 rounded-xl border border-border bg-surface font-semibold text-sm text-muted"
+          className="w-full py-3.5 px-6 rounded-xl font-medium text-sm border border-border bg-surface text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {t("printSummary")}
         </button>

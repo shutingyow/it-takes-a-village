@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
@@ -9,6 +9,7 @@ import { cn } from "@/app/lib/utils";
 import {
   clearFeedTimer,
   feedTimerStorageKey,
+  isFeedTimerRecording,
 } from "@/app/lib/feedTimer";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconFeed } from "../icons";
@@ -17,8 +18,13 @@ import { EntryTimeField } from "../EntryTimeField";
 import { FeedTimer } from "../FeedTimer";
 import type { ActivityEntry } from "../ActivityEntryCard";
 import { LoggedByHint } from "../LoggedByHint";
+import {
+  canLogSolids,
+  solidsFirstInFeedPicker,
+} from "@/app/lib/babyAge";
 
 type FeedEditEntry = Extract<ActivityEntry, { entryType: "feed" }>;
+type FeedType = "breast" | "bottle" | "solids";
 
 interface FeedModalProps {
   trackerId: Id<"trackers">;
@@ -26,12 +32,14 @@ interface FeedModalProps {
   selectedCaregiver: string;
   onClose: () => void;
   editEntry?: FeedEditEntry;
+  birthDate?: string;
 }
 
 type BottleTemperature = "room" | "warm40";
 type BottleMilk = "formula" | "breastmilk";
 
 const MAX_DURATION_MINUTES = 24 * 60;
+const MAX_SOLIDS_GRAMS = 2000;
 
 function DurationMinutesField({
   value,
@@ -57,8 +65,8 @@ function DurationMinutesField({
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between gap-2 mb-2">
+    <div className="min-w-0">
+      <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
         <label htmlFor="feed-duration-minutes" className="label-field mb-0">
           {t("feedDurationLabel")}
         </label>
@@ -66,13 +74,13 @@ function DurationMinutesField({
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="min-h-11 px-2 text-xs font-semibold text-terracotta touch-manipulation"
+            className="min-h-11 px-2 text-xs font-semibold text-terracotta touch-manipulation shrink-0"
           >
             {t("clearDuration")}
           </button>
         )}
       </div>
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="input-field flex items-center gap-2 min-w-0 w-full max-w-full box-border py-0">
         <input
           id="feed-duration-minutes"
           type="text"
@@ -82,12 +90,13 @@ function DurationMinutesField({
           placeholder="—"
           value={value ?? ""}
           onChange={(e) => setFromDigits(e.target.value)}
-          className="input-field w-28 shrink-0 text-center text-lg font-semibold tabular-nums"
+          className="min-w-0 flex-1 bg-transparent border-0 outline-none text-center text-lg font-semibold tabular-nums py-3 focus:ring-0"
           aria-label={`${t("feedDurationLabel")} (${t("durationMinutesUnit")})`}
         />
-        <span className="text-sm text-muted">{t("durationMinutesUnit")}</span>
+        <span className="text-sm text-muted shrink-0 pr-1">
+          {t("durationMinutesUnit")}
+        </span>
       </div>
-      <p className="text-xs text-muted mt-1.5">{t("feedDurationHint")}</p>
     </div>
   );
 }
@@ -112,16 +121,26 @@ export function FeedModal({
   selectedCaregiver,
   onClose,
   editEntry,
+  birthDate,
 }: FeedModalProps) {
   const { t } = useLanguage();
   const createFeed = useMutation(api.feedEntries.create);
   const updateFeed = useMutation(api.feedEntries.update);
+  const tracker = useQuery(api.trackers.getBySecret, { secretLink });
   const isEditing = Boolean(editEntry);
 
-  const [step, setStep] = useState<"type" | "details">(
-    editEntry ? "details" : "type"
-  );
-  const [feedType, setFeedType] = useState<"breast" | "bottle">(
+  const resolvedBirthDate = birthDate ?? tracker?.birthDate;
+  const solidsAvailable =
+    editEntry?.type === "solids" || canLogSolids(resolvedBirthDate);
+  const solidsFirst = solidsFirstInFeedPicker(resolvedBirthDate);
+
+  const [step, setStep] = useState<"type" | "details">(() => {
+    if (editEntry) return "details";
+    // Resume into details when a background timer is already running.
+    if (isFeedTimerRecording(secretLink)) return "details";
+    return "type";
+  });
+  const [feedType, setFeedType] = useState<FeedType>(
     editEntry?.type ?? "breast"
   );
   const [side, setSide] = useState<"left" | "right">(
@@ -145,6 +164,11 @@ export function FeedModal({
       ? editEntry.bottleTemperature
       : undefined
   );
+  const [foodName, setFoodName] = useState(editEntry?.foodName ?? "");
+  const [amountGrams, setAmountGrams] = useState<number | null>(() => {
+    const grams = editEntry?.amountGrams;
+    return grams && grams > 0 ? grams : null;
+  });
   const [notes, setNotes] = useState(editEntry?.notes ?? "");
   const [photoIds, setPhotoIds] = useState<Id<"_storage">[]>(
     editEntry?.photoIds ?? []
@@ -167,18 +191,27 @@ export function FeedModal({
       alert(t("selectBottleMilk"));
       return;
     }
+    if (feedType === "solids" && !foodName.trim()) {
+      alert(t("selectSolidsFood"));
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const payload = {
         type: feedType,
         side: feedType === "breast" ? side : undefined,
-        duration: durationMinutes ?? undefined,
-        durationMinutes: durationMinutes ?? undefined,
+        duration:
+          feedType === "solids" ? undefined : durationMinutes ?? undefined,
+        durationMinutes:
+          feedType === "solids" ? undefined : durationMinutes ?? undefined,
         amount: feedType === "bottle" ? amount : undefined,
         bottleMilk: feedType === "bottle" ? bottleMilk : undefined,
         bottleTemperature:
           feedType === "bottle" ? bottleTemperature : undefined,
+        foodName: feedType === "solids" ? foodName.trim() : undefined,
+        amountGrams:
+          feedType === "solids" ? amountGrams ?? undefined : undefined,
         timestamp,
         notes: notes || undefined,
         photoIds: photoIds.length > 0 ? photoIds : undefined,
@@ -242,44 +275,51 @@ export function FeedModal({
       ? t("saveChanges")
       : t("saveEntry");
 
+  const typeButtons: Array<{ id: FeedType; label: string }> = [
+    { id: "breast", label: t("breastFeeding") },
+    { id: "bottle", label: t("bottleFeeding") },
+  ];
+  if (solidsAvailable) {
+    const solidsBtn = { id: "solids" as const, label: t("solidsFeeding") };
+    if (solidsFirst) typeButtons.unshift(solidsBtn);
+    else typeButtons.push(solidsBtn);
+  }
+
+  const pickType = (next: FeedType) => {
+    setFeedType(next);
+    setBottleMilk(undefined);
+    setStep("details");
+  };
+
   return (
     <BottomSheet
       title={isEditing ? t("editEntry") : t("logFeed")}
       icon={<IconFeed size={20} />}
       onClose={onClose}
     >
-      <div className="space-y-4 pt-2">
+      <div className="space-y-4 pt-2 min-w-0 max-w-full overflow-x-clip">
         {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
         {step === "type" && (
           <div className="space-y-3">
             <p className="text-sm text-muted">{t("selectFeedType")}</p>
-            <button
-              type="button"
-              onClick={() => {
-                setFeedType("breast");
-                setBottleMilk(undefined);
-                setStep("details");
-              }}
-              className="btn-secondary flex items-center justify-center gap-2"
-            >
-              {t("breastFeeding")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFeedType("bottle");
-                setBottleMilk(undefined);
-                setStep("details");
-              }}
-              className="btn-secondary flex items-center justify-center gap-2"
-            >
-              {t("bottleFeeding")}
-            </button>
+            {typeButtons.map((btn) => (
+              <button
+                key={btn.id}
+                type="button"
+                onClick={() => pickType(btn.id)}
+                className={cn(
+                  "btn-secondary flex items-center justify-center gap-2",
+                  btn.id === "solids" && "border-accent-solids text-accent-solids"
+                )}
+              >
+                {btn.label}
+              </button>
+            ))}
           </div>
         )}
 
         {step === "details" && feedType === "breast" && (
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0 max-w-full">
             <button
               type="button"
               onClick={() => setStep("type")}
@@ -336,7 +376,7 @@ export function FeedModal({
         )}
 
         {step === "details" && feedType === "bottle" && (
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0 max-w-full">
             <button
               type="button"
               onClick={() => setStep("type")}
@@ -454,6 +494,100 @@ export function FeedModal({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting || !bottleMilk}
+              className="btn-primary"
+            >
+              {saveLabel}
+            </button>
+          </div>
+        )}
+
+        {step === "details" && feedType === "solids" && (
+          <div className="space-y-4 min-w-0 max-w-full">
+            <button
+              type="button"
+              onClick={() => setStep("type")}
+              className="text-sm text-primary font-medium"
+            >
+              {t("changeType")}
+            </button>
+
+            <div>
+              <label htmlFor="solids-food" className="label-field">
+                {t("solidsFoodLabel")}
+              </label>
+              <input
+                id="solids-food"
+                type="text"
+                value={foodName}
+                onChange={(e) => setFoodName(e.target.value)}
+                placeholder={t("solidsFoodPlaceholder")}
+                className="input-field"
+                autoComplete="off"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <label htmlFor="solids-grams" className="label-field mb-0">
+                  {t("solidsAmountOptional")}
+                </label>
+                {amountGrams != null && (
+                  <button
+                    type="button"
+                    onClick={() => setAmountGrams(null)}
+                    className="min-h-11 px-2 text-xs font-semibold text-terracotta touch-manipulation"
+                  >
+                    {t("clearDuration")}
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3 min-w-0">
+                <input
+                  id="solids-grams"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="off"
+                  placeholder="—"
+                  value={amountGrams ?? ""}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "");
+                    if (digits === "") {
+                      setAmountGrams(null);
+                      return;
+                    }
+                    const parsed = Number.parseInt(digits, 10);
+                    if (!Number.isFinite(parsed) || parsed < 1) {
+                      setAmountGrams(null);
+                      return;
+                    }
+                    setAmountGrams(Math.min(MAX_SOLIDS_GRAMS, parsed));
+                  }}
+                  className="input-field w-28 shrink-0 text-center text-lg font-semibold tabular-nums"
+                />
+                <span className="text-sm text-muted">g</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="label-field">{t("notesOptional")}</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder={t("solidsNotesPlaceholder")}
+                className="textarea-field"
+                rows={2}
+              />
+            </div>
+
+            {photoField}
+
+            {timeField}
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting || !foodName.trim()}
               className="btn-primary"
             >
               {saveLabel}

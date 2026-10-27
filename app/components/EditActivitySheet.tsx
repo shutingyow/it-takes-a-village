@@ -18,6 +18,7 @@ interface EditActivitySheetProps {
   secretLink: string;
   selectedCaregiver: string;
   onClose: () => void;
+  birthDate?: string;
 }
 
 export function EditActivitySheet({
@@ -26,6 +27,7 @@ export function EditActivitySheet({
   secretLink,
   selectedCaregiver,
   onClose,
+  birthDate,
 }: EditActivitySheetProps) {
   if (entry.entryType === "feed") {
     return (
@@ -34,6 +36,7 @@ export function EditActivitySheet({
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         editEntry={entry}
+        birthDate={birthDate}
         onClose={onClose}
       />
     );

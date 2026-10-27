@@ -101,11 +101,14 @@ export const getDueStatus = query({
     let effectiveFeedIntervalHours = feedIntervalHours;
     let usingNightInterval = false;
 
-    const lastFeed = await ctx.db
+    const recentFeeds = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
       .order("desc")
-      .first();
+      .take(40);
+    const lastFeed = recentFeeds.find(
+      (feed) => feed.type === "breast" || feed.type === "bottle"
+    );
 
     if (lastFeed) {
       // last feed + day or night interval (never a hardcoded 3h).

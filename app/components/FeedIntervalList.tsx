@@ -80,14 +80,25 @@ export function FeedIntervalList({
     });
 
   const breastCount = ordered.filter((entry) => entry.type === "breast").length;
-  const bottleCount = ordered.length - breastCount;
-  const totalMl = ordered.reduce((sum, entry) => sum + (entry.amount ?? 0), 0);
+  const bottleCount = ordered.filter((entry) => entry.type === "bottle").length;
+  const solidsCount = ordered.filter((entry) => entry.type === "solids").length;
+  const totalMl = ordered.reduce(
+    (sum, entry) =>
+      entry.type === "bottle" ? sum + (entry.amount ?? 0) : sum,
+    0
+  );
+  const totalGrams = ordered.reduce(
+    (sum, entry) =>
+      entry.type === "solids" ? sum + (entry.amountGrams ?? 0) : sum,
+    0
+  );
   const totalMinutes = ordered.reduce(
     (sum, entry) => sum + (feedMinutes(entry) ?? 0),
     0
   );
   const summaryExtras = [
     totalMl > 0 ? t("amountMlCompact", { amount: totalMl }) : null,
+    totalGrams > 0 ? t("amountGramsCompact", { amount: totalGrams }) : null,
     totalMinutes > 0 ? formatMinutesCompact(totalMinutes) : null,
   ].filter((part): part is string => Boolean(part));
 
@@ -95,11 +106,18 @@ export function FeedIntervalList({
     <div className="min-w-0 max-w-full overflow-hidden">
       {showSummary && (
         <p className="text-xs text-muted mb-2 leading-snug break-words">
-          {t("feedListCounts", {
-            count: ordered.length,
-            breast: breastCount,
-            bottle: bottleCount,
-          })}
+          {solidsCount > 0
+            ? t("feedListCountsWithSolids", {
+                count: ordered.length,
+                breast: breastCount,
+                bottle: bottleCount,
+                solids: solidsCount,
+              })
+            : t("feedListCounts", {
+                count: ordered.length,
+                breast: breastCount,
+                bottle: bottleCount,
+              })}
           {summaryExtras.length > 0 ? ` · ${summaryExtras.join(" · ")}` : ""}
         </p>
       )}
@@ -127,15 +145,25 @@ export function FeedIntervalList({
               ? entry.side
                 ? `${t("breast")} · ${entry.side === "left" ? t("left") : t("right")}`
                 : t("breast")
-              : milk === "formula"
-                ? `${t("bottle")} · ${t("formula")}`
-                : milk === "breastmilk"
-                  ? `${t("bottle")} · ${t("breastMilk")}`
-                  : t("bottle");
+              : entry.type === "solids"
+                ? entry.foodName?.trim()
+                  ? `${t("solids")} · ${entry.foodName.trim()}`
+                  : t("solids")
+                : milk === "formula"
+                  ? `${t("bottle")} · ${t("formula")}`
+                  : milk === "breastmilk"
+                    ? `${t("bottle")} · ${t("breastMilk")}`
+                    : t("bottle");
 
           const row = (
             <div className="flex items-start gap-2.5 min-w-0 py-1.5 px-0.5">
-              <div className="w-8 h-8 rounded-full bg-accent-feed-light text-accent-feed flex items-center justify-center shrink-0 mt-0.5">
+              <div
+                className={
+                  entry.type === "solids"
+                    ? "w-8 h-8 rounded-full bg-accent-solids-light/50 text-accent-solids flex items-center justify-center shrink-0 mt-0.5"
+                    : "w-8 h-8 rounded-full bg-accent-feed-light text-accent-feed flex items-center justify-center shrink-0 mt-0.5"
+                }
+              >
                 <IconFeed size={15} />
               </div>
               <div className="min-w-0 flex-1">
@@ -155,7 +183,12 @@ export function FeedIntervalList({
                     {formatMinutesCompact(minutes)}
                   </p>
                 )}
-                {entry.amount != null && (
+                {entry.type === "solids" && entry.amountGrams != null && (
+                  <p className="text-xs text-muted tabular-nums mt-0.5">
+                    {t("amountGramsCompact", { amount: entry.amountGrams })}
+                  </p>
+                )}
+                {entry.type === "bottle" && entry.amount != null && (
                   <p className="text-xs text-muted tabular-nums mt-0.5">
                     {t("amountMlCompact", { amount: entry.amount })}
                   </p>

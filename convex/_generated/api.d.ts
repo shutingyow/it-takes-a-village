@@ -25,6 +25,7 @@ import type * as importBabyLog from "../importBabyLog.js";
 import type * as lib_caregivers from "../lib/caregivers.js";
 import type * as lib_dayBounds from "../lib/dayBounds.js";
 import type * as lib_feedSchedule from "../lib/feedSchedule.js";
+import type * as lib_feeds from "../lib/feeds.js";
 import type * as lib_pumpSchedule from "../lib/pumpSchedule.js";
 import type * as milestones from "../milestones.js";
 import type * as momentEntries from "../momentEntries.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "lib/caregivers": typeof lib_caregivers;
   "lib/dayBounds": typeof lib_dayBounds;
   "lib/feedSchedule": typeof lib_feedSchedule;
+  "lib/feeds": typeof lib_feeds;
   "lib/pumpSchedule": typeof lib_pumpSchedule;
   milestones: typeof milestones;
   momentEntries: typeof momentEntries;

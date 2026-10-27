@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
+import { formatBabyAge } from "@/app/lib/utils";
 
 interface BirthDateFieldProps {
   secretLink: string;
   actingCaregiverName: string;
   birthDate?: string;
   compact?: boolean;
+  /** Only admins can edit. Non-admins see a read-only value when set. */
+  canEdit?: boolean;
 }
 
 export function BirthDateField({
@@ -17,6 +20,7 @@ export function BirthDateField({
   actingCaregiverName,
   birthDate,
   compact = false,
+  canEdit = false,
 }: BirthDateFieldProps) {
   const { t } = useLanguage();
   const updateBirthDate = useMutation(api.trackers.updateBirthDate);
@@ -30,6 +34,26 @@ export function BirthDateField({
   }, [birthDate]);
 
   const unchanged = value === (birthDate ?? "");
+  const ageLabel = birthDate ? formatBabyAge(birthDate) : null;
+
+  if (!canEdit) {
+    if (!birthDate) return null;
+    return (
+      <div
+        className={
+          compact
+            ? "min-w-0"
+            : "mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow min-w-0"
+        }
+      >
+        <p className="label-field mb-1">{t("birthDate")}</p>
+        <p className="text-sm text-foreground break-words">
+          {birthDate}
+          {ageLabel ? ` · ${ageLabel}` : ""}
+        </p>
+      </div>
+    );
+  }
 
   const save = async () => {
     if (!value || unchanged || !actingCaregiverName) return;
@@ -54,17 +78,17 @@ export function BirthDateField({
     <div
       className={
         compact
-          ? "min-w-0"
-          : "mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow min-w-0"
+          ? "min-w-0 w-full"
+          : "mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow min-w-0 w-full overflow-hidden"
       }
     >
-      <label htmlFor={compact ? "insights-birth-date" : "settings-birth-date"} className="label-field">
+      <label
+        htmlFor={compact ? "insights-birth-date" : "settings-birth-date"}
+        className="label-field"
+      >
         {t("birthDate")}
       </label>
-      {!compact && (
-        <p className="text-xs text-muted -mt-1 mb-2 break-words">{t("birthDateHelp")}</p>
-      )}
-      <div className="flex flex-col gap-2 min-w-0 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-2 min-w-0 w-full">
         <input
           id={compact ? "insights-birth-date" : "settings-birth-date"}
           type="date"
@@ -74,24 +98,17 @@ export function BirthDateField({
             setMessage(null);
             setError(null);
           }}
-          className="input-field min-w-0 max-w-full"
-          aria-describedby={compact ? "insights-birth-hint" : "settings-birth-hint"}
+          className="input-field w-full min-w-0 max-w-full box-border"
         />
         <button
           type="button"
           onClick={() => void save()}
           disabled={saving || unchanged || !value || !actingCaregiverName}
-          className="shrink-0 px-4 py-3 rounded-xl bg-terracotta text-white text-sm font-semibold disabled:opacity-50 touch-manipulation min-h-[44px]"
+          className="w-full min-w-0 px-4 py-3 rounded-xl bg-terracotta text-white text-sm font-semibold disabled:opacity-50 touch-manipulation min-h-[44px]"
         >
           {t("birthDateSave")}
         </button>
       </div>
-      <p
-        id={compact ? "insights-birth-hint" : "settings-birth-hint"}
-        className="text-[11px] text-muted mt-2 break-words"
-      >
-        {t("birthDateHint")}
-      </p>
       {message && (
         <p className="text-xs text-accent-diaper mt-2 break-words">{message}</p>
       )}

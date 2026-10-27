@@ -85,8 +85,12 @@ export default defineSchema({
   feedEntries: defineTable({
     trackerId: v.id("trackers"),
     caregiverName: v.string(),
-    type: v.union(v.literal("breast"), v.literal("bottle")),
-    // Breast feeding fields
+    type: v.union(
+      v.literal("breast"),
+      v.literal("bottle"),
+      v.literal("solids")
+    ),
+    // Nursing (at-breast) fields
     side: v.optional(v.union(v.literal("left"), v.literal("right"))),
     duration: v.optional(v.number()), // minutes (kept in sync with durationMinutes)
     // How long this feed lasted. Optional so older rows stay valid. Both breast and bottle.
@@ -99,6 +103,9 @@ export default defineSchema({
     bottleTemperature: v.optional(
       v.union(v.literal("room"), v.literal("warm40"))
     ),
+    // Solids fields (food name + optional grams; does not move milk due)
+    foodName: v.optional(v.string()),
+    amountGrams: v.optional(v.number()),
     timestamp: v.number(),
     notes: v.optional(v.string()),
     photoIds: v.optional(v.array(v.id("_storage"))),

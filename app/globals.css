@@ -22,6 +22,8 @@
   --accent-diaper-light: #efc84a;
   --accent-pump: #4a9fd8;
   --accent-pump-light: #6bb5e8;
+  --accent-solids: #9a7b52;
+  --accent-solids-light: #c4a574;
   --accent-health: #9a8f85;
   --accent-health-light: #f0ede9;
   --muted: #9a8f85;
@@ -56,6 +58,8 @@ html.dark {
   --accent-diaper-light: #3a3420;
   --accent-pump: #6bb5e8;
   --accent-pump-light: #243640;
+  --accent-solids: #c4a574;
+  --accent-solids-light: #3a3228;
   --accent-health: #b0a59a;
   --accent-health-light: #322e2a;
   --muted: #a89e94;
@@ -87,6 +91,8 @@ html.dark {
   --color-accent-diaper-light: var(--accent-diaper-light);
   --color-accent-pump: var(--accent-pump);
   --color-accent-pump-light: var(--accent-pump-light);
+  --color-accent-solids: var(--accent-solids);
+  --color-accent-solids-light: var(--accent-solids-light);
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-warning: var(--warning);
@@ -215,7 +221,20 @@ html {
 }
 
 .input-field {
-  @apply w-full px-4 py-3 border border-border rounded-xl bg-surface text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors;
+  @apply w-full min-w-0 max-w-full box-border px-4 py-3 border border-border rounded-xl bg-surface text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors;
+}
+
+/* iOS datetime-local has a large intrinsic min-width that blows past the sheet. */
+.input-datetime,
+input[type="datetime-local"].input-field {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  font-size: 16px; /* avoid iOS focus-zoom + layout jank */
 }
 
 .textarea-field {

@@ -92,8 +92,8 @@ export function DiaperModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const types = [
-    { id: "wet" as const, label: t("wet") },
-    { id: "dirty" as const, label: t("dirty") },
+    { id: "wet" as const, label: t("wetOnly") },
+    { id: "dirty" as const, label: t("dirtyOnly") },
     { id: "both" as const, label: t("both") },
   ];
 

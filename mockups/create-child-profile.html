@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create village · child profile — mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --background: #faf8f5;
+      --foreground: #3d3530;
+      --surface: #ffffff;
+      --primary: #8fa68f;
+      --muted: #9a8f85;
+      --border: #e8dfd4;
+      --beige-light: #ede6dc;
+      --font: "Geist", system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: #ebe6df;
+      color: var(--foreground);
+      line-height: 1.4;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+    button,
+    input {
+      font-family: inherit;
+    }
+    .page {
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 6px; }
+    .lede { color: var(--muted); font-size: 0.9rem; margin: 0 0 18px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 22px 18px;
+      box-shadow: 0 8px 28px rgba(44, 42, 40, 0.05);
+    }
+    .step {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+    .card h2 {
+      margin: 0 0 18px;
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+    .photo {
+      width: 96px;
+      height: 96px;
+      border-radius: 28px;
+      background: var(--beige-light);
+      border: 2px dashed var(--border);
+      margin: 0 auto 16px;
+      display: grid;
+      place-items: center;
+      font-size: 2rem;
+      color: var(--muted);
+      position: relative;
+    }
+    .photo .add {
+      position: absolute;
+      right: -4px;
+      bottom: -4px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1.1rem;
+      display: grid;
+      place-items: center;
+      border: 2px solid #fff;
+    }
+    .photo-hint {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin: -8px 0 16px;
+    }
+    label {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field { margin-bottom: 14px; }
+    input[type="text"],
+    input[type="date"] {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 12px;
+      font-size: 0.95rem;
+      background: var(--background);
+      color: var(--foreground);
+    }
+    .gender {
+      display: flex;
+      gap: 8px;
+    }
+    .gender button {
+      flex: 1;
+      border: 1.5px solid var(--border);
+      background: var(--beige-light);
+      border-radius: 12px;
+      padding: 11px 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--foreground);
+      cursor: pointer;
+    }
+    .gender button.on {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .primary-btn {
+      width: 100%;
+      margin-top: 8px;
+      border: 0;
+      border-radius: 14px;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+    }
+    .secondary {
+      width: 100%;
+      margin-top: 8px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 8px;
+    }
+    .note {
+      margin-top: 16px;
+      padding: 12px 14px;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .note strong { color: var(--foreground); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Create village · child profile</h1>
+    <p class="lede">Mockup — first step after Sign in → Create village. Admin sets the baby up so age bands (milk / solids) work from day one.</p>
+
+    <div class="card">
+      <div class="step">Step 1 of 2 · Child profile</div>
+      <h2>Whose village is this?</h2>
+
+      <div class="photo" aria-hidden="true">
+        📷
+        <span class="add">+</span>
+      </div>
+      <p class="photo-hint">Add a photo (optional)</p>
+
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" type="text" value="Russell" />
+      </div>
+
+      <div class="field">
+        <label for="dob">Birth date</label>
+        <input id="dob" type="date" value="2026-08-12" />
+      </div>
+
+      <div class="field">
+        <label>Gender</label>
+        <div class="gender" role="group" aria-label="Gender">
+          <button type="button" class="on" data-g="girl">Girl</button>
+          <button type="button" data-g="boy">Boy</button>
+          <button type="button" data-g="unspecified">Prefer not to say</button>
+        </div>
+      </div>
+
+      <button type="button" class="primary-btn">Continue to add caregivers</button>
+      <button type="button" class="secondary">Skip for now (can edit in Settings)</button>
+    </div>
+
+    <p class="note">
+      <strong>Why birth date, not “age”?</strong> Age changes every day; birth date powers accurate bands (6 / 9 / 12 mo solids story) and tips.
+      Photo and gender are optional; name + birth date are the ones that unlock age-aware feeding.
+      Step 2 stays caregivers + Create village (as today).
+    </p>
+  </div>
+
+  <script>
+    document.querySelectorAll(".gender button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".gender button").forEach((b) => b.classList.remove("on"));
+        btn.classList.add("on");
+      });
+    });
+  </script>
+</body>
+</html>

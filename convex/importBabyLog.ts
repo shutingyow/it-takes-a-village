@@ -41,7 +41,7 @@ const pumpEntryValidator = v.object({
 });
 
 function feedSignature(e: {
-  type: "breast" | "bottle";
+  type: "breast" | "bottle" | "solids";
   amount?: number;
   timestamp: number;
   notes: string;

@@ -62,6 +62,12 @@ const trackerReturnValidator = v.object({
   createdAt: v.number(),
 });
 
+const trackerClientValidator = v.object({
+  ...trackerReturnValidator.fields,
+  /** True when the signed-in user owns this village (SSO admin). */
+  viewerIsOwner: v.boolean(),
+});
+
 // Create a new tracker with a unique secret link (signed-in admin only)
 export const create = mutation({
   args: {
@@ -190,11 +196,18 @@ export const getBySecret = query({
   args: {
     secretLink: v.string(),
   },
-  returns: v.union(trackerReturnValidator, v.null()),
+  returns: v.union(trackerClientValidator, v.null()),
   handler: async (ctx, args) => {
     const tracker = await getTrackerBySecret(ctx, args.secretLink);
     if (!tracker) return null;
-    return normalizeTrackerForClient(tracker);
+    const userId = await getAuthUserId(ctx);
+    const viewerIsOwner = Boolean(
+      userId && tracker.ownerUserId !== undefined && tracker.ownerUserId === userId
+    );
+    return {
+      ...normalizeTrackerForClient(tracker),
+      viewerIsOwner,
+    };
   },
 });
 
@@ -468,7 +481,7 @@ function normalizeBirthDate(value: string): string {
   return `${year}-${pad(month)}-${pad(day)}`;
 }
 
-// Any caregiver on the tracker can save this, same as reminder settings.
+// Admin only — birth date drives age bands and Insights age labels.
 export const updateBirthDate = mutation({
   args: {
     secretLink: v.string(),
@@ -477,7 +490,7 @@ export const updateBirthDate = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { tracker } = await verifyCaregiver(
+    const { tracker } = await verifyAdmin(
       ctx,
       args.secretLink,
       args.actingCaregiverName

@@ -3,8 +3,9 @@
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  formatDate,
   formatMinutesCompact,
   formatTime,
   formatTimeAgo,
@@ -107,7 +108,7 @@ export function HomeCategoryDetail({
 
   const activity = useQuery(api.history.getActivity, {
     trackerId,
-    limit: 12,
+    limit: 50,
     type: meta.historyType,
   });
 
@@ -121,6 +122,23 @@ export function HomeCategoryDetail({
   const dueItem =
     dueStatus?.items.find((item) => item.type === category) ?? null;
   const lastEntry = activity?.[0];
+
+  const groupedByDate = useMemo(() => {
+    if (!activity) return [];
+    const groups: Array<{ date: string; entries: typeof activity }> = [];
+    const indexByDate = new Map<string, number>();
+    for (const entry of activity) {
+      const date = formatDate(entry.time);
+      const existing = indexByDate.get(date);
+      if (existing === undefined) {
+        indexByDate.set(date, groups.length);
+        groups.push({ date, entries: [entry] });
+      } else {
+        groups[existing]!.entries.push(entry);
+      }
+    }
+    return groups;
+  }, [activity]);
 
   const handleDelete = async (entry: ActivityEntry) => {
     if (!confirm(t("confirmDeleteEntry"))) return;
@@ -304,31 +322,44 @@ export function HomeCategoryDetail({
           <div className="text-center py-8 text-muted text-sm bg-surface rounded-2xl border border-border">
             {t("categoryEmpty")}
           </div>
-        ) : category === "feed" ? (
-          <div className="bg-surface border border-border rounded-2xl px-3 py-2 min-w-0 overflow-hidden">
-            <FeedIntervalList
-              feeds={activity.filter(
-                (
-                  entry
-                ): entry is Extract<ActivityEntry, { entryType: "feed" }> =>
-                  entry.entryType === "feed"
-              )}
-              order="newest"
-              onEdit={setEditingEntry}
-              onDelete={handleDelete}
-            />
-          </div>
         ) : (
-          <div className="pl-1 min-w-0">
-            {activity.map((entry, index) => (
-              <ActivityEntryCard
-                key={entry._id}
-                entry={entry}
-                timeLabel={formatTime(entry.time)}
-                isLast={index === activity.length - 1}
-                onEdit={setEditingEntry}
-                onDelete={handleDelete}
-              />
+          <div className="space-y-5 min-w-0">
+            {groupedByDate.map(({ date, entries }) => (
+              <div key={date} className="min-w-0">
+                <div className="text-sm font-semibold text-foreground mb-2.5 pb-1.5 border-b border-border">
+                  {date}
+                </div>
+                {category === "feed" ? (
+                  <div className="bg-surface border border-border rounded-2xl px-3 py-2 min-w-0 overflow-hidden">
+                    <FeedIntervalList
+                      feeds={entries.filter(
+                        (
+                          entry
+                        ): entry is Extract<
+                          ActivityEntry,
+                          { entryType: "feed" }
+                        > => entry.entryType === "feed"
+                      )}
+                      order="newest"
+                      onEdit={setEditingEntry}
+                      onDelete={handleDelete}
+                    />
+                  </div>
+                ) : (
+                  <div className="pl-1 min-w-0">
+                    {entries.map((entry, index) => (
+                      <ActivityEntryCard
+                        key={entry._id}
+                        entry={entry}
+                        timeLabel={formatTime(entry.time)}
+                        isLast={index === entries.length - 1}
+                        onEdit={setEditingEntry}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}

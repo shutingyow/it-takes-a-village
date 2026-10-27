@@ -47,6 +47,43 @@ export function getAgeBand(
   return ageBandFromTotalDays(totalDays);
 }
 
+const SOLIDS_BANDS: ReadonlySet<AgeBandId> = new Set([
+  "months_6_9",
+  "months_9_12",
+  "months_12_plus",
+]);
+
+/** Solids logging from ~6 months. If birth date is unknown, allow logging. */
+export function canLogSolids(
+  birthDate: string | undefined,
+  onDate?: string
+): boolean {
+  if (!birthDate || !isValidBirthDate(birthDate)) return true;
+  const day =
+    onDate && isValidBirthDate(onDate)
+      ? onDate
+      : new Intl.DateTimeFormat("en-CA", {
+          timeZone: DEFAULT_TRACKER_TIMEZONE,
+        }).format(new Date());
+  const band = getAgeBand(birthDate, day);
+  return band != null && SOLIDS_BANDS.has(band);
+}
+
+/** Near 12 months, list Solids first in the feed type picker. */
+export function solidsFirstInFeedPicker(
+  birthDate: string | undefined,
+  onDate?: string
+): boolean {
+  if (!birthDate || !isValidBirthDate(birthDate)) return false;
+  const day =
+    onDate && isValidBirthDate(onDate)
+      ? onDate
+      : new Intl.DateTimeFormat("en-CA", {
+          timeZone: DEFAULT_TRACKER_TIMEZONE,
+        }).format(new Date());
+  return getAgeBand(birthDate, day) === "months_12_plus";
+}
+
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export function isValidBirthDate(value: string): boolean {

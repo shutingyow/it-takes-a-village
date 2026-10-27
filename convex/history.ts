@@ -5,36 +5,50 @@ import {
   DEFAULT_TRACKER_TIMEZONE,
   getDayBoundsForDateKey,
 } from "./lib/dayBounds";
+import { isMilkFeed } from "./lib/feeds";
 
 /**
- * Minutes since the previous feed in `feeds`.
- * When `includePrior` is set, the first feed also measures the gap back to the
- * last feed before this set (overnight included). Otherwise the first feed
- * has no interval — used for a single calendar day.
+ * Minutes since the previous milk feed (nursing / bottle).
+ * Solids are listed but do not participate in the milk interval chain.
+ * When `includePrior` is set, the first milk feed also measures the gap back
+ * to the last milk feed before this set. Otherwise the first milk feed has
+ * no interval — used for a single calendar day.
  */
 async function feedIntervalMinutesById(
   ctx: QueryCtx,
   trackerId: Id<"trackers">,
-  feeds: Array<{ _id: Id<"feedEntries">; timestamp: number }>,
+  feeds: Array<{
+    _id: Id<"feedEntries">;
+    timestamp: number;
+    type: string;
+  }>,
   includePrior: boolean
 ): Promise<Map<Id<"feedEntries">, number | null>> {
   const result = new Map<Id<"feedEntries">, number | null>();
   if (feeds.length === 0) return result;
 
-  const sorted = [...feeds].sort((a, b) => a.timestamp - b.timestamp);
-  let prev: number | undefined;
-  if (includePrior) {
-    const prior = await ctx.db
-      .query("feedEntries")
-      .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", trackerId).lt("timestamp", sorted[0].timestamp)
-      )
-      .order("desc")
-      .first();
-    prev = prior?.timestamp;
+  for (const feed of feeds) {
+    if (!isMilkFeed(feed.type)) result.set(feed._id, null);
   }
 
-  for (const feed of sorted) {
+  const milk = feeds
+    .filter((feed) => isMilkFeed(feed.type))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (milk.length === 0) return result;
+
+  let prev: number | undefined;
+  if (includePrior) {
+    const earlier = await ctx.db
+      .query("feedEntries")
+      .withIndex("by_tracker_and_time", (q) =>
+        q.eq("trackerId", trackerId).lt("timestamp", milk[0].timestamp)
+      )
+      .order("desc")
+      .take(40);
+    prev = earlier.find((feed) => isMilkFeed(feed.type))?.timestamp;
+  }
+
+  for (const feed of milk) {
     result.set(
       feed._id,
       prev === undefined ? null : Math.round((feed.timestamp - prev) / 60000)

@@ -62,8 +62,12 @@ export const getData = query({
         durationMinutes !== undefined ? ` ${durationMinutes}min` : "";
       let summary =
         e.type === "breast"
-          ? `Breast${e.side ? ` (${e.side})` : ""}${durationLabel}`
-          : `Bottle${milkLabel} ${e.amount ?? "?"}ml${durationLabel}`;
+          ? `Nursing${e.side ? ` (${e.side})` : ""}${durationLabel}`
+          : e.type === "solids"
+            ? `Solids${e.foodName ? ` · ${e.foodName}` : ""}${
+                e.amountGrams != null ? ` ${e.amountGrams}g` : ""
+              }`
+            : `Bottle${milkLabel} ${e.amount ?? "?"}ml${durationLabel}`;
       if (e.type === "bottle" && e.bottleTemperature === "room") {
         summary += " room temp";
       } else if (e.type === "bottle" && e.bottleTemperature === "warm40") {

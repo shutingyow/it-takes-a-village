@@ -26,10 +26,25 @@ export function feedTimerStorageKey(
     : `feedTimer:${secretLink}`;
 }
 
+function storage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function loadFeedTimer(key: string): PersistedFeedTimer {
   if (typeof window === "undefined") return IDLE;
   try {
-    const raw = sessionStorage.getItem(key);
+    const store = storage();
+    const raw =
+      store?.getItem(key) ??
+      // Migrate older sessionStorage timers (same tab).
+      (typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem(key)
+        : null);
     if (!raw) return IDLE;
     const parsed = JSON.parse(raw) as PersistedFeedTimer;
     if (
@@ -65,19 +80,39 @@ function notifyFeedTimerChanged(): void {
 
 export function saveFeedTimer(key: string, state: PersistedFeedTimer): void {
   if (typeof window === "undefined") return;
-  if (state.status === "idle") {
+  const store = storage();
+  try {
     sessionStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+  if (state.status === "idle") {
+    store?.removeItem(key);
     notifyFeedTimerChanged();
     return;
   }
-  sessionStorage.setItem(key, JSON.stringify(state));
+  store?.setItem(key, JSON.stringify(state));
   notifyFeedTimerChanged();
 }
 
 export function clearFeedTimer(key: string): void {
   if (typeof window === "undefined") return;
-  sessionStorage.removeItem(key);
+  storage()?.removeItem(key);
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
   notifyFeedTimerChanged();
+}
+
+/** Active new-feed timer state, or null when idle. */
+export function getActiveFeedTimer(
+  secretLink: string
+): PersistedFeedTimer | null {
+  const state = loadFeedTimer(feedTimerStorageKey(secretLink));
+  if (state.status === "running" || state.status === "paused") return state;
+  return null;
 }
 
 /** True when a new-feed timer is actively recording (running or paused). */

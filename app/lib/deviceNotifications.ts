@@ -51,19 +51,19 @@ export type DueNotificationPayload = {
   feedTitle: string;
   /** Title when the feed is already overdue (one-shot). */
   feedTitleOverdue?: string;
-  /** Body for lead-time alerts, e.g. "Feed due in 10 min". */
-  feedBodyLead: (minutes: number) => string;
+  /** Body for lead-time alerts, e.g. "Feed due in 10 min · 3:40 PM". */
+  feedBodyLead: (minutes: number, dueAt: number) => string;
   /** Body when notifying at due time (lead = 0). */
   feedBodyAtDue: (clock: string) => string;
   /** Body when already past due, e.g. "Feed overdue · was due around 2:30". */
   feedBodyOverdue: (clock: string) => string;
-  /** Body for countdown milestones, e.g. "Next feed in 30 min". */
-  feedBodyCountdown: (minutes: number) => string;
+  /** Body for countdown milestones, e.g. "Next feed in 30 min · 3:40 PM". */
+  feedBodyCountdown: (minutes: number, dueAt: number) => string;
   pumpTitle: string;
-  pumpBodyLead: (minutes: number) => string;
+  pumpBodyLead: (minutes: number, dueAt: number) => string;
   pumpBodyAtDue: (clock: string) => string;
   napTitle?: string;
-  napBodyLead?: (minutes: number) => string;
+  napBodyLead?: (minutes: number, dueAt: number) => string;
   napBodyAtDue?: (clock: string) => string;
   formatClock: (ms: number) => string;
 };
@@ -162,8 +162,16 @@ function showBrowserNotification(
 
 async function cancelNativeNotifications(): Promise<void> {
   try {
+    // Cancel by known IDs and any other pending local notifs we scheduled
+    // (covers older ID schemes so a stale "pump in 10 min" cannot linger).
+    const pending = await LocalNotifications.getPending().catch(() => null);
+    const pendingIds =
+      pending?.notifications.map((n) => n.id).filter((id) => typeof id === "number") ??
+      [];
+    const ids = Array.from(new Set<number>([...ALL_IDS, ...pendingIds]));
+    if (ids.length === 0) return;
     await LocalNotifications.cancel({
-      notifications: ALL_IDS.map((id) => ({ id })),
+      notifications: ids.map((id) => ({ id })),
     });
   } catch {
     // Plugin may be unavailable in web preview.
@@ -274,7 +282,7 @@ export async function syncDueNotifications(
   const bodyForDue = (
     dueAt: number,
     fireAt: number,
-    leadBody: (minutes: number) => string,
+    leadBody: (minutes: number, dueAt: number) => string,
     atDueBody: (clock: string) => string,
     overdueBody?: (clock: string) => string
   ) => {
@@ -285,7 +293,7 @@ export async function syncDueNotifications(
     if (remaining <= 0) {
       return atDueBody(payload.formatClock(dueAt));
     }
-    return leadBody(remaining);
+    return leadBody(remaining, dueAt);
   };
 
   if (payload.feedDueAt !== null) {
@@ -324,7 +332,7 @@ export async function syncDueNotifications(
         planOnce(
           id,
           payload.feedTitle,
-          payload.feedBodyCountdown(minsLeft),
+          payload.feedBodyCountdown(minsLeft, feedDueAt),
           milestoneAt,
           `feed-countdown-${feedDueAt}-${minsLeft}`
         );

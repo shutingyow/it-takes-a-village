@@ -120,7 +120,7 @@ export function DueSoonCard({
   }, []);
 
   const dueStatus = useQuery(api.reminders.getDueStatus, { trackerId, now });
-  const recentFeeds = useQuery(api.feedEntries.getRecent, {
+  const recentFeeds = useQuery(api.feedEntries.getRecentMilk, {
     trackerId,
     limit: 2,
   });

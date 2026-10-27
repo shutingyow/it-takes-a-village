@@ -19,11 +19,10 @@ import {
   IconUsers,
   IconWarning,
 } from "../icons";
-import {
-  isAdminCaregiver,
-  type CaregiverInfo,
-} from "@/app/lib/trackerStorage";
+import type { CaregiverInfo } from "@/app/lib/trackerStorage";
+import { signInWithOAuth } from "@/app/lib/oauthSignIn";
 import { BirthDateField } from "../BirthDateField";
+import Link from "next/link";
 
 export type SettingsView =
   | "menu"
@@ -59,6 +58,8 @@ interface SettingsTabProps {
     intervalHours?: number;
   };
   openView?: SettingsView | null;
+  /** SSO owner of this village — gates admin settings. */
+  viewerIsOwner?: boolean;
 }
 
 export function SettingsTab({
@@ -78,23 +79,34 @@ export function SettingsTab({
   medicationReminders,
   pumpSchedule,
   openView,
+  viewerIsOwner = false,
 }: SettingsTabProps) {
   const { t, language, setLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
   const { isAuthenticated } = useConvexAuth();
-  const { signOut } = useAuthActions();
+  const { signIn, signOut } = useAuthActions();
   const [view, setView] = useState<SettingsView>("menu");
   const [showSupplyModal, setShowSupplyModal] = useState(false);
   const [newCaregiverName, setNewCaregiverName] = useState("");
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
 
   const activeAlerts = useQuery(api.supplyAlerts.getActive, { trackerId });
   const addCaregiver = useMutation(api.trackers.addCaregiver);
   const removeCaregiver = useMutation(api.trackers.removeCaregiver);
 
-  const isAdmin = isAdminCaregiver(caregivers, selectedCaregiver);
+  const isAdmin = viewerIsOwner;
   const adminCount = caregivers.filter((c) => c.role === "admin").length;
+
+  const handleSignIn = async (provider: "apple" | "google") => {
+    setAuthBusy(true);
+    try {
+      await signInWithOAuth(signIn, provider);
+    } finally {
+      setAuthBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (openView) setView(openView);
@@ -277,6 +289,52 @@ export function SettingsTab({
 
       <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
         <p className="text-sm font-semibold text-foreground mb-1">
+          {t("accountSection")}
+        </p>
+        {isAuthenticated ? (
+          <>
+            <p className="text-xs text-muted mb-3">{t("accountSignedIn")}</p>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="w-full py-3.5 px-4 rounded-xl border border-border bg-background text-sm font-semibold text-foreground touch-manipulation min-h-[44px]"
+            >
+              {t("signOut")}
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-muted mb-3">{t("accountSignedOut")}</p>
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={authBusy}
+                onClick={() => void handleSignIn("apple")}
+                className="w-full py-3.5 px-4 rounded-xl bg-foreground text-background text-sm font-semibold touch-manipulation min-h-[44px] disabled:opacity-50"
+              >
+                {t("signInWithApple")}
+              </button>
+              <button
+                type="button"
+                disabled={authBusy}
+                onClick={() => void handleSignIn("google")}
+                className="w-full py-3.5 px-4 rounded-xl border border-border bg-background text-sm font-semibold text-foreground touch-manipulation min-h-[44px] disabled:opacity-50"
+              >
+                {t("signInWithGoogle")}
+              </button>
+              <Link
+                href="/"
+                className="block text-center text-xs font-semibold text-primary pt-1"
+              >
+                {t("signInForAdmin")}
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
+        <p className="text-sm font-semibold text-foreground mb-1">
           {t("language")}
         </p>
         <p className="text-xs text-muted mb-3">{t("languageDesc")}</p>
@@ -343,16 +401,12 @@ export function SettingsTab({
         secretLink={secretLink}
         actingCaregiverName={selectedCaregiver}
         birthDate={birthDate}
+        canEdit={isAdmin}
       />
-
-      {isAuthenticated && (
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          className="w-full mb-4 rounded-2xl border border-border bg-surface px-4 py-3.5 text-sm font-semibold text-foreground card-shadow"
-        >
-          {t("signOut")}
-        </button>
+      {!isAdmin && !birthDate && (
+        <p className="mb-4 text-xs text-muted break-words">
+          {t("birthDateAdminOnly")}
+        </p>
       )}
 
       <div className="space-y-2">

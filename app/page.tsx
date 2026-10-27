@@ -20,6 +20,7 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { cn } from "@/app/lib/utils";
 import { IconReminders } from "@/app/components/icons";
 import { LanguageToggle } from "@/app/components/LanguageToggle";
+import { signInWithOAuth } from "@/app/lib/oauthSignIn";
 
 const CREATE_TIMEOUT_MS = 15_000;
 const DEFAULT_ADMIN = "Mommy (Shuting)";
@@ -43,6 +44,9 @@ export default function Home() {
     isAuthenticated ? {} : "skip"
   );
   const { isWebSocketConnected, hasEverConnected } = useConvexConnectionState();
+  const isBackendReady = isWebSocketConnected || hasEverConnected;
+  /** Avoid a flash of “Connecting…” on every cold start (prod + iOS). */
+  const [showConnectingBanner, setShowConnectingBanner] = useState(false);
   const [babyName, setBabyName] = useState("");
   const [caregivers, setCaregivers] = useState<CaregiverDraft[]>([
     { name: DEFAULT_ADMIN, role: "admin" },
@@ -75,6 +79,15 @@ export default function Home() {
   useEffect(() => {
     setLastVisited(getLastVisitedTracker());
   }, []);
+
+  useEffect(() => {
+    if (isBackendReady) {
+      setShowConnectingBanner(false);
+      return;
+    }
+    const id = window.setTimeout(() => setShowConnectingBanner(true), 2500);
+    return () => window.clearTimeout(id);
+  }, [isBackendReady]);
 
   // After SSO, land on parent manage/create; after sign-out, return to join chooser.
   useEffect(() => {
@@ -129,8 +142,6 @@ export default function Home() {
     router.push(`/tracker/${pendingOpenSecret}`);
   }, [pendingOpenSecret, pendingOpenTracker, router, t]);
 
-  const isBackendReady = isWebSocketConnected || hasEverConnected;
-
   const addCaregiverRow = () => {
     setCaregivers((prev) => [...prev, { name: "", role: "caregiver" }]);
   };
@@ -179,7 +190,7 @@ export default function Home() {
     setError(null);
     setSigningInProvider(provider);
     try {
-      await signIn(provider);
+      await signInWithOAuth(signIn, provider);
     } catch (err) {
       console.error("Sign-in failed:", err);
       const raw = err instanceof Error ? err.message : String(err);
@@ -526,19 +537,57 @@ export default function Home() {
     </div>
   );
 
-  const renderMyVillages = () => (
-    <div className="rounded-xl border border-border p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
+  const renderMyVillages = () => {
+    if (myVillages === undefined) {
+      return (
+        <p className="text-sm text-muted text-center">{t("loadingTracker")}</p>
+      );
+    }
+
+    if (myVillages.length === 0) {
+      return (
+        <p className="text-sm text-muted text-center">{t("myVillagesEmpty")}</p>
+      );
+    }
+
+    // One village: a single primary open action for the admin.
+    if (myVillages.length === 1) {
+      const village = myVillages[0]!;
+      const label = village.babyName?.trim() || t("yourTracker");
+      const url = `${typeof window !== "undefined" ? window.location.origin : ""}/tracker/${village.secretLink}`;
+      return (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => router.push(`/tracker/${village.secretLink}`)}
+            className="btn-primary w-full text-left px-4 py-4"
+          >
+            <p className="text-xs font-medium text-white/80 mb-1">
+              {t("openVillage")}
+            </p>
+            <p className="text-base font-semibold text-white">{label}</p>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setShareUrl({
+                url,
+                babyName: village.babyName ?? undefined,
+              })
+            }
+            className="w-full text-sm font-semibold text-muted py-2"
+          >
+            {t("shareVillage")}
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-xl border border-border p-4 space-y-3">
         <h2 className="text-sm font-semibold text-foreground">
           {t("myVillages")}
         </h2>
-        <span className="text-xs text-muted">{t("signedInAs")}</span>
-      </div>
-      {myVillages === undefined ? (
-        <p className="text-sm text-muted">{t("loadingTracker")}</p>
-      ) : myVillages.length === 0 ? (
-        <p className="text-sm text-muted">{t("myVillagesEmpty")}</p>
-      ) : (
         <ul className="space-y-2">
           {myVillages.map((village) => {
             const label = village.babyName?.trim() || t("yourTracker");
@@ -578,9 +627,9 @@ export default function Home() {
             );
           })}
         </ul>
-      )}
-    </div>
-  );
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
@@ -608,13 +657,19 @@ export default function Home() {
         </div>
 
         <div className="space-y-6">
-          {!isBackendReady && (
+          {showConnectingBanner && !isBackendReady && (
             <div className="rounded-2xl border border-warning/40 bg-warning-light px-4 py-3 text-sm text-[#9a7b2a]">
-              {t("connecting")}{" "}
-              <code className="font-mono text-xs bg-white/60 px-1.5 py-0.5 rounded">
-                npx convex dev
-              </code>{" "}
-              {t("inAnotherTerminal")}
+              {t("connecting")}
+              {process.env.NODE_ENV === "development" && (
+                <>
+                  {" "}
+                  {t("connectingDevHint")}{" "}
+                  <code className="font-mono text-xs bg-white/60 px-1.5 py-0.5 rounded">
+                    npx convex dev
+                  </code>{" "}
+                  {t("inAnotherTerminal")}
+                </>
+              )}
             </div>
           )}
 
@@ -624,25 +679,9 @@ export default function Home() {
             </div>
           )}
 
-          {/* Signed-in: My villages + create (no competing three-path dump) */}
+          {/* Signed-in admin: one village entry (My villages), not Continue + Open */}
           {isAuthenticated ? (
             <>
-              {canContinue && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(`/tracker/${lastVisited!.secretLink}`)
-                  }
-                  className="btn-primary w-full text-left px-4 py-4"
-                >
-                  <p className="text-xs font-medium text-white/80 mb-1">
-                    {t("continue")}
-                  </p>
-                  <p className="text-base font-semibold text-white">
-                    {t("continueWith", { name: continueLabel })}
-                  </p>
-                </button>
-              )}
               {renderMyVillages()}
               <button
                 type="button"

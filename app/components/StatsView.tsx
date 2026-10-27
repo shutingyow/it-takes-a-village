@@ -22,6 +22,8 @@ interface StatsViewProps {
   birthDate?: string;
   secretLink?: string;
   selectedCaregiver?: string;
+  /** Birth date edits are admin-only. */
+  canEditBirthDate?: boolean;
   onBack?: () => void;
   title?: string;
 }
@@ -35,31 +37,68 @@ const METRIC_COLOURS: Record<"feeds" | "diapers" | "pumps", string> = {
   pumps: "#a89b8a",
 };
 
+function AverageLine({
+  averageValue,
+  maxValue,
+}: {
+  averageValue: number;
+  maxValue: number;
+}) {
+  if (!(averageValue > 0) || !(maxValue > 0)) return null;
+  const bottomPct = Math.min(100, (averageValue / maxValue) * 100);
+  return (
+    <div
+      className="absolute left-0 right-0 z-10 pointer-events-none border-t border-dashed border-foreground/35"
+      style={{ bottom: `${bottomPct}%` }}
+      aria-hidden
+    />
+  );
+}
+
 function BarChart({
   data,
   maxValue,
   colour,
   formatValue,
+  averageValue,
 }: {
   data: Array<{ label: string; value: number }>;
   maxValue: number;
   colour: string;
   formatValue?: (value: number) => string;
+  averageValue?: number;
 }) {
   return (
-    <div className="flex items-end justify-between gap-1 h-28">
-      {data.map((d) => {
-        const pct = maxValue > 0 ? (d.value / maxValue) * 100 : 0;
-        const label =
-          d.value > 0
-            ? formatValue
-              ? formatValue(d.value)
-              : String(d.value)
-            : "";
-        return (
-          <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
-            <span className="text-[10px] font-medium text-muted">{label}</span>
-            <div className="w-full flex items-end justify-center h-20">
+    <div className="flex flex-col gap-1">
+      <div className="flex items-end justify-between gap-1">
+        {data.map((d) => {
+          const label =
+            d.value > 0
+              ? formatValue
+                ? formatValue(d.value)
+                : String(d.value)
+              : "";
+          return (
+            <span
+              key={`v-${d.label}`}
+              className="flex-1 text-[10px] font-medium text-muted text-center tabular-nums min-h-[14px]"
+            >
+              {label}
+            </span>
+          );
+        })}
+      </div>
+      <div className="relative h-20 flex items-end justify-between gap-1">
+        {averageValue != null && (
+          <AverageLine averageValue={averageValue} maxValue={maxValue} />
+        )}
+        {data.map((d) => {
+          const pct = maxValue > 0 ? (d.value / maxValue) * 100 : 0;
+          return (
+            <div
+              key={d.label}
+              className="flex-1 h-full flex items-end justify-center"
+            >
               <div
                 className="w-full max-w-[28px] rounded-t-lg transition-all"
                 style={{
@@ -69,12 +108,19 @@ function BarChart({
                 }}
               />
             </div>
-            <span className="text-[9px] text-muted truncate w-full text-center">
-              {d.label}
-            </span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      <div className="flex justify-between gap-1">
+        {data.map((d) => (
+          <span
+            key={`l-${d.label}`}
+            className="flex-1 text-[9px] text-muted truncate text-center"
+          >
+            {d.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -85,6 +131,7 @@ function StackedBarChart({
   bottomColour,
   topColour,
   formatValue,
+  averageValue,
 }: {
   data: Array<{
     label: string;
@@ -96,25 +143,41 @@ function StackedBarChart({
   bottomColour: string;
   topColour: string;
   formatValue?: (value: number) => string;
+  averageValue?: number;
 }) {
   return (
-    <div className="flex items-end justify-between gap-1 h-28">
-      {data.map((d) => {
-        const pct = maxValue > 0 ? (d.total / maxValue) * 100 : 0;
-        const parts = d.bottom + d.top;
-        const bottomShare = parts > 0 ? (d.bottom / parts) * 100 : 0;
-        const valueLabel =
-          d.total > 0
-            ? formatValue
-              ? formatValue(d.total)
-              : String(d.total)
-            : "";
-        return (
-          <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
-            <span className="text-[10px] font-medium text-muted">
+    <div className="flex flex-col gap-1">
+      <div className="flex items-end justify-between gap-1">
+        {data.map((d) => {
+          const valueLabel =
+            d.total > 0
+              ? formatValue
+                ? formatValue(d.total)
+                : String(d.total)
+              : "";
+          return (
+            <span
+              key={`v-${d.label}`}
+              className="flex-1 text-[10px] font-medium text-muted text-center tabular-nums min-h-[14px]"
+            >
               {valueLabel}
             </span>
-            <div className="w-full flex items-end justify-center h-20">
+          );
+        })}
+      </div>
+      <div className="relative h-20 flex items-end justify-between gap-1">
+        {averageValue != null && (
+          <AverageLine averageValue={averageValue} maxValue={maxValue} />
+        )}
+        {data.map((d) => {
+          const pct = maxValue > 0 ? (d.total / maxValue) * 100 : 0;
+          const parts = d.bottom + d.top;
+          const bottomShare = parts > 0 ? (d.bottom / parts) * 100 : 0;
+          return (
+            <div
+              key={d.label}
+              className="flex-1 h-full flex items-end justify-center"
+            >
               <div
                 className="w-full max-w-[28px] rounded-t-lg overflow-hidden transition-all flex flex-col-reverse"
                 style={{
@@ -145,12 +208,19 @@ function StackedBarChart({
                 )}
               </div>
             </div>
-            <span className="text-[9px] text-muted truncate w-full text-center">
-              {d.label}
-            </span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      <div className="flex justify-between gap-1">
+        {data.map((d) => (
+          <span
+            key={`l-${d.label}`}
+            className="flex-1 text-[9px] text-muted truncate text-center"
+          >
+            {d.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -158,7 +228,7 @@ function StackedBarChart({
 function ChartLegend({
   items,
 }: {
-  items: Array<{ colour: string; label: string }>;
+  items: Array<{ colour?: string; dashed?: boolean; label: string }>;
 }) {
   return (
     <div className="flex items-center justify-center gap-4 mt-3 flex-wrap">
@@ -167,10 +237,17 @@ function ChartLegend({
           key={item.label}
           className="flex items-center gap-1.5 text-[11px] text-muted"
         >
-          <span
-            className="w-2.5 h-2.5 rounded-sm shrink-0"
-            style={{ backgroundColor: item.colour }}
-          />
+          {item.dashed ? (
+            <span
+              className="w-3 h-0 border-t border-dashed border-foreground/45 shrink-0"
+              aria-hidden
+            />
+          ) : (
+            <span
+              className="w-2.5 h-2.5 rounded-sm shrink-0"
+              style={{ backgroundColor: item.colour }}
+            />
+          )}
           {item.label}
         </span>
       ))}
@@ -210,6 +287,7 @@ export function StatsView({
   birthDate,
   secretLink,
   selectedCaregiver,
+  canEditBirthDate = false,
   onBack,
   title,
 }: StatsViewProps) {
@@ -487,30 +565,24 @@ export function StatsView({
         </div>
       )}
 
-      {!birthDate && (
-        <div className="mb-4 min-w-0">
-          <p className="text-xs text-muted mb-2 break-words">
-            {t("setBirthDatePrompt")}
-          </p>
-          {secretLink && selectedCaregiver && (
-            <div className="bg-surface border border-border rounded-2xl p-3 card-shadow min-w-0">
-              <BirthDateField
-                secretLink={secretLink}
-                actingCaregiverName={selectedCaregiver}
-                birthDate={birthDate}
-                compact
-              />
-            </div>
-          )}
+      {!birthDate && canEditBirthDate && secretLink && selectedCaregiver && (
+        <div className="mb-4 min-w-0 w-full overflow-hidden">
+          <div className="bg-surface border border-border rounded-2xl p-3 card-shadow min-w-0 w-full overflow-hidden">
+            <BirthDateField
+              secretLink={secretLink}
+              actingCaregiverName={selectedCaregiver}
+              birthDate={birthDate}
+              canEdit
+              compact
+            />
+          </div>
         </div>
       )}
 
       {rangeMode === "daily" && (
         <TodayTimetable
           trackerId={trackerId}
-          mode="day"
           dateKey={selectedDateKey}
-          hideRangeToggle
           className="px-0 pb-4"
           secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
@@ -580,6 +652,22 @@ export function StatsView({
               </>
             )}
           </SummaryCard>
+
+          {day.solidsCount > 0 && (
+            <SummaryCard title={t("solidsDayTotal")}>
+              <StatLine
+                label={t("statsTotalFeeds")}
+                value={
+                  day.solidsGrams > 0
+                    ? t("solidsMealsGrams", {
+                        count: day.solidsCount,
+                        grams: day.solidsGrams,
+                      })
+                    : t("solidsMealsOnly", { count: day.solidsCount })
+                }
+              />
+            </SummaryCard>
+          )}
 
           <SummaryCard title={t("diapers")}>
             {day.diaperCount === 0 ? (
@@ -726,6 +814,7 @@ export function StatsView({
                       bottomColour="#c4846a"
                       topColour="#8fa4b8"
                       formatValue={(v) => `${v}`}
+                      averageValue={avgMilkMlPerDay}
                     />
                     <ChartLegend
                       items={[
@@ -736,6 +825,10 @@ export function StatsView({
                         {
                           colour: "#8fa4b8",
                           label: `${t("breastmilk")}: ${totalBreastmilkMl} ml`,
+                        },
+                        {
+                          dashed: true,
+                          label: `${t("chartAverage")}: ${avgMilkMlPerDay} ml`,
                         },
                       ]}
                     />
@@ -757,6 +850,7 @@ export function StatsView({
                     maxValue={countMax}
                     bottomColour="#8fa68f"
                     topColour="#c9a84c"
+                    averageValue={avgCountPerDay}
                   />
                   <ChartLegend
                     items={[
@@ -765,32 +859,37 @@ export function StatsView({
                         colour: "#c9a84c",
                         label: `${t("dirty")}: ${totalDirty}`,
                       },
+                      {
+                        dashed: true,
+                        label: `${t("chartAverage")}: ${avgCountPerDay}`,
+                      },
                     ]}
                   />
                 </>
               ) : (
-                <BarChart
-                  data={days.map((d) => ({
-                    label: d.label,
-                    value: getCountValue(d),
-                  }))}
-                  maxValue={countMax}
-                  colour={METRIC_COLOURS[metric]}
-                />
+                <>
+                  <BarChart
+                    data={days.map((d) => ({
+                      label: d.label,
+                      value: getCountValue(d),
+                    }))}
+                    maxValue={countMax}
+                    colour={METRIC_COLOURS[metric]}
+                    averageValue={avgCountPerDay}
+                  />
+                  <ChartLegend
+                    items={[
+                      {
+                        dashed: true,
+                        label: `${t("chartAverage")}: ${avgCountPerDay}`,
+                      },
+                    ]}
+                  />
+                </>
               )}
             </div>
           )}
 
-          <TodayTimetable
-            trackerId={trackerId}
-            mode="week"
-            dateKey={selectedWeekEndKey}
-            weekAlign="ending"
-            hideRangeToggle
-            className="px-0 pb-4"
-            secretLink={secretLink}
-            selectedCaregiver={selectedCaregiver}
-          />
         </>
       )}
     </div>

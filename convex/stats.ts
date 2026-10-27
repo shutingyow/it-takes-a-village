@@ -19,6 +19,8 @@ const dayStatValidator = v.object({
   feedCount: v.number(),
   breastCount: v.number(),
   bottleCount: v.number(),
+  solidsCount: v.number(),
+  solidsGrams: v.number(),
   formulaMl: v.number(),
   breastmilkMl: v.number(),
   breastDurationMinutes: v.number(),
@@ -71,6 +73,8 @@ type DayStat = {
   feedCount: number;
   breastCount: number;
   bottleCount: number;
+  solidsCount: number;
+  solidsGrams: number;
   formulaMl: number;
   breastmilkMl: number;
   breastDurationMinutes: number;
@@ -93,6 +97,7 @@ function buildDayStat(
     timestamp: number;
     type: string;
     amount?: number;
+    amountGrams?: number;
     bottleMilk?: "formula" | "breastmilk";
     notes?: string;
     durationMinutes?: number;
@@ -119,6 +124,8 @@ function buildDayStat(
   let breastmilkMl = 0;
   let breastCount = 0;
   let bottleCount = 0;
+  let solidsCount = 0;
+  let solidsGrams = 0;
   let breastDurationMinutes = 0;
   for (const feed of dayFeeds) {
     if (feed.type === "breast") {
@@ -129,9 +136,18 @@ function buildDayStat(
       }
     } else if (feed.type === "bottle") {
       bottleCount += 1;
+    } else if (feed.type === "solids") {
+      solidsCount += 1;
+      if (
+        feed.amountGrams != null &&
+        feed.amountGrams > 0 &&
+        Number.isFinite(feed.amountGrams)
+      ) {
+        solidsGrams += feed.amountGrams;
+      }
     }
 
-    // Direct breast feeds have no amount — exclude from ml totals
+    // Direct breast / solids have no bottle amount — exclude from ml totals
     if (feed.type !== "bottle" || !feed.amount || feed.amount <= 0) {
       continue;
     }
@@ -171,9 +187,11 @@ function buildDayStat(
   return {
     date: dateKey,
     label: formatWeekdayShortInZone(dayStart, DEFAULT_TRACKER_TIMEZONE),
-    feedCount: dayFeeds.length,
+    feedCount: breastCount + bottleCount,
     breastCount,
     bottleCount,
+    solidsCount,
+    solidsGrams,
     formulaMl,
     breastmilkMl,
     breastDurationMinutes,
@@ -409,7 +427,9 @@ type FeedRow = {
 };
 
 function summarizeFeeds(feeds: FeedRow[]): FeedingWindow {
-  const sorted = [...feeds].sort((a, b) => a.timestamp - b.timestamp);
+  const sorted = [...feeds]
+    .filter((feed) => feed.type === "breast" || feed.type === "bottle")
+    .sort((a, b) => a.timestamp - b.timestamp);
   let formulaMl = 0;
   let breastmilkMl = 0;
   let untypedMl = 0;

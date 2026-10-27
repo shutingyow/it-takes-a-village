@@ -2,15 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
+import { Capacitor } from "@capacitor/core";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { formatTime } from "@/app/lib/utils";
-import {
-  computeIntervalPumpDueAt,
-  DEFAULT_PUMP_INTERVAL_HOURS,
-  listUpcomingPumpDueAts,
-} from "@/convex/lib/pumpSchedule";
+import { listUpcomingPumpDueAts } from "@/convex/lib/pumpSchedule";
 import {
   DEFAULT_NOTIFY_BEFORE_MINUTES,
   getDeviceRemindersEnabled,
@@ -38,11 +35,13 @@ interface ReminderSchedulerProps {
 /**
  * Keeps local/device notifications in sync with last feed + pump schedule + nap wake window.
  * Mount once on the open tracker (caregiver unlocked). Opt-in is localStorage.
- * Feed (and pump-in-interval-mode) fire at due − notifyBeforeMinutes.
- * Feed countdown is suppressed while a feed timer is actively recording.
+ *
+ * Pump due times come from the same `getDueStatus` row the UI shows, so a
+ * notification never targets a different clock than Due soon.
  *
  * Resyncs when due timestamps / status / settings change — not every clock tick —
- * so cancel+reschedule does not eat an overdue ASAP alert.
+ * so cancel+reschedule does not eat an overdue ASAP alert. Also resyncs when the
+ * Capacitor app returns to the foreground (clears stale OS schedules).
  */
 export function ReminderScheduler({
   trackerId,
@@ -71,11 +70,26 @@ export function ReminderScheduler({
     window.addEventListener("storage", onStorage);
     window.addEventListener("deviceRemindersChanged", onFocus);
     window.addEventListener("feedTimerChanged", onFocus);
+
+    let removeAppState: (() => void) | undefined;
+    if (Capacitor.isNativePlatform()) {
+      void import("@capacitor/app").then(({ App }) => {
+        void App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive) onFocus();
+        }).then((handle) => {
+          removeAppState = () => {
+            void handle.remove();
+          };
+        });
+      });
+    }
+
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("deviceRemindersChanged", onFocus);
       window.removeEventListener("feedTimerChanged", onFocus);
+      removeAppState?.();
     };
   }, []);
 
@@ -90,13 +104,20 @@ export function ReminderScheduler({
   });
 
   const feedItem = dueStatus?.items.find((item) => item.type === "feed");
+  const pumpItem = dueStatus?.items.find((item) => item.type === "pump");
   const feedDueKey = feedItem
     ? `${feedItem.dueAt}:${feedItem.status}`
+    : "none";
+  const pumpDueKey = pumpItem
+    ? `${pumpItem.dueAt}:${pumpItem.status}`
     : "none";
   const hourBucket = Math.floor(now / 3_600_000);
 
   useEffect(() => {
     if (!dueStatus) return;
+    // Wait until last pump query settles so we don't schedule fixed-slot
+    // alerts as if there were no pumps (that caused "in 10 min" vs UI 2h+).
+    if (lastPump === undefined) return;
 
     const enabled = getDeviceRemindersEnabled();
     const lead =
@@ -108,12 +129,22 @@ export function ReminderScheduler({
     if (enabled && pumpSchedule?.enabled) {
       const mode = pumpSchedule.mode ?? "fixed";
       if (mode === "interval") {
-        const dueAt = computeIntervalPumpDueAt(
+        // Exact same due the Due soon card shows.
+        if (pumpItem) pumpDueAts = [pumpItem.dueAt];
+      } else if (pumpItem) {
+        const later = listUpcomingPumpDueAts(
+          {
+            enabled: true,
+            times: pumpSchedule.times,
+            amountMl: pumpSchedule.amountMl,
+            timezone: pumpSchedule.timezone,
+            mode: "fixed",
+          },
           lastPump?.timestamp,
-          pumpSchedule.intervalHours ?? DEFAULT_PUMP_INTERVAL_HOURS,
-          Date.now()
-        );
-        if (dueAt !== null) pumpDueAts = [dueAt];
+          Date.now(),
+          6
+        ).filter((ts) => ts > pumpItem.dueAt);
+        pumpDueAts = [pumpItem.dueAt, ...later].slice(0, 6);
       } else {
         pumpDueAts = listUpcomingPumpDueAts(
           {
@@ -121,6 +152,7 @@ export function ReminderScheduler({
             times: pumpSchedule.times,
             amountMl: pumpSchedule.amountMl,
             timezone: pumpSchedule.timezone,
+            mode: "fixed",
           },
           lastPump?.timestamp,
           Date.now(),
@@ -153,20 +185,32 @@ export function ReminderScheduler({
       notifyBeforeMinutes: lead,
       feedTitle: t("nextFeedDue"),
       feedTitleOverdue: t("feedOverdueTitle"),
-      feedBodyLead: (minutes) =>
-        t("deviceNotifFeedLead", { minutes: String(minutes) }),
+      feedBodyLead: (minutes, dueAt) =>
+        t("deviceNotifFeedLead", {
+          minutes: String(minutes),
+          time: formatTime(dueAt),
+        }),
       feedBodyAtDue: (clock) => t("deviceNotifFeedBody", { time: clock }),
       feedBodyOverdue: (clock) =>
         t("deviceNotifFeedOverdue", { time: clock }),
-      feedBodyCountdown: (minutes) =>
-        t("deviceNotifFeedCountdown", { minutes: String(minutes) }),
+      feedBodyCountdown: (minutes, dueAt) =>
+        t("deviceNotifFeedCountdown", {
+          minutes: String(minutes),
+          time: formatTime(dueAt),
+        }),
       pumpTitle: t("nextPumpDue"),
-      pumpBodyLead: (minutes) =>
-        t("deviceNotifPumpLead", { minutes: String(minutes) }),
+      pumpBodyLead: (minutes, dueAt) =>
+        t("deviceNotifPumpLead", {
+          minutes: String(minutes),
+          time: formatTime(dueAt),
+        }),
       pumpBodyAtDue: (clock) => t("deviceNotifPumpBody", { time: clock }),
       napTitle: t("nextNapDue"),
-      napBodyLead: (minutes) =>
-        t("deviceNotifNapLead", { minutes: String(minutes) }),
+      napBodyLead: (minutes, dueAt) =>
+        t("deviceNotifNapLead", {
+          minutes: String(minutes),
+          time: formatTime(dueAt),
+        }),
       napBodyAtDue: (clock) => t("deviceNotifNapBody", { time: clock }),
       formatClock: formatTime,
     });
@@ -181,9 +225,11 @@ export function ReminderScheduler({
   }, [
     dueStatus,
     feedItem,
+    pumpItem,
     feedDueKey,
+    pumpDueKey,
     hourBucket,
-    lastPump?.timestamp,
+    lastPump,
     recentSleep,
     pumpSchedule,
     feedIntervalHours,

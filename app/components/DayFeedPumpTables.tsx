@@ -100,12 +100,24 @@ export function DayFeedPumpTables({ entries }: DayFeedPumpTablesProps) {
                     ? entry.side
                       ? `${t("breast")} · ${entry.side === "left" ? t("left") : t("right")}`
                       : t("breast")
-                    : t("bottle");
+                    : entry.type === "solids"
+                      ? entry.foodName?.trim()
+                        ? `${t("solids")} · ${entry.foodName.trim()}`
+                        : t("solids")
+                      : t("bottle");
                 const milkLabel =
                   milk === "formula"
                     ? t("formula")
                     : milk === "breastmilk"
                       ? t("breastMilk")
+                      : DASH;
+                const amountLabel =
+                  entry.type === "solids"
+                    ? entry.amountGrams != null
+                      ? `${entry.amountGrams} g`
+                      : DASH
+                    : entry.amount != null
+                      ? `${entry.amount} ml`
                       : DASH;
                 return (
                   <tr key={entry._id}>
@@ -113,10 +125,10 @@ export function DayFeedPumpTables({ entries }: DayFeedPumpTablesProps) {
                       {formatTime(entry.time)}
                     </td>
                     <td className={bodyCell}>{typeLabel}</td>
+                    <td className={bodyCell}>{amountLabel}</td>
                     <td className={bodyCell}>
-                      {entry.amount != null ? `${entry.amount} ml` : DASH}
+                      {entry.type === "solids" ? DASH : milkLabel}
                     </td>
-                    <td className={bodyCell}>{milkLabel}</td>
                     <td className={bodyCell}>
                       {minutes
                         ? t("feedDurationMinutes", { min: minutes })

@@ -14,6 +14,8 @@ import { convexAuth } from "@convex-dev/auth/server";
  * - {CONVEX_SITE_URL}/api/auth/callback/google
  * - {CONVEX_SITE_URL}/api/auth/callback/apple
  */
+const NATIVE_AUTH_SCHEME = "ittakesavillage://";
+
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Google,
@@ -36,4 +38,24 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       },
     }),
   ],
+  callbacks: {
+    // Allow Capacitor to return to the app via custom URL scheme after OAuth
+    // instead of landing on SITE_URL in Safari.
+    async redirect({ redirectTo }) {
+      const site = (process.env.SITE_URL ?? "").replace(/\/$/, "");
+      if (redirectTo.startsWith(NATIVE_AUTH_SCHEME)) {
+        return redirectTo;
+      }
+      if (redirectTo.startsWith("/") || redirectTo.startsWith("?")) {
+        if (!site) {
+          throw new Error("SITE_URL is not configured");
+        }
+        return `${site}${redirectTo}`;
+      }
+      if (site && redirectTo.startsWith(site)) {
+        return redirectTo;
+      }
+      throw new Error(`Invalid redirectTo: ${redirectTo}`);
+    },
+  },
 });

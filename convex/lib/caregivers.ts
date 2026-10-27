@@ -1,3 +1,4 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -86,6 +87,10 @@ export async function verifyCaregiver(
   return { tracker, caregivers };
 }
 
+/**
+ * Admin power comes from SSO ownership of the village, not from picking an
+ * admin caregiver name on the shared lock screen.
+ */
 export async function verifyAdmin(
   ctx: QueryCtx | MutationCtx,
   secretLink: string,
@@ -97,8 +102,14 @@ export async function verifyAdmin(
     actingCaregiverName
   );
 
-  const actor = caregivers.find((c) => c.name === actingCaregiverName);
-  if (!actor || actor.role !== "admin") {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) {
+    throw new Error("Sign in required for admin actions");
+  }
+  if (tracker.ownerUserId === undefined) {
+    throw new Error("Claim this village on the home screen to manage it");
+  }
+  if (tracker.ownerUserId !== userId) {
     throw new Error("Admin access required");
   }
 

@@ -10,6 +10,7 @@ interface InsightsTabProps {
   birthDate?: string;
   secretLink: string;
   selectedCaregiver: string;
+  canEditBirthDate?: boolean;
 }
 
 export function InsightsTab({
@@ -18,6 +19,7 @@ export function InsightsTab({
   birthDate,
   secretLink,
   selectedCaregiver,
+  canEditBirthDate = false,
 }: InsightsTabProps) {
   const { t } = useLanguage();
 
@@ -28,6 +30,7 @@ export function InsightsTab({
       birthDate={birthDate}
       secretLink={secretLink}
       selectedCaregiver={selectedCaregiver}
+      canEditBirthDate={canEditBirthDate}
       onBack={undefined}
       title={t("tabInsights")}
     />

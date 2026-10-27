@@ -20,6 +20,8 @@ const timetableEventValidator = v.object({
   endMs: v.optional(v.number()),
   label: v.optional(v.string()),
   caregiverName: v.optional(v.string()),
+  /** Solids stay under kind "feed" but use a distinct tone in the UI. */
+  tone: v.optional(v.literal("solids")),
 });
 
 /**
@@ -58,6 +60,7 @@ export const getSchedule = query({
         endMs?: number;
         label?: string;
         caregiverName?: string;
+        tone?: "solids";
       }>;
     }> = [];
 
@@ -106,13 +109,29 @@ export const getSchedule = query({
       });
 
       const events = [
-        ...feeds.map((e) => ({
-          id: e._id,
-          kind: "feed" as const,
-          startMs: e.timestamp,
-          caregiverName: e.caregiverName,
-          ...(e.amount !== undefined ? { label: `${e.amount} ml` } : {}),
-        })),
+        ...feeds.map((e) => {
+          if (e.type === "solids") {
+            const bits = [
+              e.foodName?.trim() || "Solids",
+              e.amountGrams != null ? `${e.amountGrams}g` : null,
+            ].filter(Boolean);
+            return {
+              id: e._id,
+              kind: "feed" as const,
+              startMs: e.timestamp,
+              caregiverName: e.caregiverName,
+              label: bits.join(" · "),
+              tone: "solids" as const,
+            };
+          }
+          return {
+            id: e._id,
+            kind: "feed" as const,
+            startMs: e.timestamp,
+            caregiverName: e.caregiverName,
+            ...(e.amount !== undefined ? { label: `${e.amount} ml` } : {}),
+          };
+        }),
         ...diapers.map((e) => ({
           id: e._id,
           kind: "diaper" as const,

@@ -24,13 +24,15 @@ export function EntryTimeField({ value, onChange, label }: EntryTimeFieldProps) 
   const { t } = useLanguage();
 
   return (
-    <div>
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <label className="label-field mb-0">{label ?? t("entryTime")}</label>
+    <div className="min-w-0 w-full max-w-full overflow-x-clip">
+      <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+        <label className="label-field mb-0 min-w-0 truncate">
+          {label ?? t("entryTime")}
+        </label>
         <button
           type="button"
           onClick={() => onChange(Date.now())}
-          className="text-xs font-semibold text-primary px-2.5 py-1 rounded-full bg-primary-light"
+          className="text-xs font-semibold text-primary px-2.5 py-1 rounded-full bg-primary-light shrink-0"
         >
           {t("useNow")}
         </button>
@@ -39,9 +41,9 @@ export function EntryTimeField({ value, onChange, label }: EntryTimeFieldProps) 
         type="datetime-local"
         value={toDatetimeLocalValue(value)}
         onChange={(e) => onChange(fromDatetimeLocalValue(e.target.value))}
-        className="input-field"
+        className="input-field input-datetime min-w-0 max-w-full"
       />
-      <p className="text-xs text-muted mt-1.5">{t("entryTimeHint")}</p>
+      <p className="text-xs text-muted mt-1.5 break-words">{t("entryTimeHint")}</p>
     </div>
   );
 }

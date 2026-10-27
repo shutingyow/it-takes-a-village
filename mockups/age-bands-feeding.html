@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Age-band feeding mockups — It Takes A Village</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --background: #faf8f5;
+      --foreground: #3d3530;
+      --surface: #ffffff;
+      --primary: #8fa68f;
+      --muted: #9a8f85;
+      --border: #e8dfd4;
+      --beige-light: #ede6dc;
+      --feed: #f07878;
+      --diaper: #efc84a;
+      --pump: #6bb5e8;
+      --nap: #6fbf8a;
+      --solids: #b8956a;
+      --font: "Geist", system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: #ebe6df;
+      color: var(--foreground);
+      line-height: 1.4;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font-family: inherit; }
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    h1 {
+      font-size: 1.25rem;
+      margin: 0 0 6px;
+      font-weight: 600;
+    }
+    .lede {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 0 0 18px;
+      max-width: 40rem;
+    }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .tabs button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--foreground);
+      cursor: pointer;
+    }
+    .tabs button[aria-selected="true"] {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .phone {
+      background: var(--background);
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      padding: 14px 12px 18px;
+      box-shadow: 0 8px 28px rgba(44, 42, 40, 0.06);
+    }
+    .phone > .caption {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0 0 10px;
+      font-weight: 700;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 0 2px;
+    }
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      background: var(--beige-light);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .header strong {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .header span {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .tiles { display: flex; flex-direction: column; gap: 8px; }
+    .tile {
+      border-radius: 1.35rem;
+      min-height: 5.25rem;
+      padding: 14px 14px 14px 4.5rem;
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+    .tile .ico {
+      position: absolute;
+      left: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.92;
+      color: #fff;
+    }
+    .tile .name {
+      font-size: 1.45rem;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+    .tile .sum {
+      font-size: 0.85rem;
+      font-weight: 500;
+      opacity: 0.92;
+      margin-top: 6px;
+    }
+    .feed { background: var(--feed); }
+    .diaper { background: var(--diaper); }
+    .pump { background: var(--pump); }
+    .nap { background: var(--nap); }
+    .due {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 10px;
+      margin: 10px 0 0;
+      box-shadow: 0 1px 3px rgba(44, 42, 40, 0.04);
+    }
+    .due .label {
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .due-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      font-size: 0.82rem;
+    }
+    .due-row + .due-row { border-top: 1px solid #f0ebe4; }
+    .due-row .icon-wrap {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--beige-light);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      color: var(--foreground);
+    }
+    .due-row .k {
+      width: 2.75rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .due-row .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .due-row .v .clock {
+      color: var(--muted);
+      font-weight: 500;
+      margin-left: 4px;
+    }
+    .sheet {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px;
+    }
+    .sheet h3 {
+      margin: 0 0 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip {
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1.5px solid var(--border);
+      background: var(--beige-light);
+      color: var(--foreground);
+    }
+    .chip.on {
+      background: #e05a5a;
+      border-color: #e05a5a;
+      color: #fff;
+    }
+    .chip.solids-on {
+      background: var(--solids);
+      border-color: var(--solids);
+      color: #fff;
+    }
+    .chip.ghost {
+      opacity: 0.35;
+    }
+    .field { margin-bottom: 10px; }
+    .field label {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .field .box {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 11px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      background: var(--background);
+    }
+    .hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin: 0;
+      font-weight: 500;
+    }
+    .tt {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .tt h3 {
+      margin: 0 0 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+    .tt-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 0;
+      font-size: 0.8rem;
+      font-weight: 500;
+      border-bottom: 1px solid #f3eee8;
+    }
+    .tt-row:last-child { border-bottom: 0; }
+    .tt-time {
+      width: 3rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      font-size: 0.75rem;
+    }
+    .pill {
+      border-radius: 8px;
+      padding: 3px 8px;
+      font-weight: 700;
+      font-size: 0.68rem;
+      color: #fff;
+      letter-spacing: 0.01em;
+    }
+    .pill.milk { background: #e05a5a; }
+    .pill.solids { background: var(--solids); }
+    .note {
+      margin-top: 14px;
+      padding: 12px 14px;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .note strong { color: var(--foreground); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Feeding UI by age band</h1>
+    <p class="lede">
+      Same Today shell as the live app. Milk owns What’s due; solids show up around 6 months
+      with their own timetable color.
+    </p>
+
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" aria-selected="true" data-tab="m0">0–6 mo · milk only</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="m6">~6 mo · practice</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="m9">~9 mo · meals + milk</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="m12">~12 mo · meals lead</button>
+    </div>
+
+    <!-- icons as templates -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+      <symbol id="i-feed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 2h4v2.2l1.2 1.2a2 2 0 0 1 .6 1.4V8H8V6.8a2 2 0 0 1 .6-1.4L9.8 4.2V2Z" />
+        <path d="M8 8h8v9.5a2.5 2.5 0 0 1-2.5 2.5h-3A2.5 2.5 0 0 1 8 17.5V8Z" />
+        <path d="M10 11h4" />
+      </symbol>
+      <symbol id="i-diaper" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 7.5c0-.8.7-1.5 1.5-1.5h11c.8 0 1.5.7 1.5 1.5V11c0 3.5-2.2 6.5-6 7.5-3.8-1-6-4-6-7.5V7.5Z" />
+        <path d="M5 11h4.5M14.5 11H19" />
+        <path d="M9.5 11c.6 1.8 1.4 2.8 2.5 2.8s1.9-1 2.5-2.8" />
+      </symbol>
+      <symbol id="i-pump" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9.5 4.5c2.2 2.8 3.8 4.8 3.8 6.8a3.8 3.8 0 1 1-7.6 0c0-2 1.6-4 3.8-6.8Z" />
+        <path d="M17 9c1.6 2 2.7 3.4 2.7 4.9a2.7 2.7 0 1 1-5.4 0c0-1.5 1.1-2.9 2.7-4.9Z" />
+      </symbol>
+      <symbol id="i-nap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.5 14.2A8 8 0 0 1 9.8 3.5 8.2 8.2 0 1 0 20.5 14.2Z" />
+      </symbol>
+      <symbol id="i-solids" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 11h16v2.5a6 6 0 0 1-6 6h-4a6 6 0 0 1-6-6V11Z" />
+        <path d="M8 11V7.5A4 4 0 0 1 12 3.5 4 4 0 0 1 16 7.5V11" />
+      </symbol>
+    </svg>
+
+    <!-- 0–6 -->
+    <div class="panel active" id="m0" role="tabpanel">
+      <div class="grid">
+        <div class="phone">
+          <p class="caption">Today</p>
+          <div class="header">
+            <div class="avatar" aria-hidden="true"></div>
+            <div>
+              <strong>Russell</strong>
+              <span>11 weeks</span>
+            </div>
+          </div>
+          <div class="tiles">
+            <div class="tile feed">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-feed"/></svg>
+              <div class="name">Feed</div>
+              <div class="sum">40 mins ago · 90ml</div>
+            </div>
+            <div class="tile diaper">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-diaper"/></svg>
+              <div class="name">Diaper</div>
+              <div class="sum">1h ago · wet</div>
+            </div>
+            <div class="tile pump">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-pump"/></svg>
+              <div class="name">Pump</div>
+              <div class="sum">2h ago · 120ml</div>
+            </div>
+            <div class="tile nap">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-nap"/></svg>
+              <div class="name">Nap</div>
+              <div class="sum">3h ago · 45 min</div>
+            </div>
+          </div>
+          <div class="due">
+            <div class="label">What’s due</div>
+            <div class="due-row">
+              <span class="icon-wrap" style="color:#e05a5a"><svg width="15" height="15"><use href="#i-feed"/></svg></span>
+              <span class="k">Feed</span>
+              <span class="v">Due in 1h 20m <span class="clock">· 3:10</span></span>
+            </div>
+            <div class="due-row">
+              <span class="icon-wrap" style="color:#4a9fd8"><svg width="15" height="15"><use href="#i-pump"/></svg></span>
+              <span class="k">Pump</span>
+              <span class="v">Due in 40m <span class="clock">· 2:30</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="phone">
+          <p class="caption">Log feed</p>
+          <div class="sheet">
+            <h3>What kind of feed?</h3>
+            <div class="chips">
+              <span class="chip on">Nursing</span>
+              <span class="chip">Bottle</span>
+              <span class="chip ghost">Solids</span>
+            </div>
+            <div class="field"><label>Amount</label><div class="box">90 ml</div></div>
+          </div>
+        </div>
+        <div class="phone">
+          <p class="caption">Reports · timetable</p>
+          <div class="tt">
+            <h3>Today’s schedule</h3>
+            <div class="tt-row"><span class="tt-time">10:20</span><span class="pill milk">Bottle</span> 90ml formula</div>
+            <div class="tt-row"><span class="tt-time">11:05</span><span class="pill milk">Nursing</span> 18 min</div>
+            <div class="tt-row"><span class="tt-time">13:40</span><span class="pill milk">Bottle</span> 80ml</div>
+          </div>
+        </div>
+      </div>
+      <p class="note"><strong>Story:</strong> Milk clock only. Keep the log simple.</p>
+    </div>
+
+    <!-- 6 mo -->
+    <div class="panel" id="m6" role="tabpanel">
+      <div class="grid">
+        <div class="phone">
+          <p class="caption">Today</p>
+          <div class="header">
+            <div class="avatar" aria-hidden="true"></div>
+            <div>
+              <strong>Russell</strong>
+              <span>6 months</span>
+            </div>
+          </div>
+          <div class="tiles">
+            <div class="tile feed">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-feed"/></svg>
+              <div class="name">Feed</div>
+              <div class="sum">25 mins ago · 110ml · solids earlier</div>
+            </div>
+            <div class="tile diaper">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-diaper"/></svg>
+              <div class="name">Diaper</div>
+              <div class="sum">50 mins ago</div>
+            </div>
+            <div class="tile pump">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-pump"/></svg>
+              <div class="name">Pump</div>
+              <div class="sum">1 session today</div>
+            </div>
+            <div class="tile nap">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-nap"/></svg>
+              <div class="name">Nap</div>
+              <div class="sum">Napping now</div>
+            </div>
+          </div>
+          <div class="due">
+            <div class="label">What’s due</div>
+            <div class="due-row">
+              <span class="icon-wrap" style="color:#e05a5a"><svg width="15" height="15"><use href="#i-feed"/></svg></span>
+              <span class="k">Feed</span>
+              <span class="v">Due in 2h <span class="clock">· 4:05</span></span>
+            </div>
+            <div class="due-row">
+              <span class="icon-wrap" style="color:#4a9fd8"><svg width="15" height="15"><use href="#i-pump"/></svg></span>
+              <span class="k">Pump</span>
+              <span class="v">Due in 1h <span class="clock">· 3:05</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="phone">
+          <p class="caption">Log feed</p>
+          <div class="sheet">
+            <h3>What kind of feed?</h3>
+            <div class="chips">
+              <span class="chip">Nursing</span>
+              <span class="chip">Bottle</span>
+              <span class="chip solids-on">Solids</span>
+            </div>
+            <div class="field"><label>Food</label><div class="box">Avocado puree</div></div>
+            <div class="field"><label>Amount (optional)</label><div class="box">30 g</div></div>
+          </div>
+        </div>
+        <div class="phone">
+          <p class="caption">Reports · timetable</p>
+          <div class="tt">
+            <h3>Today’s schedule</h3>
+            <div class="tt-row"><span class="tt-time">08:00</span><span class="pill milk">Bottle</span> 120ml</div>
+            <div class="tt-row"><span class="tt-time">11:40</span><span class="pill solids">Solids</span> avocado · 30g</div>
+            <div class="tt-row"><span class="tt-time">12:10</span><span class="pill milk">Nursing</span> 15 min</div>
+          </div>
+        </div>
+      </div>
+      <p class="note"><strong>Story:</strong> Solids are optional. Milk due stays the clock.</p>
+    </div>
+
+    <!-- 9 mo -->
+    <div class="panel" id="m9" role="tabpanel">
+      <div class="grid">
+        <div class="phone">
+          <p class="caption">Today</p>
+          <div class="header">
+            <div class="avatar" aria-hidden="true"></div>
+            <div>
+              <strong>Russell</strong>
+              <span>9 months</span>
+            </div>
+          </div>
+          <div class="tiles">
+            <div class="tile feed">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-feed"/></svg>
+              <div class="name">Feed</div>
+              <div class="sum">Last milk 1h ago · 3 solids today</div>
+            </div>
+            <div class="tile diaper">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-diaper"/></svg>
+              <div class="name">Diaper</div>
+              <div class="sum">2h ago</div>
+            </div>
+            <div class="tile pump">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-pump"/></svg>
+              <div class="name">Pump</div>
+              <div class="sum">2 sessions</div>
+            </div>
+            <div class="tile nap">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-nap"/></svg>
+              <div class="name">Nap</div>
+              <div class="sum">1h ago · 40 min</div>
+            </div>
+          </div>
+          <div class="due">
+            <div class="label">What’s due</div>
+            <div class="due-row">
+              <span class="icon-wrap" style="color:#e05a5a"><svg width="15" height="15"><use href="#i-feed"/></svg></span>
+              <span class="k">Feed</span>
+              <span class="v">Due in 55m <span class="clock">· 3:15</span></span>
+            </div>
+            <div class="due-row">
+              <span class="icon-wrap" style="color:#4a9fd8"><svg width="15" height="15"><use href="#i-pump"/></svg></span>
+              <span class="k">Pump</span>
+              <span class="v">Due in 2h</span>
+            </div>
+          </div>
+        </div>
+        <div class="phone">
+          <p class="caption">Reports · day totals</p>
+          <div class="sheet">
+            <h3>Milk · day total</h3>
+            <div class="field"><div class="box"><strong>420 ml</strong> · nursing 12m · formula 280ml</div></div>
+            <h3 style="margin-top:12px">Solids · day total</h3>
+            <div class="field"><div class="box"><strong>3 meals · ~110 g</strong><br /><span class="hint">oats 40g · banana 35g · chicken 35g</span></div></div>
+          </div>
+        </div>
+        <div class="phone">
+          <p class="caption">Reports · timetable</p>
+          <div class="tt">
+            <h3>Today’s schedule</h3>
+            <div class="tt-row"><span class="tt-time">07:30</span><span class="pill milk">Bottle</span> 150ml</div>
+            <div class="tt-row"><span class="tt-time">09:00</span><span class="pill solids">Solids</span> oats · 40g</div>
+            <div class="tt-row"><span class="tt-time">11:00</span><span class="pill milk">Nursing</span> 10 min</div>
+            <div class="tt-row"><span class="tt-time">12:30</span><span class="pill solids">Solids</span> banana · 35g</div>
+            <div class="tt-row"><span class="tt-time">15:00</span><span class="pill solids">Solids</span> chicken · 35g</div>
+            <div class="tt-row"><span class="tt-time">15:20</span><span class="pill milk">Bottle</span> 120ml</div>
+          </div>
+        </div>
+      </div>
+      <p class="note"><strong>Story:</strong> Both show on the day. Milk still owns the reminder. Grams stay separate from ml.</p>
+    </div>
+
+    <!-- 12 mo -->
+    <div class="panel" id="m12" role="tabpanel">
+      <div class="grid">
+        <div class="phone">
+          <p class="caption">Today</p>
+          <div class="header">
+            <div class="avatar" aria-hidden="true"></div>
+            <div>
+              <strong>Russell</strong>
+              <span>12 months</span>
+            </div>
+          </div>
+          <div class="tiles">
+            <div class="tile feed">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-feed"/></svg>
+              <div class="name">Feed</div>
+              <div class="sum">Lunch 40g · milk 2h ago</div>
+            </div>
+            <div class="tile diaper">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-diaper"/></svg>
+              <div class="name">Diaper</div>
+              <div class="sum">1h ago</div>
+            </div>
+            <div class="tile pump">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-pump"/></svg>
+              <div class="name">Pump</div>
+              <div class="sum">1 session</div>
+            </div>
+            <div class="tile nap">
+              <svg class="ico" width="64" height="64" stroke-width="1.35"><use href="#i-nap"/></svg>
+              <div class="name">Nap</div>
+              <div class="sum">1 nap today</div>
+            </div>
+          </div>
+          <div class="due">
+            <div class="label">What’s due</div>
+            <div class="due-row">
+              <span class="icon-wrap" style="color:#e05a5a"><svg width="15" height="15"><use href="#i-feed"/></svg></span>
+              <span class="k">Feed</span>
+              <span class="v">Due in 1h 10m <span class="clock">· 4:00</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="phone">
+          <p class="caption">Reports · day totals</p>
+          <div class="sheet">
+            <h3>Solids · day total</h3>
+            <div class="field"><div class="box"><strong>4 meals · ~280 g</strong><br /><span class="hint">porridge · family lunch · fruit · dinner</span></div></div>
+            <h3 style="margin-top:12px">Milk · day total</h3>
+            <div class="field"><div class="box"><strong>320 ml</strong></div></div>
+          </div>
+        </div>
+        <div class="phone">
+          <p class="caption">Log feed · defaults</p>
+          <div class="sheet">
+            <h3>What kind of feed?</h3>
+            <div class="chips">
+              <span class="chip solids-on">Solids</span>
+              <span class="chip">Bottle</span>
+              <span class="chip">Nursing</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note"><strong>Story:</strong> Same shell; day totals put meals first. Still capped at 12 months.</p>
+    </div>
+  </div>
+
+  <script>
+    const tabs = document.querySelectorAll('[role="tab"]');
+    const panels = document.querySelectorAll(".panel");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const id = tab.getAttribute("data-tab");
+        tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+        panels.forEach((p) => p.classList.toggle("active", p.id === id));
+      });
+    });
+  </script>
+</body>
+</html>

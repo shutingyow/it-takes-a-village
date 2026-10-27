@@ -25,8 +25,15 @@ Parents **sign in** to create a village. Caregivers still open the **secret link
 |-------|--------|
 | Backend | Convex Auth (`convex/auth.ts`) — Google + Apple OAuth |
 | Callbacks | `{CONVEX_SITE_URL}/api/auth/callback/google` and `…/apple` |
-| Site return | `SITE_URL` = `https://it-takes-a-village.vercel.app` (prod) or `http://localhost:3000` (dev) |
-| Client | Home page SSO buttons; Capacitor loads the same web app |
+| Site return (web) | `SITE_URL` = `https://it-takes-a-village.vercel.app` (prod) or `http://localhost:3000` (dev) |
+| App return (iOS) | Custom scheme `ittakesavillage://auth/callback` via `@capacitor/browser` + `App.appUrlOpen` |
+| Client | Home / Settings / lock-screen SSO; Capacitor loads the same web app |
+
+On **iOS**, OAuth opens an in-app browser sheet and returns to the Capacitor app (not Safari). That needs:
+
+1. Deployed Convex `callbacks.redirect` (allows `ittakesavillage://`)
+2. Deployed web client (`signInWithOAuth` + `OAuthDeepLinkHandler`)
+3. **Xcode rebuild** after `Info.plist` URL scheme / `npm run cap:sync` (scheme is native-only)
 
 ### Dashboard setup (required before SSO works)
 
@@ -57,7 +64,7 @@ Parents **sign in** to create a village. Caregivers still open the **secret link
 4. **Local testing** — repeat the same `AUTH_*` sets **without** `--prod` (or use separate Google/Apple clients with local Convex `.site` callback). Local `SITE_URL` should be `http://localhost:3000`.
 5. **Xcode** — App target → **Sign in with Apple** capability; rebuild after changing entitlements.
 
-OAuth runs in the system browser against Convex callbacks, then returns to `SITE_URL`. After setting env vars, wait a few seconds and try sign-in again (no code redeploy required for env-only changes).
+OAuth runs against Convex HTTPS callbacks. On **web**, the user returns to `SITE_URL`. On **iOS**, the client passes `redirectTo=ittakesavillage://auth/callback` so the sheet hands control back to the app. After setting env vars only, wait a few seconds and try again (no code redeploy). After auth / Info.plist changes, deploy Convex + Vercel and rebuild the iOS binary.
 
 ## Prerequisites (your Mac)
 

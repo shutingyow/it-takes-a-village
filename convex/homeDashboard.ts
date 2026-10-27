@@ -52,13 +52,16 @@ export const getTileSummaries = query({
     ),
   }),
   handler: async (ctx, args) => {
-    const lastFeed = await ctx.db
+    const recentFeeds = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) =>
         q.eq("trackerId", args.trackerId)
       )
       .order("desc")
-      .first();
+      .take(40);
+    const lastFeed = recentFeeds.find(
+      (feed) => feed.type === "breast" || feed.type === "bottle"
+    );
 
     const lastDiaper = await ctx.db
       .query("diaperEntries")

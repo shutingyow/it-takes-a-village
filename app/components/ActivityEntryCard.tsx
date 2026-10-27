@@ -30,6 +30,7 @@ export type ActivityEntry = FunctionReturnType<
 
 const iconBg: Record<string, string> = {
   feed: "bg-beige-light text-accent-feed",
+  solids: "bg-accent-solids-light/40 text-accent-solids",
   sleep: "bg-accent-sleep text-white",
   nap: "bg-accent-sleep text-white",
   diaper: "bg-accent-diaper text-white",
@@ -70,6 +71,7 @@ export function ActivityEntryCard({
   const { t } = useLanguage();
 
   const entryType = iconTypeFor(entry);
+  const isSolids = entry.entryType === "feed" && entry.type === "solids";
   const title = getTitle(entry, t);
   const subtitle = getSubtitle(entry, t);
   const notes = entryNotes(entry);
@@ -82,7 +84,7 @@ export function ActivityEntryCard({
       <div
         className={cn(
           "relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-          iconBg[entryType]
+          isSolids ? iconBg.solids : iconBg[entryType]
         )}
       >
         <ActivityIcon type={entryType} size={14} />
@@ -176,6 +178,9 @@ function resolveBottleMilk(
 }
 
 function iconTypeFor(entry: ActivityEntry): ActivityType {
+  if (entry.entryType === "feed" && entry.type === "solids") {
+    return "feed";
+  }
   switch (entry.entryType) {
     case "feed":
     case "sleep":
@@ -214,6 +219,10 @@ function getTitle(entry: ActivityEntry, t: TFunction): string {
         return `${feedType} · ${side}`;
       }
       return feedType;
+    }
+    if (entry.type === "solids") {
+      const food = entry.foodName?.trim();
+      return food ? `${t("solids")} · ${food}` : t("solids");
     }
     const milk = resolveBottleMilk(entry);
     if (milk === "formula") {
@@ -280,6 +289,12 @@ function appendLoggedBy(
 function getSubtitle(entry: ActivityEntry, t: TFunction): string | null {
   if (entry.entryType === "feed") {
     const parts: string[] = [];
+    if (entry.type === "solids") {
+      if (entry.amountGrams != null && entry.amountGrams > 0) {
+        parts.push(t("amountGramsCompact", { amount: entry.amountGrams }));
+      }
+      return appendLoggedBy(parts, entry.caregiverName, t);
+    }
     const minutes = entry.durationMinutes ?? entry.duration;
     if (minutes) {
       parts.push(t("feedDurationMinutes", { min: minutes }));

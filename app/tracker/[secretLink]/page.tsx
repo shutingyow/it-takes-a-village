@@ -34,6 +34,7 @@ import {
 import { saveLastVisitedTracker } from "@/app/lib/trackerStorage";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ReminderScheduler } from "@/app/components/ReminderScheduler";
+import { FeedTimerBanner } from "@/app/components/FeedTimerBanner";
 import { useAppShell } from "@/app/lib/appShell";
 import { cn } from "@/app/lib/utils";
 
@@ -104,11 +105,15 @@ export default function TrackerPage({
       return;
     }
     const saved = getLockedCaregiver(secretLink);
-    const validNames = tracker.caregivers.map((c) => c.name);
+    const selectable = tracker.viewerIsOwner
+      ? tracker.caregivers
+      : tracker.caregivers.filter((c) => c.role !== "admin");
+    const validNames = selectable.map((c) => c.name);
     if (saved && validNames.includes(saved)) {
       setLockedCaregiver(saved);
       setNeedsPick(false);
     } else {
+      if (saved) clearLockedCaregiver(secretLink);
       setLockedCaregiver(null);
       setNeedsPick(true);
     }
@@ -239,9 +244,13 @@ export default function TrackerPage({
   if (needsPick || !lockedCaregiver || !lockedInfo) {
     return (
       <div className="min-h-screen flex flex-col bg-background safe-top">
-        {claimBanner}
         <CaregiverLockScreen
           caregivers={tracker.caregivers}
+          viewerIsOwner={tracker.viewerIsOwner}
+          canClaim={canClaim}
+          claiming={claiming}
+          claimError={claimError}
+          onClaim={() => void handleClaimVillage()}
           onConfirm={handleConfirmCaregiver}
         />
       </div>
@@ -317,6 +326,7 @@ export default function TrackerPage({
             birthDate={tracker.birthDate}
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
+            canEditBirthDate={tracker.viewerIsOwner}
           />
         )}
         {activeTab === "profile" && (
@@ -344,6 +354,7 @@ export default function TrackerPage({
             wakeWindowMinutes={tracker.wakeWindowMinutes}
             medicationReminders={tracker.medicationReminders}
             pumpSchedule={tracker.pumpSchedule}
+            viewerIsOwner={tracker.viewerIsOwner}
           />
         )}
       </main>
@@ -352,6 +363,15 @@ export default function TrackerPage({
         activeTab={activeTab}
         onTabChange={handleTabChange}
         onLogPress={() => setShowLogSheet(true)}
+      />
+
+      <FeedTimerBanner
+        secretLink={secretLink}
+        hidden={activeLogModal === "feed"}
+        onOpen={() => {
+          setShowLogSheet(false);
+          setActiveLogModal("feed");
+        }}
       />
 
       {showLogSheet && (
@@ -363,6 +383,7 @@ export default function TrackerPage({
           trackerId={tracker._id}
           secretLink={secretLink}
           selectedCaregiver={lockedCaregiver}
+          birthDate={tracker.birthDate}
           onClose={() => setActiveLogModal(null)}
         />
       )}

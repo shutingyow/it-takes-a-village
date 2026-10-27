@@ -1,6 +1,13 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getTrackerBySecret } from "./lib/caregivers";
+import { isMilkFeed } from "./lib/feeds";
+
+const feedTypeValidator = v.union(
+  v.literal("breast"),
+  v.literal("bottle"),
+  v.literal("solids")
+);
 
 const bottleTemperatureValidator = v.union(
   v.literal("room"),
@@ -36,25 +43,42 @@ function inferBottleMilkFromNotes(
   return null;
 }
 
+function normalizeFoodName(foodName: string | undefined): string | undefined {
+  const trimmed = foodName?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function storedAmountGrams(amountGrams: number | undefined): number | undefined {
+  if (amountGrams === undefined || !Number.isFinite(amountGrams) || amountGrams <= 0) {
+    return undefined;
+  }
+  return Math.min(2000, Math.round(amountGrams));
+}
+
 // Create a feed entry
 export const create = mutation({
   args: {
     trackerId: v.id("trackers"),
     caregiverName: v.string(),
-    type: v.union(v.literal("breast"), v.literal("bottle")),
+    type: feedTypeValidator,
     side: v.optional(v.union(v.literal("left"), v.literal("right"))),
     duration: v.optional(v.number()),
     durationMinutes: v.optional(v.number()),
     amount: v.optional(v.number()),
     bottleMilk: v.optional(bottleMilkValidator),
     bottleTemperature: v.optional(bottleTemperatureValidator),
+    foodName: v.optional(v.string()),
+    amountGrams: v.optional(v.number()),
     timestamp: v.number(),
     notes: v.optional(v.string()),
     photoIds: v.optional(v.array(v.id("_storage"))),
   },
   returns: v.id("feedEntries"),
   handler: async (ctx, args) => {
-    const minutes = storedDurationMinutes(args.durationMinutes, args.duration);
+    const minutes =
+      args.type === "solids"
+        ? undefined
+        : storedDurationMinutes(args.durationMinutes, args.duration);
     return await ctx.db.insert("feedEntries", {
       trackerId: args.trackerId,
       caregiverName: args.caregiverName,
@@ -66,6 +90,9 @@ export const create = mutation({
       bottleMilk: args.type === "bottle" ? args.bottleMilk : undefined,
       bottleTemperature:
         args.type === "bottle" ? args.bottleTemperature : undefined,
+      foodName: args.type === "solids" ? normalizeFoodName(args.foodName) : undefined,
+      amountGrams:
+        args.type === "solids" ? storedAmountGrams(args.amountGrams) : undefined,
       timestamp: args.timestamp,
       notes: args.notes,
       photoIds: args.photoIds,
@@ -90,17 +117,35 @@ export const getRecent = query({
   },
 });
 
-// Get last feed entry
+/** Recent milk feeds only (nursing / bottle). Solids never move the milk clock. */
+export const getRecentMilk = query({
+  args: {
+    trackerId: v.id("trackers"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 50;
+    const recent = await ctx.db
+      .query("feedEntries")
+      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+      .order("desc")
+      .take(Math.max(limit * 4, 40));
+    return recent.filter((feed) => isMilkFeed(feed.type)).slice(0, limit);
+  },
+});
+
+/** Last milk feed (nursing / bottle). Skips solids. */
 export const getLast = query({
   args: {
     trackerId: v.id("trackers"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const recent = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
       .order("desc")
-      .first();
+      .take(40);
+    return recent.find((feed) => isMilkFeed(feed.type)) ?? null;
   },
 });
 
@@ -108,13 +153,15 @@ export const getLast = query({
 export const update = mutation({
   args: {
     entryId: v.id("feedEntries"),
-    type: v.union(v.literal("breast"), v.literal("bottle")),
+    type: feedTypeValidator,
     side: v.optional(v.union(v.literal("left"), v.literal("right"))),
     duration: v.optional(v.number()),
     durationMinutes: v.optional(v.number()),
     amount: v.optional(v.number()),
     bottleMilk: v.optional(bottleMilkValidator),
     bottleTemperature: v.optional(bottleTemperatureValidator),
+    foodName: v.optional(v.string()),
+    amountGrams: v.optional(v.number()),
     timestamp: v.number(),
     notes: v.optional(v.string()),
     photoIds: v.optional(v.array(v.id("_storage"))),
@@ -126,7 +173,10 @@ export const update = mutation({
       throw new Error("Feed entry not found");
     }
 
-    const minutes = storedDurationMinutes(args.durationMinutes, args.duration);
+    const minutes =
+      args.type === "solids"
+        ? undefined
+        : storedDurationMinutes(args.durationMinutes, args.duration);
 
     await ctx.db.replace(args.entryId, {
       trackerId: existing.trackerId,
@@ -139,6 +189,9 @@ export const update = mutation({
       bottleMilk: args.type === "bottle" ? args.bottleMilk : undefined,
       bottleTemperature:
         args.type === "bottle" ? args.bottleTemperature : undefined,
+      foodName: args.type === "solids" ? normalizeFoodName(args.foodName) : undefined,
+      amountGrams:
+        args.type === "solids" ? storedAmountGrams(args.amountGrams) : undefined,
       timestamp: args.timestamp,
       notes: args.notes,
       photoIds: args.photoIds,
