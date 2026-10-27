@@ -11,6 +11,15 @@ import {
 } from "@/app/lib/utils";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconFeed, IconMedication, IconPump } from "./icons";
+import {
+  DEFAULT_FEED_INTERVAL_HOURS,
+  isLateFeed,
+  resolveNightFeedSettings,
+} from "@/convex/lib/feedSchedule";
+import {
+  dismissLateFeedAck,
+  isLateFeedAckDismissed,
+} from "@/app/lib/feedScheduleAck";
 
 interface DueSoonCardProps {
   trackerId: Id<"trackers">;
@@ -140,13 +149,18 @@ export function DueSoonCard({
 }: DueSoonCardProps) {
   const { t } = useLanguage();
   const [now, setNow] = useState(Date.now());
+  const [ackTick, setAckTick] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 60000);
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(interval);
   }, []);
 
   const dueStatus = useQuery(api.reminders.getDueStatus, { trackerId, now });
+  const recentFeeds = useQuery(api.feedEntries.getRecent, {
+    trackerId,
+    limit: 2,
+  });
 
   if (!dueStatus) {
     return (
@@ -165,6 +179,29 @@ export function DueSoonCard({
   const pumpItem =
     dueStatus.items.find((item) => item.type === "pump") ?? null;
   const showPump = !!pumpScheduleEnabled;
+  const lastFeed = recentFeeds?.[0] ?? null;
+  const previousFeed = recentFeeds?.[1] ?? null;
+  const overdue = feedItem?.status === "overdue";
+  const night = resolveNightFeedSettings({
+    nightFeedIntervalEnabled: dueStatus.nightFeedIntervalEnabled,
+    nightFeedIntervalHours: dueStatus.nightFeedIntervalHours,
+    nightFeedWindowStart: dueStatus.nightFeedWindowStart,
+    nightFeedWindowEnd: dueStatus.nightFeedWindowEnd,
+  });
+  const dayHours = dueStatus.feedIntervalHours ?? DEFAULT_FEED_INTERVAL_HOURS;
+  const lateLogged =
+    !overdue &&
+    lastFeed != null &&
+    previousFeed != null &&
+    feedItem != null &&
+    isLateFeed({
+      previousFeedAt: previousFeed.timestamp,
+      thisFeedAt: lastFeed.timestamp,
+      dayIntervalHours: dayHours,
+      night,
+    }) &&
+    !isLateFeedAckDismissed(lastFeed._id);
+  void ackTick;
 
   const medItems = dueStatus.items.filter(
     (item) =>
@@ -178,7 +215,11 @@ export function DueSoonCard({
       <div className="grid grid-cols-1 gap-3">
         <HeroDueCard
           kind="feed"
-          title={t("nextFeedDue")}
+          title={
+            dueStatus.usingNightInterval
+              ? t("nextFeedDueNight")
+              : t("nextFeedDue")
+          }
           item={feedItem}
           emptyHint={t("logFeedForDue")}
         />
@@ -191,6 +232,26 @@ export function DueSoonCard({
           />
         )}
       </div>
+
+      {lateLogged && lastFeed && feedItem && (
+        <div className="mt-2.5 flex items-start justify-between gap-2 rounded-xl bg-surface border border-border px-3 py-2.5">
+          <p className="text-xs font-medium text-muted leading-snug min-w-0">
+            {t("feedLateTimingPushed", {
+              time: formatTime(feedItem.dueAt),
+            })}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              dismissLateFeedAck(lastFeed._id);
+              setAckTick((n) => n + 1);
+            }}
+            className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-primary px-1.5 py-0.5"
+          >
+            {t("gotIt")}
+          </button>
+        </div>
+      )}
 
       {medItems.length > 0 && (
         <div className="space-y-2 mt-2.5">

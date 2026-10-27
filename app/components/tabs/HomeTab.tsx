@@ -8,7 +8,7 @@ import {
   type HomeTileCategory,
 } from "../HomeCategoryGrid";
 import { HomeCategoryDetail } from "../HomeCategoryDetail";
-import { NextFeedBanner } from "../NextFeedBanner";
+import { DueSoonCard } from "../DueSoonCard";
 import { WellnessTipCard } from "../WellnessTipCard";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
@@ -36,6 +36,7 @@ export function HomeTab({
   babyName,
   birthDate,
   photoStorageId,
+  pumpScheduleEnabled,
   onOpenMilestones,
   onOpenSettings,
   onQuickLog,
@@ -70,8 +71,6 @@ export function HomeTab({
         villageFallback={villageFallback}
       />
 
-      <NextFeedBanner trackerId={trackerId} />
-
       <HomeCategoryGrid
         trackerId={trackerId}
         onSelect={(cat: HomeTileCategory) => setCategory(cat)}
@@ -80,6 +79,11 @@ export function HomeTab({
             ? (cat: HomeTileCategory) => onQuickLog(cat)
             : undefined
         }
+      />
+
+      <DueSoonCard
+        trackerId={trackerId}
+        pumpScheduleEnabled={pumpScheduleEnabled}
       />
 
       <WellnessTipCard
