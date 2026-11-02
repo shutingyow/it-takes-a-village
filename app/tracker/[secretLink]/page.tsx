@@ -3,6 +3,7 @@
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CaregiverLockScreen } from "@/app/components/CaregiverLockScreen";
 import { LockedCaregiverBadge } from "@/app/components/LockedCaregiverBadge";
 import { HomeTab } from "@/app/components/tabs/HomeTab";
@@ -46,6 +47,7 @@ export default function TrackerPage({
 }) {
   const { secretLink } = use(params);
   const { t } = useLanguage();
+  const router = useRouter();
   const appShell = useAppShell();
   const { isAuthenticated } = useConvexAuth();
   const [activeTab, setActiveTab] = useState<TrackerTab>("today");
@@ -64,6 +66,10 @@ export default function TrackerPage({
   const ensureMigrated = useMutation(api.trackers.ensureMigrated);
   const claimTracker = useMutation(api.trackers.claim);
   const tracker = useQuery(api.trackers.getBySecret, { secretLink });
+  const myVillages = useQuery(
+    api.trackers.listMine,
+    isAuthenticated ? {} : "skip"
+  );
   const lastFeed = useQuery(
     api.feedEntries.getLast,
     tracker ? { trackerId: tracker._id } : "skip"
@@ -122,6 +128,22 @@ export default function TrackerPage({
   useEffect(() => {
     if (activeTab !== "profile") setProfileOpenView(null);
   }, [activeTab]);
+
+  // After SSO on someone else's (or an orphan) link, send parents to their village.
+  useEffect(() => {
+    if (!isAuthenticated || !tracker || tracker.viewerIsOwner) return;
+    if (tracker.ownerUserId === undefined) return; // claimable — stay
+    if (!myVillages || myVillages.length !== 1) return;
+    const mine = myVillages[0]!;
+    if (mine.secretLink === secretLink) return;
+    router.replace(`/tracker/${mine.secretLink}`);
+  }, [
+    isAuthenticated,
+    tracker,
+    myVillages,
+    secretLink,
+    router,
+  ]);
 
   const handleViewAllHistory = () => {
     setProfileOpenView("history");
@@ -241,6 +263,14 @@ export default function TrackerPage({
     ) : null;
 
   if (needsPick || !lockedCaregiver || !lockedInfo) {
+    const ownedVillages =
+      myVillages
+        ?.filter((v) => v.secretLink !== secretLink)
+        .map((v) => ({
+          secretLink: v.secretLink,
+          babyName: v.babyName,
+        })) ?? [];
+
     return (
       <div className="min-h-screen flex flex-col bg-background safe-top">
         <CaregiverLockScreen
@@ -251,6 +281,8 @@ export default function TrackerPage({
           claimError={claimError}
           onClaim={() => void handleClaimVillage()}
           onConfirm={handleConfirmCaregiver}
+          ownedVillages={ownedVillages}
+          onOpenOwnedVillage={(link) => router.push(`/tracker/${link}`)}
         />
       </div>
     );

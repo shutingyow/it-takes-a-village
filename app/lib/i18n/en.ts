@@ -93,12 +93,17 @@ export const translations = {
   emailPasswordAlreadyExists: "That email already has an account — try Sign in",
   emailPasswordInvalidEmail: "Enter a valid email address",
   parentOwnerReady: "You’re the village owner. Pick your name below.",
-  parentSignedInNotOwner: "Signed in — add this village to unlock admin.",
+  parentSignedInNotOwner:
+    "You’re signed in, but this link belongs to another account. Open one of your villages below, or go home.",
+  parentSignedInNoVillages:
+    "You’re signed in, but this link isn’t yours and you don’t have a village yet. Go home to create one.",
+  goToHome: "Go to home",
   signedInAs: "Signed in",
   myVillages: "My villages",
   myVillagesEmpty: "No villages yet. Create one below.",
   shareVillage: "Share link & QR",
   openVillage: "Open",
+  openYourVillage: "Open {name}",
   createVillageTitle: "Create a new village",
   createRequiresSignIn: "Sign in to create a village.",
   closeShare: "Done",

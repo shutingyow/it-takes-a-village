@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { cn } from "../lib/utils";
@@ -9,6 +10,11 @@ import type { CaregiverInfo } from "../lib/trackerStorage";
 import { signInWithOAuth } from "../lib/oauthSignIn";
 import { EmailPasswordForm } from "./EmailPasswordForm";
 import { IconUser } from "./icons";
+
+export type OwnedVillageSummary = {
+  secretLink: string;
+  babyName?: string;
+};
 
 interface CaregiverLockScreenProps {
   caregivers: CaregiverInfo[];
@@ -20,6 +26,9 @@ interface CaregiverLockScreenProps {
   claiming?: boolean;
   claimError?: string | null;
   onClaim?: () => void;
+  /** Villages owned by the signed-in user (for escape hatch when this link isn’t theirs). */
+  ownedVillages?: OwnedVillageSummary[];
+  onOpenOwnedVillage?: (secretLink: string) => void;
 }
 
 export function CaregiverLockScreen({
@@ -30,12 +39,15 @@ export function CaregiverLockScreen({
   claiming = false,
   claimError = null,
   onClaim,
+  ownedVillages = [],
+  onOpenOwnedVillage,
 }: CaregiverLockScreenProps) {
   const { t } = useLanguage();
   const { isAuthenticated } = useConvexAuth();
-  const { signIn } = useAuthActions();
+  const { signIn, signOut } = useAuthActions();
   const [selected, setSelected] = useState("");
   const [authBusy, setAuthBusy] = useState<"apple" | "google" | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   const selectable = useMemo(() => {
     if (viewerIsOwner) return caregivers;
@@ -50,6 +62,18 @@ export function CaregiverLockScreen({
       setAuthBusy(null);
     }
   };
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
+  const villageLabel = (babyName?: string) =>
+    babyName?.trim() || t("yourTracker");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background p-3 sm:p-4 overflow-y-auto">
@@ -123,9 +147,39 @@ export function CaregiverLockScreen({
                 </button>
               </div>
             ) : (
-              <p className="text-xs text-muted pt-1">
-                {t("parentSignedInNotOwner")}
-              </p>
+              <div className="space-y-3 pt-1">
+                <p className="text-xs text-muted leading-snug">
+                  {ownedVillages.length > 0
+                    ? t("parentSignedInNotOwner")
+                    : t("parentSignedInNoVillages")}
+                </p>
+                {ownedVillages.map((village) => (
+                  <button
+                    key={village.secretLink}
+                    type="button"
+                    onClick={() => onOpenOwnedVillage?.(village.secretLink)}
+                    className="btn-primary text-sm py-3"
+                  >
+                    {t("openYourVillage", {
+                      name: villageLabel(village.babyName),
+                    })}
+                  </button>
+                ))}
+                <Link
+                  href="/"
+                  className="block w-full text-center rounded-xl border border-border bg-surface text-sm font-semibold py-3 text-foreground"
+                >
+                  {t("goToHome")}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void handleSignOut()}
+                  disabled={signingOut}
+                  className="w-full text-xs font-semibold text-muted py-1 disabled:opacity-50"
+                >
+                  {t("signOut")}
+                </button>
+              </div>
             )}
           </div>
         )}

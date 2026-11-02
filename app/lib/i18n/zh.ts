@@ -87,12 +87,17 @@ export const zh: Translations = {
   emailPasswordAlreadyExists: "该邮箱已有账户 — 请改用登录",
   emailPasswordInvalidEmail: "请输入有效邮箱",
   parentOwnerReady: "你是本村主人。请在下方选择名字。",
-  parentSignedInNotOwner: "已登录 — 将本村加入后即可解锁管理员。",
+  parentSignedInNotOwner:
+    "你已登录，但此链接属于其他账户。请打开下方你的村庄，或返回首页。",
+  parentSignedInNoVillages:
+    "你已登录，但此链接不属于你，且你还没有村庄。请返回首页创建。",
+  goToHome: "返回首页",
   signedInAs: "已登录",
   myVillages: "我的村庄",
   myVillagesEmpty: "还没有村庄，请在下方创建。",
   shareVillage: "分享链接与二维码",
   openVillage: "打开",
+  openYourVillage: "打开 {name}",
   createVillageTitle: "创建新村庄",
   createRequiresSignIn: "请先登录后再创建村庄。",
   closeShare: "完成",
