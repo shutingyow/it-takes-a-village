@@ -386,7 +386,10 @@ export default function Home() {
         </h2>
         <p className="text-sm text-muted mt-1">{t("signInHint")}</p>
       </div>
-      <EmailPasswordForm disabled={signingInProvider !== null} />
+      <EmailPasswordForm
+        disabled={signingInProvider !== null}
+        defaultFlow="signUp"
+      />
       <div className="flex items-center gap-3 pt-1">
         <div className="h-px flex-1 bg-border" />
         <span className="text-xs text-muted">{t("orContinueWith")}</span>

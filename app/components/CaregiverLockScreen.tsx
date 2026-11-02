@@ -72,7 +72,13 @@ export function CaregiverLockScreen({
             </p>
             {!isAuthenticated ? (
               <div className="space-y-3 pt-1">
-                <EmailPasswordForm disabled={authBusy !== null} />
+                <p className="text-xs text-muted leading-snug">
+                  {t("parentUnlockHint")}
+                </p>
+                <EmailPasswordForm
+                  disabled={authBusy !== null}
+                  defaultFlow="signUp"
+                />
                 <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-border" />
                   <span className="text-xs text-muted">{t("orContinueWith")}</span>

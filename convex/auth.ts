@@ -22,7 +22,17 @@ const NATIVE_AUTH_SCHEME = "ittakesavillage://";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
-    Password,
+    Password({
+      profile(params) {
+        const email = String(params.email ?? "")
+          .trim()
+          .toLowerCase();
+        if (!email || !email.includes("@")) {
+          throw new Error("Invalid email");
+        }
+        return { email };
+      },
+    }),
     Google,
     Apple({
       // Preserve name on first Sign in with Apple (only sent once).

@@ -84,9 +84,14 @@ export const translations = {
     "Admin names show after you sign in and add this village. Caregivers can pick a name below to log.",
   noCaregiverNamesYet: "No caregiver names yet. Ask the parent to add yours.",
   signInForAdmin: "Sign in to manage",
-  parentUnlockTitle:
-    "Admin? Sign in with your Apple or Google account",
-  parentUnlockHint: "",
+  parentUnlockTitle: "Admin? Sign in to unlock this village",
+  parentUnlockHint:
+    "Use email, Apple, or Google. New here? Choose Create account first.",
+  signInTab: "Sign in",
+  createAccountTab: "Create account",
+  signUpHint: "Creates your parent account. Then you can claim or create a village.",
+  emailPasswordAlreadyExists: "That email already has an account — try Sign in",
+  emailPasswordInvalidEmail: "Enter a valid email address",
   parentOwnerReady: "You’re the village owner. Pick your name below.",
   parentSignedInNotOwner: "Signed in — add this village to unlock admin.",
   signedInAs: "Signed in",
