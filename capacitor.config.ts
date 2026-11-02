@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from "@capacitor/cli";
+import { KeyboardResize } from "@capacitor/keyboard";
 
 /**
  * iOS App Store shell for It Takes A Village.
@@ -39,7 +40,7 @@ const config: CapacitorConfig = {
     },
     Keyboard: {
       // Shrink the WebView with the keyboard so forms can scroll above it.
-      resize: "native",
+      resize: KeyboardResize.Native,
     },
   },
   // Native min iOS is set in Xcode (IPHONEOS_DEPLOYMENT_TARGET = 17.0).
