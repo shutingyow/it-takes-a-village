@@ -75,6 +75,8 @@ export function ActivityModal({
           notes: notes || undefined,
         });
       }
+      const { hapticSuccess } = await import("@/app/lib/haptics");
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to save activity:", error);

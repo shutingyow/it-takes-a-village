@@ -120,6 +120,8 @@ export function SleepModal({
         startTime: Date.now(),
         photoIds: photoIds.length > 0 ? photoIds : undefined,
       });
+      const { hapticSuccess } = await import("@/app/lib/haptics");
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to start sleep:", error);
@@ -138,6 +140,8 @@ export function SleepModal({
         endTime: Date.now(),
         photoIds: photoIds.length > 0 ? photoIds : undefined,
       });
+      const { hapticSuccess } = await import("@/app/lib/haptics");
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to end sleep:", error);
@@ -172,6 +176,8 @@ export function SleepModal({
         notes: notes || undefined,
         photoIds: photoIds.length > 0 ? photoIds : undefined,
       });
+      const { hapticSuccess } = await import("@/app/lib/haptics");
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to log past sleep:", error);
@@ -198,6 +204,8 @@ export function SleepModal({
         notes: notes || undefined,
         photoIds: photoIds.length > 0 ? photoIds : undefined,
       });
+      const { hapticSuccess } = await import("@/app/lib/haptics");
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to update sleep:", error);

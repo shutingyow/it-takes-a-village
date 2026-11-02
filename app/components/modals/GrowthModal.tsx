@@ -91,6 +91,8 @@ export function GrowthModal({
           ...payload,
         });
       }
+      const { hapticSuccess } = await import("@/app/lib/haptics");
+      void hapticSuccess();
       onClose();
     } catch (err) {
       console.error(err);

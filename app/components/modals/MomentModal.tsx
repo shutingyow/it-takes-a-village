@@ -78,6 +78,8 @@ export function MomentModal({
           ...payload,
         });
       }
+      const { hapticSuccess } = await import("@/app/lib/haptics");
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to save moment:", error);

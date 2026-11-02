@@ -104,6 +104,8 @@ export function HealthModal({
           ...payload,
         });
       }
+      const { hapticSuccess } = await import("@/app/lib/haptics");
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to save health entry:", error);

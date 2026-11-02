@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
-import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 
-/** Noticeable tap after logging an entry. No-ops on web. */
+/** Noticeable tap after logging or editing an entry. No-ops on web. */
 export async function hapticSuccess(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
@@ -9,6 +9,16 @@ export async function hapticSuccess(): Promise<void> {
     await Haptics.impact({ style: ImpactStyle.Medium });
   } catch {
     // Plugin missing or unsupported.
+  }
+}
+
+/** Distinct feedback after deleting an entry. */
+export async function hapticDelete(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await Haptics.notification({ type: NotificationType.Warning });
+  } catch {
+    // ignore
   }
 }
 

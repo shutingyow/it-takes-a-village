@@ -76,6 +76,8 @@ export function HistoryTab({
           entryId: entry._id,
         });
       }
+      const { hapticDelete } = await import("@/app/lib/haptics");
+      void hapticDelete();
     } catch (error) {
       console.error("Failed to delete entry:", error);
       alert(t("deleteFailed"));
