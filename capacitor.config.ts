@@ -38,7 +38,8 @@ const config: CapacitorConfig = {
       backgroundColor: "#faf8f5",
     },
     Keyboard: {
-      resize: "body",
+      // Shrink the WebView with the keyboard so forms can scroll above it.
+      resize: "native",
     },
   },
   // Native min iOS is set in Xcode (IPHONEOS_DEPLOYMENT_TARGET = 17.0).

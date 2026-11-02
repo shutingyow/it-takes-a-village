@@ -38,6 +38,24 @@ export function NativeAppShell({ children }: { children: ReactNode }) {
 
     let cancelled = false;
     let removeNetwork: (() => void) | undefined;
+    let removeKeyboardShow: (() => void) | undefined;
+    let removeKeyboardHide: (() => void) | undefined;
+
+    const scrollFocusedIntoView = () => {
+      const el = document.activeElement;
+      if (!(el instanceof HTMLElement)) return;
+      if (
+        el.tagName !== "INPUT" &&
+        el.tagName !== "TEXTAREA" &&
+        !el.isContentEditable
+      ) {
+        return;
+      }
+      // Delay so keyboard + WebView resize settle first.
+      window.setTimeout(() => {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 80);
+    };
 
     void (async () => {
       await configureNativeChrome("light");
@@ -69,7 +87,36 @@ export function NativeAppShell({ children }: { children: ReactNode }) {
       } catch {
         // Plugin missing — rely on bundled errorPath only.
       }
+
+      try {
+        const { Keyboard } = await import("@capacitor/keyboard");
+        await Keyboard.setScroll({ isDisabled: false });
+        const showHandle = await Keyboard.addListener(
+          "keyboardWillShow",
+          (info) => {
+            document.documentElement.style.setProperty(
+              "--keyboard-inset",
+              `${Math.max(0, info.keyboardHeight)}px`
+            );
+            scrollFocusedIntoView();
+          }
+        );
+        const hideHandle = await Keyboard.addListener("keyboardWillHide", () => {
+          document.documentElement.style.setProperty("--keyboard-inset", "0px");
+        });
+        removeKeyboardShow = () => {
+          void showHandle.remove();
+        };
+        removeKeyboardHide = () => {
+          void hideHandle.remove();
+        };
+      } catch {
+        // Plugin missing — focus scroll still helps on web/PWA.
+      }
     })();
+
+    const onFocusIn = () => scrollFocusedIntoView();
+    document.addEventListener("focusin", onFocusIn);
 
     const onClickCapture = (event: MouseEvent) => {
       const target = event.target;
@@ -93,6 +140,10 @@ export function NativeAppShell({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
       removeNetwork?.();
+      removeKeyboardShow?.();
+      removeKeyboardHide?.();
+      document.documentElement.style.setProperty("--keyboard-inset", "0px");
+      document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("click", onClickCapture, true);
     };
   }, []);

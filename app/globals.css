@@ -162,6 +162,11 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Extra bottom space while the soft keyboard is open (set by NativeAppShell). */
+body {
+  padding-bottom: var(--keyboard-inset, 0px);
+}
+
 /* Native shell: less “browser document”, more app surface. */
 .tracker-shell {
   width: 100%;

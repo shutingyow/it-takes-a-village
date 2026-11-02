@@ -639,20 +639,22 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
-      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2">
+    <div className="min-h-dvh overflow-y-auto overscroll-y-contain bg-background px-4 pb-8 relative safe-top">
+      {/* Below status bar / battery — not absolute under the Dynamic Island */}
+      <div className="mx-auto max-w-md w-full flex items-center justify-end gap-2 pt-3 pb-3">
         {isAuthenticated && (
           <button
             type="button"
             onClick={() => void signOut()}
-            className="text-sm font-semibold text-muted hover:text-foreground px-2 py-1"
+            className="text-sm font-semibold text-muted hover:text-foreground px-2 py-2 min-h-11"
           >
             {t("signOut")}
           </button>
         )}
         <LanguageToggle />
       </div>
-      <div className="max-w-md w-full bg-surface rounded-2xl card-shadow p-8 border border-border">
+      {/* Top-aligned so the keyboard can push the focused caregiver field into view */}
+      <div className="mx-auto max-w-md w-full bg-surface rounded-2xl card-shadow p-8 border border-border">
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-xl bg-primary-light flex items-center justify-center mx-auto mb-4 p-2">
             <IconReminders size={40} className="rounded-lg object-contain" />

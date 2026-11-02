@@ -56,7 +56,7 @@ export function LanguageToggle({
   return (
     <div
       className={cn(
-        "inline-flex items-center rounded-full border border-border bg-surface/90 p-0.5 text-xs font-medium shadow-sm",
+        "inline-flex items-center rounded-full border border-border bg-surface p-1 text-sm font-semibold shadow-sm",
         className
       )}
       role="group"
@@ -66,7 +66,7 @@ export function LanguageToggle({
         type="button"
         onClick={() => setLanguage("en")}
         className={cn(
-          "rounded-full px-3 py-1.5 transition-colors",
+          "rounded-full px-3.5 py-2 min-h-11 transition-colors touch-manipulation",
           language === "en"
             ? "bg-primary text-white"
             : "text-muted hover:text-foreground"
@@ -75,14 +75,11 @@ export function LanguageToggle({
       >
         EN
       </button>
-      <span className="px-0.5 text-border select-none" aria-hidden="true">
-        |
-      </span>
       <button
         type="button"
         onClick={() => setLanguage("zh")}
         className={cn(
-          "rounded-full px-3 py-1.5 transition-colors",
+          "rounded-full px-3.5 py-2 min-h-11 transition-colors touch-manipulation",
           language === "zh"
             ? "bg-primary text-white"
             : "text-muted hover:text-foreground"
