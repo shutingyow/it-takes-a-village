@@ -128,8 +128,7 @@ export default function PrivacyPage() {
             >
               privacy@ittakesavillage.app
             </a>
-            . Replace this address with a monitored inbox before App Store
-            review if needed.
+            .
           </p>
         </section>
       </div>

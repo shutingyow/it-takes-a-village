@@ -20,8 +20,25 @@ import {
   IconWarning,
 } from "../icons";
 import type { CaregiverInfo } from "@/app/lib/trackerStorage";
+import { Capacitor } from "@capacitor/core";
 import { signInWithOAuth } from "@/app/lib/oauthSignIn";
 import { BirthDateField } from "../BirthDateField";
+
+const PRIVACY_POLICY_URL = "https://it-takes-a-village.vercel.app/privacy";
+
+async function openPrivacyPolicy(): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { Browser } = await import("@capacitor/browser");
+      await Browser.open({ url: PRIVACY_POLICY_URL });
+      return;
+    } catch {
+      // fall through
+    }
+  }
+  window.open(PRIVACY_POLICY_URL, "_blank", "noopener,noreferrer");
+}
+
 export type SettingsView =
   | "menu"
   | "export"
@@ -402,6 +419,20 @@ export function SettingsTab({
           {t("birthDateAdminOnly")}
         </p>
       )}
+
+      <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
+        <p className="text-sm font-semibold text-foreground mb-1">
+          {t("legalSection")}
+        </p>
+        <p className="text-xs text-muted mb-3">{t("legalSectionDesc")}</p>
+        <button
+          type="button"
+          onClick={() => void openPrivacyPolicy()}
+          className="w-full py-3.5 px-4 rounded-xl border border-border bg-background text-sm font-semibold text-foreground touch-manipulation min-h-[44px]"
+        >
+          {t("privacyPolicy")}
+        </button>
+      </div>
 
       <div className="space-y-2">
         {adminItems
