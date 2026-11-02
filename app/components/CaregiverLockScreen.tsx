@@ -28,6 +28,8 @@ interface CaregiverLockScreenProps {
   onClaim?: () => void;
   /** Villages owned by the signed-in user (for escape hatch when this link isn’t theirs). */
   ownedVillages?: OwnedVillageSummary[];
+  /** True while listMine is still loading. */
+  ownedVillagesLoading?: boolean;
   onOpenOwnedVillage?: (secretLink: string) => void;
 }
 
@@ -40,6 +42,7 @@ export function CaregiverLockScreen({
   claimError = null,
   onClaim,
   ownedVillages = [],
+  ownedVillagesLoading = false,
   onOpenOwnedVillage,
 }: CaregiverLockScreenProps) {
   const { t } = useLanguage();
@@ -92,7 +95,9 @@ export function CaregiverLockScreen({
         {!viewerIsOwner && (
           <div className="mb-5 rounded-xl border border-border bg-background/70 p-3 space-y-2">
             <p className="text-sm font-semibold text-foreground">
-              {t("parentUnlockTitle")}
+              {isAuthenticated
+                ? t("parentUnlockTitleSignedIn")
+                : t("parentUnlockTitle")}
             </p>
             {!isAuthenticated ? (
               <div className="space-y-3 pt-1">
@@ -146,6 +151,8 @@ export function CaregiverLockScreen({
                   {claiming ? t("claimingVillage") : t("claimVillage")}
                 </button>
               </div>
+            ) : ownedVillagesLoading ? (
+              <p className="text-xs text-muted pt-1">{t("findingYourVillage")}</p>
             ) : (
               <div className="space-y-3 pt-1">
                 <p className="text-xs text-muted leading-snug">

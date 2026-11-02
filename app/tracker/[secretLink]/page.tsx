@@ -88,10 +88,22 @@ export default function TrackerPage({
   }, [secretLink, ensureMigrated]);
 
   useEffect(() => {
-    if (tracker) {
-      saveLastVisitedTracker(secretLink, tracker.babyName);
+    // Don't pin a foreign village as "last visited" for signed-in parents —
+    // that recreates the Who-are-you loop after the next launch.
+    if (!tracker) return;
+    if (
+      isAuthenticated &&
+      !tracker.viewerIsOwner &&
+      tracker.ownerUserId !== undefined
+    ) {
+      return;
     }
-  }, [secretLink, tracker?.babyName, tracker?._id]);
+    saveLastVisitedTracker(secretLink, tracker.babyName);
+  }, [
+    secretLink,
+    tracker,
+    isAuthenticated,
+  ]);
 
   useEffect(() => {
     setHydrated(false);
@@ -114,6 +126,19 @@ export default function TrackerPage({
       ? tracker.caregivers
       : tracker.caregivers.filter((c) => c.role !== "admin");
     const validNames = selectable.map((c) => c.name);
+    // Owner with a single name: skip the pick screen.
+    if (
+      tracker.viewerIsOwner &&
+      selectable.length === 1 &&
+      selectable[0]
+    ) {
+      const only = selectable[0].name;
+      setLockedCaregiver(only);
+      saveLockedCaregiver(secretLink, only);
+      setNeedsPick(false);
+      setHydrated(true);
+      return;
+    }
     if (saved && validNames.includes(saved)) {
       setLockedCaregiver(saved);
       setNeedsPick(false);
@@ -129,21 +154,20 @@ export default function TrackerPage({
     if (activeTab !== "profile") setProfileOpenView(null);
   }, [activeTab]);
 
-  // After SSO on someone else's (or an orphan) link, send parents to their village.
+  // Signed in on someone else's link → go to your village (or home if several).
   useEffect(() => {
     if (!isAuthenticated || !tracker || tracker.viewerIsOwner) return;
     if (tracker.ownerUserId === undefined) return; // claimable — stay
-    if (!myVillages || myVillages.length !== 1) return;
-    const mine = myVillages[0]!;
+    if (myVillages === undefined) return; // still loading
+    if (myVillages.length === 0) {
+      router.replace("/");
+      return;
+    }
+    const mine =
+      myVillages.find((v) => v.secretLink === secretLink) ?? myVillages[0]!;
     if (mine.secretLink === secretLink) return;
     router.replace(`/tracker/${mine.secretLink}`);
-  }, [
-    isAuthenticated,
-    tracker,
-    myVillages,
-    secretLink,
-    router,
-  ]);
+  }, [isAuthenticated, tracker, myVillages, secretLink, router]);
 
   const handleViewAllHistory = () => {
     setProfileOpenView("history");
@@ -263,6 +287,7 @@ export default function TrackerPage({
     ) : null;
 
   if (needsPick || !lockedCaregiver || !lockedInfo) {
+    const ownedVillagesLoading = isAuthenticated && myVillages === undefined;
     const ownedVillages =
       myVillages
         ?.filter((v) => v.secretLink !== secretLink)
@@ -282,7 +307,8 @@ export default function TrackerPage({
           onClaim={() => void handleClaimVillage()}
           onConfirm={handleConfirmCaregiver}
           ownedVillages={ownedVillages}
-          onOpenOwnedVillage={(link) => router.push(`/tracker/${link}`)}
+          ownedVillagesLoading={ownedVillagesLoading}
+          onOpenOwnedVillage={(link) => router.replace(`/tracker/${link}`)}
         />
       </div>
     );

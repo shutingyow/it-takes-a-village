@@ -85,8 +85,10 @@ export const translations = {
   noCaregiverNamesYet: "No caregiver names yet. Ask the parent to add yours.",
   signInForAdmin: "Sign in to manage",
   parentUnlockTitle: "Admin? Sign in to unlock this village",
+  parentUnlockTitleSignedIn: "This isn’t your village",
   parentUnlockHint:
     "Use email, Apple, or Google. New here? Choose Create account first.",
+  findingYourVillage: "Finding your village…",
   signInTab: "Sign in",
   createAccountTab: "Create account",
   signUpHint: "Creates your parent account. Then you can claim or create a village.",
