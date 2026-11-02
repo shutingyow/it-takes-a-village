@@ -651,6 +651,12 @@ export const translations = {
   consistencyOther: "Other",
   skipOptional: "Skip",
 
+  offlineTitle: "You’re offline",
+  offlineBody:
+    "Check your connection, then try again. Your village will be here when you’re back online.",
+  offlineRetry: "Try again",
+  offlineHint: "Wi‑Fi or cellular needed to sync care logs.",
+
   // Entry time + edit/delete
   entryTime: "When",
   entryDate: "Date",

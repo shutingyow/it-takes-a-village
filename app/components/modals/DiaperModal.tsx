@@ -124,6 +124,8 @@ export function DiaperModal({
           ...payload,
         });
       }
+      const { hapticSuccess } = await import("@/app/lib/haptics");
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to save diaper entry:", error);

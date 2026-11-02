@@ -17,11 +17,20 @@ const config: CapacitorConfig = {
   server: {
     url: "https://it-takes-a-village.vercel.app",
     cleartext: false,
+    // Bundled page shown when the live URL cannot load (cold start offline).
+    errorPath: "offline.html",
+    allowNavigation: [
+      "it-takes-a-village.vercel.app",
+      "*.convex.cloud",
+      "*.convex.site",
+    ],
   },
   plugins: {
     SplashScreen: {
-      launchAutoHide: true,
-      backgroundColor: "#FAFAF8",
+      // Keep splash until NativeAppShell hides it after first paint.
+      launchAutoHide: false,
+      launchShowDuration: 0,
+      backgroundColor: "#faf8f5",
       showSpinner: false,
     },
     StatusBar: {

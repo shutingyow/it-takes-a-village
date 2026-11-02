@@ -23,6 +23,7 @@ import {
   canLogSolids,
   solidsFirstInFeedPicker,
 } from "@/app/lib/babyAge";
+import { hapticSuccess } from "@/app/lib/haptics";
 
 type FeedEditEntry = Extract<ActivityEntry, { entryType: "feed" }>;
 type FeedType = "breast" | "bottle" | "solids";
@@ -258,6 +259,7 @@ export function FeedModal({
         });
       }
       clearFeedTimer(timerKey);
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to save feed:", error);

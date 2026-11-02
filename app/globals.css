@@ -158,8 +158,11 @@ html {
 html,
 body {
   background-color: var(--background);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
+/* Native shell: less “browser document”, more app surface. */
 .tracker-shell {
   width: 100%;
   max-width: 32rem;
@@ -173,6 +176,8 @@ body {
   background:
     radial-gradient(120% 60% at 50% -10%, var(--app-shell-glow) 0%, transparent 55%),
     var(--background);
+  -webkit-touch-callout: none;
+  overscroll-behavior-y: none;
 }
 
 .app-tab-bar {

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "./ConvexClientProvider";
+import { NativeAppShell } from "./components/NativeAppShell";
 import { LanguageProvider } from "./lib/i18n/LanguageProvider";
 import { ThemeProvider } from "./lib/theme";
 
@@ -55,7 +56,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background">
         <ConvexClientProvider>
           <ThemeProvider>
-            <LanguageProvider>{children}</LanguageProvider>
+            <LanguageProvider>
+              <NativeAppShell>{children}</NativeAppShell>
+            </LanguageProvider>
           </ThemeProvider>
         </ConvexClientProvider>
       </body>

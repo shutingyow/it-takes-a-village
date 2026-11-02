@@ -12,6 +12,7 @@ import { EntryPhotoField } from "../EntryPhotoField";
 import { EntryTimeField } from "../EntryTimeField";
 import type { ActivityEntry } from "../ActivityEntryCard";
 import { LoggedByHint } from "../LoggedByHint";
+import { hapticSuccess } from "@/app/lib/haptics";
 
 type PumpEditEntry = Extract<ActivityEntry, { entryType: "pump" }>;
 
@@ -73,6 +74,7 @@ export function PumpModal({
           ...payload,
         });
       }
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to save pump entry:", error);

@@ -22,8 +22,6 @@ import {
 import type { CaregiverInfo } from "@/app/lib/trackerStorage";
 import { signInWithOAuth } from "@/app/lib/oauthSignIn";
 import { BirthDateField } from "../BirthDateField";
-import Link from "next/link";
-
 export type SettingsView =
   | "menu"
   | "export"
@@ -321,12 +319,9 @@ export function SettingsTab({
               >
                 {t("signInWithGoogle")}
               </button>
-              <Link
-                href="/"
-                className="block text-center text-xs font-semibold text-primary pt-1"
-              >
+              <p className="text-center text-xs text-muted pt-1">
                 {t("signInForAdmin")}
-              </Link>
+              </p>
             </div>
           </>
         )}

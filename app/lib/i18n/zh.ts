@@ -613,6 +613,11 @@ export const zh: Translations = {
   consistencyOther: "其他",
   skipOptional: "跳过",
 
+  offlineTitle: "目前离线",
+  offlineBody: "请检查网络后重试。恢复连接后，村里的记录还在。",
+  offlineRetry: "重试",
+  offlineHint: "需要 Wi‑Fi 或蜂窝网络才能同步。",
+
   entryTime: "时间",
   entryDate: "日期",
   entryTimeHint: "可改为补记过去的记录",

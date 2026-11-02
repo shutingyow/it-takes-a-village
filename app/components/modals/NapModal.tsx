@@ -13,6 +13,7 @@ import {
   isNapTimerRecording,
   napTimerStorageKey,
 } from "@/app/lib/feedTimer";
+import { hapticSuccess } from "@/app/lib/haptics";
 import type { ActivityEntry } from "../ActivityEntryCard";
 import { LoggedByHint } from "../LoggedByHint";
 
@@ -125,6 +126,7 @@ export function NapModal({
       if (!liveRecording) {
         clearFeedTimer(timerKey);
       }
+      void hapticSuccess();
       onClose();
     } catch (error) {
       console.error("Failed to save nap:", error);
