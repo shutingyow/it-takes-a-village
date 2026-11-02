@@ -21,6 +21,7 @@ import { cn } from "@/app/lib/utils";
 import { IconReminders } from "@/app/components/icons";
 import { LanguageToggle } from "@/app/components/LanguageToggle";
 import { signInWithOAuth } from "@/app/lib/oauthSignIn";
+import { EmailPasswordForm } from "@/app/components/EmailPasswordForm";
 
 const CREATE_TIMEOUT_MS = 15_000;
 const DEFAULT_ADMIN = "Mommy (Shuting)";
@@ -384,6 +385,12 @@ export default function Home() {
           {t("signInToCreate")}
         </h2>
         <p className="text-sm text-muted mt-1">{t("signInHint")}</p>
+      </div>
+      <EmailPasswordForm disabled={signingInProvider !== null} />
+      <div className="flex items-center gap-3 pt-1">
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-xs text-muted">{t("orContinueWith")}</span>
+        <div className="h-px flex-1 bg-border" />
       </div>
       <button
         type="button"

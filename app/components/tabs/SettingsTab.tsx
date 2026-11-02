@@ -23,6 +23,7 @@ import type { CaregiverInfo } from "@/app/lib/trackerStorage";
 import { Capacitor } from "@capacitor/core";
 import { signInWithOAuth } from "@/app/lib/oauthSignIn";
 import { BirthDateField } from "../BirthDateField";
+import { EmailPasswordForm } from "../EmailPasswordForm";
 
 const PRIVACY_POLICY_URL = "https://it-takes-a-village.vercel.app/privacy";
 
@@ -319,7 +320,16 @@ export function SettingsTab({
         ) : (
           <>
             <p className="text-xs text-muted mb-3">{t("accountSignedOut")}</p>
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <EmailPasswordForm
+                disabled={authBusy}
+                onBusyChange={setAuthBusy}
+              />
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted">{t("orContinueWith")}</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
               <button
                 type="button"
                 disabled={authBusy}

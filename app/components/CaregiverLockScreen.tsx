@@ -7,6 +7,7 @@ import { cn } from "../lib/utils";
 import { useLanguage } from "../lib/i18n/LanguageProvider";
 import type { CaregiverInfo } from "../lib/trackerStorage";
 import { signInWithOAuth } from "../lib/oauthSignIn";
+import { EmailPasswordForm } from "./EmailPasswordForm";
 import { IconUser } from "./icons";
 
 interface CaregiverLockScreenProps {
@@ -70,7 +71,13 @@ export function CaregiverLockScreen({
               {t("parentUnlockTitle")}
             </p>
             {!isAuthenticated ? (
-              <div className="space-y-2 pt-1">
+              <div className="space-y-3 pt-1">
+                <EmailPasswordForm disabled={authBusy !== null} />
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs text-muted">{t("orContinueWith")}</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
                 <button
                   type="button"
                   disabled={authBusy !== null}

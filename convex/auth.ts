@@ -1,9 +1,10 @@
 import Apple from "@auth/core/providers/apple";
 import Google from "@auth/core/providers/google";
+import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
 
 /**
- * Apple + Google OAuth via Convex Auth.
+ * Apple + Google OAuth + email/password via Convex Auth.
  *
  * Env (Convex dashboard / `npx convex env set`):
  * - AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET
@@ -13,11 +14,15 @@ import { convexAuth } from "@convex-dev/auth/server";
  * Callbacks:
  * - {CONVEX_SITE_URL}/api/auth/callback/google
  * - {CONVEX_SITE_URL}/api/auth/callback/apple
+ *
+ * Password accounts work in-app (no OAuth browser). Reset/verify email can be
+ * added later via Password({ reset, verify }).
  */
 const NATIVE_AUTH_SCHEME = "ittakesavillage://";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
+    Password,
     Google,
     Apple({
       // Preserve name on first Sign in with Apple (only sent once).
