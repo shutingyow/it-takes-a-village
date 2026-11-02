@@ -16,7 +16,7 @@ export default function PrivacyPage() {
         </Link>
       </p>
       <h1 className="mb-2 text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-      <p className="mb-8 text-sm text-muted">Last updated: October 7, 2026</p>
+      <p className="mb-8 text-sm text-muted">Last updated: November 2, 2026</p>
 
       <div className="space-y-6 text-[15px] leading-relaxed text-foreground/90">
         <section className="space-y-2">
@@ -80,14 +80,15 @@ export default function PrivacyPage() {
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-lg font-medium">iOS App Store privacy labels</h2>
+          <h2 className="text-lg font-medium">What Apple’s App Store listing shows</h2>
           <p>
-            When submitting the iOS app, App Store Connect privacy nutrition
-            labels should reflect that the App may collect and link to the user
-            data types you actually enable (for example Health &amp; Fitness /
-            Other Health data for care logs, Photos if users attach images, and
-            identifiers or usage data only if you add analytics later). Update
-            the labels whenever product behavior changes.
+            On the App Store, Apple’s privacy labels summarize the kinds of data
+            the App may collect. For It Takes A Village, that typically includes
+            care-related information you enter (such as feeding, sleep, growth,
+            and health notes), and photos if you choose to attach them. If you
+            sign in, account-related identifiers needed for sign-in may also
+            apply. We do not currently use third-party advertising or analytics
+            SDKs that track you across other companies’ apps.
           </p>
         </section>
 
