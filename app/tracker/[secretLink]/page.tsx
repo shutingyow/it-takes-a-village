@@ -36,8 +36,6 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ReminderScheduler } from "@/app/components/ReminderScheduler";
 import { FeedTimerBanner } from "@/app/components/FeedTimerBanner";
 import { useAppShell } from "@/app/lib/appShell";
-import { isNativePlatform } from "@/app/lib/deviceNotifications";
-import { cn } from "@/app/lib/utils";
 
 type LogType = "feed" | "diaper" | "pump" | "activity" | "nap" | "moment";
 
@@ -244,13 +242,7 @@ export default function TrackerPage({
 
   if (needsPick || !lockedCaregiver || !lockedInfo) {
     return (
-      <div
-        className={cn(
-          "min-h-screen flex flex-col bg-background",
-          // Capacitor contentInset already pads the WebView — avoid a double gap.
-          !isNativePlatform() && "safe-top"
-        )}
-      >
+      <div className="min-h-screen flex flex-col bg-background safe-top">
         <CaregiverLockScreen
           caregivers={tracker.caregivers}
           viewerIsOwner={tracker.viewerIsOwner}
@@ -265,12 +257,7 @@ export default function TrackerPage({
   }
 
   return (
-    <div
-      className={cn(
-        "relative h-dvh max-h-dvh flex flex-col tracker-shell app-shell overflow-hidden",
-        !isNativePlatform() && "safe-top"
-      )}
-    >
+    <div className="relative h-dvh max-h-dvh flex flex-col tracker-shell app-shell overflow-hidden safe-top bg-background">
       {/* Brand line only in browser tabs — native/PWA already has the app name */}
       {!appShell && (
         <header className="px-4 pt-1 pb-0.5 shrink-0">

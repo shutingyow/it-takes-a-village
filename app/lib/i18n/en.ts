@@ -653,7 +653,10 @@ export const translations = {
 
   // Entry time + edit/delete
   entryTime: "When",
+  entryDate: "Date",
   entryTimeHint: "Change this to log a past entry",
+  timeItLive: "Time it live",
+  timeItLiveHint: "Keeps timing if you leave this screen.",
   useNow: "Now",
   editEntry: "Edit entry",
   deleteEntry: "Delete entry",

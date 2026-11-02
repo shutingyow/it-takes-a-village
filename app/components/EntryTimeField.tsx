@@ -43,7 +43,6 @@ export function EntryTimeField({ value, onChange, label }: EntryTimeFieldProps) 
         onChange={(e) => onChange(fromDatetimeLocalValue(e.target.value))}
         className="input-field input-datetime min-w-0 max-w-full"
       />
-      <p className="text-xs text-muted mt-1.5 break-words">{t("entryTimeHint")}</p>
     </div>
   );
 }

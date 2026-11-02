@@ -26,7 +26,7 @@ const config: CapacitorConfig = {
     },
     StatusBar: {
       style: "DARK",
-      backgroundColor: "#FAFAF8",
+      backgroundColor: "#faf8f5",
     },
     Keyboard: {
       resize: "body",
@@ -35,7 +35,8 @@ const config: CapacitorConfig = {
   // Native min iOS is set in Xcode (IPHONEOS_DEPLOYMENT_TARGET = 17.0).
   // Live Activities package needs iOS 16+; project targets 17 to match Xcode.
   ios: {
-    contentInset: "automatic",
+    // Edge-to-edge WebView; CSS safe-top pads content under the status bar.
+    contentInset: "never",
     preferredContentMode: "mobile",
     scheme: "It Takes A Village",
   },

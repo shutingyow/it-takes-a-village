@@ -15,6 +15,7 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconFeed } from "../icons";
 import { EntryPhotoField } from "../EntryPhotoField";
 import { EntryTimeField } from "../EntryTimeField";
+import { EntryWhenFields } from "../EntryWhenFields";
 import { FeedTimer } from "../FeedTimer";
 import type { ActivityEntry } from "../ActivityEntryCard";
 import { LoggedByHint } from "../LoggedByHint";
@@ -135,7 +136,6 @@ export function FeedModal({
 
   const [step, setStep] = useState<"type" | "details">(() => {
     if (editEntry) return "details";
-    // Resume into details when a background timer is already running.
     if (isFeedTimerRecording(secretLink)) return "details";
     return "type";
   });
@@ -167,7 +167,6 @@ export function FeedModal({
   const [timestamp, setTimestamp] = useState(
     () => editEntry?.timestamp ?? Date.now()
   );
-  /** Bottle log: start/end instead of timer + temperature. */
   const [feedStartAt, setFeedStartAt] = useState(
     () => editEntry?.timestamp ?? Date.now()
   );
@@ -178,6 +177,9 @@ export function FeedModal({
     }
     return Date.now();
   });
+  const [timeLive, setTimeLive] = useState(() =>
+    !editEntry && isFeedTimerRecording(secretLink)
+  );
   const [timeTouched, setTimeTouched] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -193,24 +195,31 @@ export function FeedModal({
       alert(t("selectBottleMilk"));
       return;
     }
-    if (feedType === "bottle" && feedEndAt <= feedStartAt) {
-      alert(t("feedEndBeforeStart"));
-      return;
-    }
     if (feedType === "solids" && !foodName.trim()) {
       alert(t("selectSolidsFood"));
       return;
     }
 
+    let resolvedStart = feedStartAt;
+    let resolvedEnd = feedEndAt;
+    if (feedType === "breast" || feedType === "bottle") {
+      if (resolvedEnd <= resolvedStart && durationMinutes != null) {
+        resolvedEnd = resolvedStart + durationMinutes * 60_000;
+      }
+      if (resolvedEnd <= resolvedStart) {
+        alert(t("feedEndBeforeStart"));
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
-      const bottleDurationMins =
-        feedType === "bottle"
-          ? Math.max(
-              1,
-              Math.round((feedEndAt - feedStartAt) / 60_000)
-            )
+      const rangeDurationMins =
+        feedType === "breast" || feedType === "bottle"
+          ? Math.max(1, Math.round((resolvedEnd - resolvedStart) / 60_000))
           : null;
+      const breastDuration =
+        durationMinutes ?? rangeDurationMins ?? undefined;
       const payload = {
         type: feedType,
         side: feedType === "breast" ? side : undefined,
@@ -218,20 +227,23 @@ export function FeedModal({
           feedType === "solids"
             ? undefined
             : feedType === "bottle"
-              ? bottleDurationMins ?? undefined
-              : durationMinutes ?? undefined,
+              ? rangeDurationMins ?? undefined
+              : breastDuration,
         durationMinutes:
           feedType === "solids"
             ? undefined
             : feedType === "bottle"
-              ? bottleDurationMins ?? undefined
-              : durationMinutes ?? undefined,
+              ? rangeDurationMins ?? undefined
+              : breastDuration,
         amount: feedType === "bottle" ? amount : undefined,
         bottleMilk: feedType === "bottle" ? bottleMilk : undefined,
         foodName: feedType === "solids" ? foodName.trim() : undefined,
         amountGrams:
           feedType === "solids" ? amountGrams ?? undefined : undefined,
-        timestamp: feedType === "bottle" ? feedStartAt : timestamp,
+        timestamp:
+          feedType === "breast" || feedType === "bottle"
+            ? resolvedStart
+            : timestamp,
         notes: notes || undefined,
         photoIds: photoIds.length > 0 ? photoIds : undefined,
       };
@@ -254,30 +266,53 @@ export function FeedModal({
     }
   };
 
-  const durationSection = (
-    <>
-      <FeedTimer
-        storageKey={timerKey}
-        onDurationMinutes={setDurationMinutes}
-        shouldStampStart={shouldStampStart}
-        onStampStart={setTimestamp}
-      />
-      <DurationMinutesField
-        value={durationMinutes}
-        onChange={setDurationMinutes}
-      />
-    </>
-  );
-
-  const timeField = (
-    <EntryTimeField
-      value={timestamp}
-      onChange={(next) => {
+  const whenFields = (
+    <EntryWhenFields
+      startAt={feedStartAt}
+      endAt={feedEndAt}
+      onStartChange={(next) => {
         setTimeTouched(true);
-        setTimestamp(next);
+        setFeedStartAt(next);
+      }}
+      onEndChange={(next) => {
+        setTimeTouched(true);
+        setFeedEndAt(next);
       }}
     />
   );
+
+  const liveTimerToggle = (
+    <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-[#faf6f2] px-3 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-foreground">
+          {t("timeItLive")}
+        </p>
+        <p className="text-xs text-muted leading-snug">{t("timeItLiveHint")}</p>
+      </div>
+      <input
+        type="checkbox"
+        checked={timeLive}
+        onChange={(e) => setTimeLive(e.target.checked)}
+        className="size-4 accent-primary shrink-0"
+      />
+    </label>
+  );
+
+  const liveTimerSection = timeLive ? (
+    <FeedTimer
+      storageKey={timerKey}
+      onDurationMinutes={setDurationMinutes}
+      shouldStampStart={shouldStampStart}
+      onStampStart={(startMs) => {
+        setFeedStartAt(startMs);
+        setTimeTouched(true);
+      }}
+      onStampEnd={(endMs) => {
+        setFeedEndAt(endMs);
+        setTimeTouched(true);
+      }}
+    />
+  ) : null;
 
   const photoField = (
     <EntryPhotoField
@@ -347,7 +382,15 @@ export function FeedModal({
               {t("changeType")}
             </button>
 
-            {durationSection}
+            {whenFields}
+            {liveTimerToggle}
+            {liveTimerSection}
+            {!timeLive && (
+              <DurationMinutesField
+                value={durationMinutes}
+                onChange={setDurationMinutes}
+              />
+            )}
 
             <div>
               <label className="label-field">{t("sideOptional")}</label>
@@ -381,8 +424,6 @@ export function FeedModal({
 
             {photoField}
 
-            {timeField}
-
             <button
               type="button"
               onClick={handleSubmit}
@@ -404,17 +445,9 @@ export function FeedModal({
               {t("changeType")}
             </button>
 
-            <EntryTimeField
-              label={t("feedStartTime")}
-              value={feedStartAt}
-              onChange={setFeedStartAt}
-            />
-
-            <EntryTimeField
-              label={t("feedEndTime")}
-              value={feedEndAt}
-              onChange={setFeedEndAt}
-            />
+            {whenFields}
+            {liveTimerToggle}
+            {liveTimerSection}
 
             <div>
               <label className="label-field">{t("amountMl", { amount })}</label>
@@ -579,7 +612,7 @@ export function FeedModal({
 
             {photoField}
 
-            {timeField}
+            <EntryTimeField value={timestamp} onChange={setTimestamp} />
 
             <button
               type="button"

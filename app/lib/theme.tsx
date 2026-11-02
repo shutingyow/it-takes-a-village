@@ -78,6 +78,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         theme === "system" ? (media.matches ? "dark" : "light") : theme;
       setResolvedTheme(resolved);
       applyThemeClass(resolved);
+      void import("@/app/lib/appShell").then(({ configureNativeChrome }) =>
+        configureNativeChrome(resolved)
+      );
     };
     sync();
 

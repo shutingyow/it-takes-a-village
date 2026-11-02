@@ -614,7 +614,10 @@ export const zh: Translations = {
   skipOptional: "跳过",
 
   entryTime: "时间",
+  entryDate: "日期",
   entryTimeHint: "可改为补记过去的记录",
+  timeItLive: "实时计时",
+  timeItLiveHint: "离开此页后仍会继续计时。",
   useNow: "现在",
   editEntry: "编辑记录",
   deleteEntry: "删除记录",

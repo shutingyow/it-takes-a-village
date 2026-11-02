@@ -19,6 +19,7 @@ interface FeedTimerProps {
   /** Stamp When to feed start when Start is pressed (new logs only if When untouched). */
   shouldStampStart: boolean;
   onStampStart?: (startMs: number) => void;
+  onStampEnd?: (endMs: number) => void;
 }
 
 export function FeedTimer({
@@ -26,6 +27,7 @@ export function FeedTimer({
   onDurationMinutes,
   shouldStampStart,
   onStampStart,
+  onStampEnd,
 }: FeedTimerProps) {
   const { t } = useLanguage();
   const [state, setState] = useState<PersistedFeedTimer>({
@@ -109,6 +111,7 @@ export function FeedTimer({
         : state.accumulatedMs;
     const minutes = elapsedToDurationMinutes(total);
     onDurationMinutes(minutes);
+    onStampEnd?.(stopAt);
     persist({
       status: "stopped",
       accumulatedMs: total,

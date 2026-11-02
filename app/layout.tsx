@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "It Takes A Village",
   },
 };
@@ -39,7 +39,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#5B8A7A",
+  themeColor: "#faf8f5",
 };
 
 export default function RootLayout({

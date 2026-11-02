@@ -154,6 +154,12 @@ html {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* Fill under the iOS status bar with app beige (content still padded via .safe-top). */
+html,
+body {
+  background-color: var(--background);
+}
+
 .tracker-shell {
   width: 100%;
   max-width: 32rem;
