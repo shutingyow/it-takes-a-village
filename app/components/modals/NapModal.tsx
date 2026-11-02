@@ -2,16 +2,17 @@
 
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { BottomSheet } from "../ui/BottomSheet";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ActivityIcon } from "../icons";
-import { EntryTimeField } from "../EntryTimeField";
-import { DurationMinutesField } from "../DurationMinutesField";
+import { EntryWhenFields } from "../EntryWhenFields";
+import { FeedTimer } from "../FeedTimer";
 import {
-  fromDatetimeLocalValue,
-  toDatetimeLocalValue,
-} from "../EntryTimeField";
+  clearFeedTimer,
+  isNapTimerRecording,
+  napTimerStorageKey,
+} from "@/app/lib/feedTimer";
 import type { ActivityEntry } from "../ActivityEntryCard";
 import { LoggedByHint } from "../LoggedByHint";
 
@@ -49,22 +50,21 @@ export function NapModal({
   const [startTime, setStartTime] = useState(
     () => editEntry?.startTime ?? Date.now()
   );
+  const [endTime, setEndTime] = useState(
+    () => editEntry?.endTime ?? Date.now()
+  );
   const [durationMinutes, setDurationMinutes] = useState<number | null>(() =>
     initialDuration(editEntry)
   );
-  const [endTime, setEndTime] = useState<number | null>(
-    editEntry?.endTime ?? null
+  const [timeLive, setTimeLive] = useState(
+    () => !editEntry && isNapTimerRecording(secretLink)
   );
+  const [timeTouched, setTimeTouched] = useState(false);
   const [notes, setNotes] = useState(editEntry?.notes ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // New naps start at "now". A typed duration means the nap already happened,
-  // so an untouched start is shifted back and the nap ends now.
-  const autoStartRef = useRef(!isEditing);
 
-  const handleStartChange = (next: number) => {
-    setStartTime(next);
-    autoStartRef.current = Math.abs(next - Date.now()) <= 2_000;
-  };
+  const timerKey = napTimerStorageKey(secretLink, editEntry?._id);
+  const shouldStampStart = !isEditing && !timeTouched;
 
   const handleSubmit = async () => {
     if (!selectedCaregiver) {
@@ -73,30 +73,27 @@ export function NapModal({
     }
 
     const now = Date.now();
+    const liveRecording = timeLive && isNapTimerRecording(secretLink);
     let resolvedStart = startTime;
-    let resolvedEnd = endTime ?? undefined;
+    let resolvedEnd: number | undefined = endTime;
     let resolvedMinutes = durationMinutes ?? undefined;
-    if (resolvedEnd == null && resolvedMinutes != null) {
-      const forwardEnd = resolvedStart + resolvedMinutes * 60_000;
-      if (forwardEnd <= now) {
-        resolvedEnd = forwardEnd;
-      } else if (autoStartRef.current) {
-        resolvedEnd = now;
-        resolvedStart = now - resolvedMinutes * 60_000;
-      } else {
+
+    // Live timer still running → log an ongoing nap (no end yet).
+    if (liveRecording) {
+      resolvedEnd = undefined;
+      resolvedMinutes = undefined;
+    } else {
+      if (resolvedEnd <= resolvedStart && resolvedMinutes != null) {
+        resolvedEnd = resolvedStart + resolvedMinutes * 60_000;
+      }
+      if (resolvedEnd <= resolvedStart) {
+        alert(t("pastSleepInvalidTime"));
+        return;
+      }
+      if (resolvedEnd > now) {
         alert(t("pastSleepFutureEnd"));
         return;
       }
-    }
-    if (resolvedEnd != null && resolvedEnd <= resolvedStart) {
-      alert(t("pastSleepInvalidTime"));
-      return;
-    }
-    if (resolvedEnd != null && resolvedEnd > now) {
-      alert(t("pastSleepFutureEnd"));
-      return;
-    }
-    if (resolvedEnd != null) {
       resolvedMinutes = Math.max(
         1,
         Math.round((resolvedEnd - resolvedStart) / 60_000)
@@ -125,6 +122,9 @@ export function NapModal({
           ...payload,
         });
       }
+      if (!liveRecording) {
+        clearFeedTimer(timerKey);
+      }
       onClose();
     } catch (error) {
       console.error("Failed to save nap:", error);
@@ -141,61 +141,58 @@ export function NapModal({
     >
       <div className="space-y-4 pt-2 min-w-0">
         {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
-        <EntryTimeField
-          value={startTime}
-          onChange={handleStartChange}
-          label={t("napStartLabel")}
+
+        <EntryWhenFields
+          startAt={startTime}
+          endAt={endTime}
+          onStartChange={(next) => {
+            setTimeTouched(true);
+            setStartTime(next);
+          }}
+          onEndChange={(next) => {
+            setTimeTouched(true);
+            setEndTime(next);
+          }}
         />
 
-        <DurationMinutesField
-          id="nap-duration-minutes"
-          label={t("feedDurationOptional")}
-          hint={t("napDurationHint")}
-          value={durationMinutes}
-          onChange={setDurationMinutes}
-        />
-
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <label className="label-field mb-0" htmlFor="nap-end-time">
-              {t("napEndLabel")}
-            </label>
-            {endTime != null ? (
-              <button
-                type="button"
-                onClick={() => setEndTime(null)}
-                className="min-h-11 px-2 text-xs font-semibold text-terracotta touch-manipulation"
-              >
-                {t("clearEndTime")}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() =>
-                  setEndTime(
-                    startTime + (durationMinutes ?? 30) * 60_000 > Date.now()
-                      ? Date.now()
-                      : startTime + (durationMinutes ?? 30) * 60_000
-                  )
-                }
-                className="min-h-11 px-2 text-xs font-semibold text-primary touch-manipulation"
-              >
-                {t("addEndTime")}
-              </button>
-            )}
+        <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-[#faf6f2] px-3 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              {t("timeItLive")}
+            </p>
+            <p className="text-xs text-muted leading-snug">
+              {t("timeItLiveHint")}
+            </p>
           </div>
-          {endTime != null && (
-            <input
-              id="nap-end-time"
-              type="datetime-local"
-              value={toDatetimeLocalValue(endTime)}
-              onChange={(e) => setEndTime(fromDatetimeLocalValue(e.target.value))}
-              className="input-field"
-            />
-          )}
-          <p className="text-xs text-muted mt-1.5">{t("napEndHint")}</p>
-          <p className="text-xs text-muted mt-1">{t("napStillGoing")}</p>
-        </div>
+          <input
+            type="checkbox"
+            checked={timeLive}
+            onChange={(e) => setTimeLive(e.target.checked)}
+            className="size-4 accent-primary shrink-0"
+          />
+        </label>
+
+        {timeLive && (
+          <FeedTimer
+            storageKey={timerKey}
+            label={t("napTimerLabel")}
+            hint={t("napTimerHint")}
+            onDurationMinutes={setDurationMinutes}
+            shouldStampStart={shouldStampStart}
+            onStampStart={(startMs) => {
+              setStartTime(startMs);
+              setTimeTouched(true);
+            }}
+            onStampEnd={(endMs) => {
+              setEndTime(endMs);
+              setTimeTouched(true);
+            }}
+          />
+        )}
+
+        {timeLive && (
+          <p className="text-xs text-muted">{t("napStillGoing")}</p>
+        )}
 
         <div>
           <label className="label-field">{t("notesOptional")}</label>

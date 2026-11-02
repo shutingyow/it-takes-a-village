@@ -20,6 +20,8 @@ interface FeedTimerProps {
   shouldStampStart: boolean;
   onStampStart?: (startMs: number) => void;
   onStampEnd?: (endMs: number) => void;
+  label?: string;
+  hint?: string;
 }
 
 export function FeedTimer({
@@ -28,6 +30,8 @@ export function FeedTimer({
   shouldStampStart,
   onStampStart,
   onStampEnd,
+  label,
+  hint,
 }: FeedTimerProps) {
   const { t } = useLanguage();
   const [state, setState] = useState<PersistedFeedTimer>({
@@ -144,7 +148,7 @@ export function FeedTimer({
     <div className="rounded-2xl border border-border bg-accent-feed-light/60 px-4 py-4">
       <div className="flex items-center justify-between gap-2 mb-1">
         <p className="text-sm font-semibold text-foreground">
-          {t("feedTimerLabel")}
+          {label ?? t("feedTimerLabel")}
         </p>
         {statusLabel && (
           <span
@@ -159,7 +163,7 @@ export function FeedTimer({
           </span>
         )}
       </div>
-      <p className="text-xs text-muted mb-3">{t("feedTimerHint")}</p>
+      <p className="text-xs text-muted mb-3">{hint ?? t("feedTimerHint")}</p>
 
       <p
         className="text-center text-4xl font-semibold tracking-tight tabular-nums text-foreground mb-4"

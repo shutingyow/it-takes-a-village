@@ -26,6 +26,20 @@ export function feedTimerStorageKey(
     : `feedTimer:${secretLink}`;
 }
 
+export function napTimerStorageKey(
+  secretLink: string,
+  editEntryId?: string
+): string {
+  return editEntryId
+    ? `napTimer:${secretLink}:edit:${editEntryId}`
+    : `napTimer:${secretLink}`;
+}
+
+export function isNapTimerRecording(secretLink: string): boolean {
+  const state = loadFeedTimer(napTimerStorageKey(secretLink));
+  return state.status === "running" || state.status === "paused";
+}
+
 function storage(): Storage | null {
   if (typeof window === "undefined") return null;
   try {
