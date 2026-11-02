@@ -22,7 +22,7 @@ struct FeedLiveActivityLiveActivity: Widget {
                         .font(.title2)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    countdownText(dueAt: context.state.dueAt, font: .title3.weight(.semibold))
+                    sinceText(from: context.state.dueAt, font: .title3.weight(.semibold))
                 }
                 DynamicIslandExpandedRegion(.center) {
                     Text(context.state.title)
@@ -39,7 +39,7 @@ struct FeedLiveActivityLiveActivity: Widget {
                 Image(systemName: "bottle.fill")
                     .foregroundStyle(Color(red: 0.83, green: 0.42, blue: 0.42))
             } compactTrailing: {
-                countdownText(dueAt: context.state.dueAt, font: .caption.weight(.semibold))
+                sinceText(from: context.state.dueAt, font: .caption.weight(.semibold))
             } minimal: {
                 Image(systemName: "bottle.fill")
                     .foregroundStyle(Color(red: 0.83, green: 0.42, blue: 0.42))
@@ -69,16 +69,17 @@ struct FeedLiveActivityLiveActivity: Widget {
 
             Spacer(minLength: 8)
 
-            countdownText(dueAt: context.state.dueAt, font: .title2.monospacedDigit().weight(.bold))
+            sinceText(from: context.state.dueAt, font: .title2.monospacedDigit().weight(.bold))
                 .foregroundStyle(Color(red: 0.55, green: 0.22, blue: 0.20))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
 
+    /// Counts *up* from last feed (past date + `.timer`).
     @ViewBuilder
-    private func countdownText(dueAt: Date, font: Font) -> some View {
-        Text(dueAt, style: .timer)
+    private func sinceText(from lastFeedAt: Date, font: Font) -> some View {
+        Text(lastFeedAt, style: .timer)
             .font(font)
             .multilineTextAlignment(.trailing)
             .monospacedDigit()

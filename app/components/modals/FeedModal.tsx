@@ -35,7 +35,6 @@ interface FeedModalProps {
   birthDate?: string;
 }
 
-type BottleTemperature = "room" | "warm40";
 type BottleMilk = "formula" | "breastmilk";
 
 const MAX_DURATION_MINUTES = 24 * 60;
@@ -156,14 +155,6 @@ export function FeedModal({
       ? inferBottleMilk(editEntry)
       : undefined
   );
-  const [bottleTemperature, setBottleTemperature] = useState<
-    BottleTemperature | undefined
-  >(
-    editEntry?.bottleTemperature === "room" ||
-      editEntry?.bottleTemperature === "warm40"
-      ? editEntry.bottleTemperature
-      : undefined
-  );
   const [foodName, setFoodName] = useState(editEntry?.foodName ?? "");
   const [amountGrams, setAmountGrams] = useState<number | null>(() => {
     const grams = editEntry?.amountGrams;
@@ -176,6 +167,17 @@ export function FeedModal({
   const [timestamp, setTimestamp] = useState(
     () => editEntry?.timestamp ?? Date.now()
   );
+  /** Bottle log: start/end instead of timer + temperature. */
+  const [feedStartAt, setFeedStartAt] = useState(
+    () => editEntry?.timestamp ?? Date.now()
+  );
+  const [feedEndAt, setFeedEndAt] = useState(() => {
+    if (editEntry?.timestamp) {
+      const mins = editEntry.durationMinutes ?? editEntry.duration;
+      if (mins && mins > 0) return editEntry.timestamp + mins * 60_000;
+    }
+    return Date.now();
+  });
   const [timeTouched, setTimeTouched] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -191,6 +193,10 @@ export function FeedModal({
       alert(t("selectBottleMilk"));
       return;
     }
+    if (feedType === "bottle" && feedEndAt <= feedStartAt) {
+      alert(t("feedEndBeforeStart"));
+      return;
+    }
     if (feedType === "solids" && !foodName.trim()) {
       alert(t("selectSolidsFood"));
       return;
@@ -198,21 +204,34 @@ export function FeedModal({
 
     setIsSubmitting(true);
     try {
+      const bottleDurationMins =
+        feedType === "bottle"
+          ? Math.max(
+              1,
+              Math.round((feedEndAt - feedStartAt) / 60_000)
+            )
+          : null;
       const payload = {
         type: feedType,
         side: feedType === "breast" ? side : undefined,
         duration:
-          feedType === "solids" ? undefined : durationMinutes ?? undefined,
+          feedType === "solids"
+            ? undefined
+            : feedType === "bottle"
+              ? bottleDurationMins ?? undefined
+              : durationMinutes ?? undefined,
         durationMinutes:
-          feedType === "solids" ? undefined : durationMinutes ?? undefined,
+          feedType === "solids"
+            ? undefined
+            : feedType === "bottle"
+              ? bottleDurationMins ?? undefined
+              : durationMinutes ?? undefined,
         amount: feedType === "bottle" ? amount : undefined,
         bottleMilk: feedType === "bottle" ? bottleMilk : undefined,
-        bottleTemperature:
-          feedType === "bottle" ? bottleTemperature : undefined,
         foodName: feedType === "solids" ? foodName.trim() : undefined,
         amountGrams:
           feedType === "solids" ? amountGrams ?? undefined : undefined,
-        timestamp,
+        timestamp: feedType === "bottle" ? feedStartAt : timestamp,
         notes: notes || undefined,
         photoIds: photoIds.length > 0 ? photoIds : undefined,
       };
@@ -385,36 +404,17 @@ export function FeedModal({
               {t("changeType")}
             </button>
 
-            {durationSection}
+            <EntryTimeField
+              label={t("feedStartTime")}
+              value={feedStartAt}
+              onChange={setFeedStartAt}
+            />
 
-            <div>
-              <label className="label-field">{t("bottleMilkType")}</label>
-              <div className="flex gap-2">
-                {(
-                  [
-                    { id: "formula" as const, label: t("formula") },
-                    { id: "breastmilk" as const, label: t("breastMilk") },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setBottleMilk(opt.id)}
-                    className={cn(
-                      "btn-option flex-1 py-3.5 text-base",
-                      bottleMilk === opt.id
-                        ? "btn-option-selected"
-                        : "btn-option-default"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              {!bottleMilk && (
-                <p className="mt-1.5 text-xs text-muted">{t("selectBottleMilk")}</p>
-              )}
-            </div>
+            <EntryTimeField
+              label={t("feedEndTime")}
+              value={feedEndAt}
+              onChange={setFeedEndAt}
+            />
 
             <div>
               <label className="label-field">{t("amountMl", { amount })}</label>
@@ -446,25 +446,21 @@ export function FeedModal({
             </div>
 
             <div>
-              <label className="label-field">{t("bottleTemperature")}</label>
+              <label className="label-field">{t("bottleMilkType")}</label>
               <div className="flex gap-2">
                 {(
                   [
-                    { id: "room" as const, label: t("bottleTempRoom") },
-                    { id: "warm40" as const, label: t("bottleTempWarm40") },
+                    { id: "formula" as const, label: t("formula") },
+                    { id: "breastmilk" as const, label: t("breastMilk") },
                   ] as const
                 ).map((opt) => (
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() =>
-                      setBottleTemperature(
-                        bottleTemperature === opt.id ? undefined : opt.id
-                      )
-                    }
+                    onClick={() => setBottleMilk(opt.id)}
                     className={cn(
-                      "btn-option flex-1",
-                      bottleTemperature === opt.id
+                      "btn-option flex-1 py-3.5 text-base",
+                      bottleMilk === opt.id
                         ? "btn-option-selected"
                         : "btn-option-default"
                     )}
@@ -473,6 +469,9 @@ export function FeedModal({
                   </button>
                 ))}
               </div>
+              {!bottleMilk && (
+                <p className="mt-1.5 text-xs text-muted">{t("selectBottleMilk")}</p>
+              )}
             </div>
 
             <div>
@@ -487,8 +486,6 @@ export function FeedModal({
             </div>
 
             {photoField}
-
-            {timeField}
 
             <button
               type="button"

@@ -25,7 +25,9 @@ export type NightFeedSettings = {
 };
 
 export const DEFAULT_NIGHT_FEED_SETTINGS: NightFeedSettings = {
-  enabled: true,
+  // Off until parent opts in — otherwise overnight reminders jump to 4–6h
+  // without them noticing.
+  enabled: false,
   intervalHours: DEFAULT_NIGHT_FEED_INTERVAL_HOURS,
   start: DEFAULT_NIGHT_FEED_START,
   end: DEFAULT_NIGHT_FEED_END,
@@ -108,7 +110,8 @@ export function resolveNightFeedSettings(partial?: {
       ? Math.min(24, Math.max(0.5, partial.nightFeedIntervalHours))
       : DEFAULT_NIGHT_FEED_SETTINGS.intervalHours;
   return {
-    enabled: partial?.nightFeedIntervalEnabled ?? DEFAULT_NIGHT_FEED_SETTINGS.enabled,
+    enabled:
+      partial?.nightFeedIntervalEnabled ?? DEFAULT_NIGHT_FEED_SETTINGS.enabled,
     intervalHours,
     start,
     end,

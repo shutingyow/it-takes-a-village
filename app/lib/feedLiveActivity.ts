@@ -1,9 +1,8 @@
 /**
- * Next-feed Live Activity / Dynamic Island countdown (iOS 16.2+).
+ * Lock-screen Live Activity: time since last feed (iOS 16.2+).
  *
  * Native bridge: `FeedLiveActivityPlugin` registered from AppBridgeViewController.
- * Local notification milestones remain the fallback when Live Activities
- * are unsupported or disabled.
+ * Passes lastFeedAtMs — iOS Text(..., .timer) counts *up* from a past date.
  */
 
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -14,6 +13,7 @@ interface FeedLiveActivityPlugin {
   startActivity(options: {
     title: string;
     subtitle: string;
+    /** Epoch ms of last feed — timer counts up from this. */
     dueAtMs: number;
   }): Promise<{ activityId: string }>;
   updateActivity(options: {
@@ -53,9 +53,9 @@ function writeStoredId(id: string | null): void {
 
 export async function syncFeedLiveActivity(opts: {
   enabled: boolean;
-  feedDueAt: number | null;
+  /** Timestamp of the last milk feed. */
+  lastFeedAt: number | null;
   title: string;
-  /** e.g. "Next feed" */
   subtitle: string;
 }): Promise<"live" | "unsupported" | "skipped" | "error"> {
   if (!isNativePlatform() || !opts.enabled) {
@@ -83,10 +83,8 @@ export async function syncFeedLiveActivity(opts: {
     return "unsupported";
   }
 
-  const dueAt = opts.feedDueAt;
-  // End as soon as due passes — iOS Text(..., .timer) counts *up* after due,
-  // which looked like the countdown was silently extending when a feed was missed.
-  if (dueAt === null || dueAt <= Date.now()) {
+  const lastFeedAt = opts.lastFeedAt;
+  if (lastFeedAt === null || lastFeedAt > Date.now() + 60_000) {
     await endFeedLiveActivity();
     return "skipped";
   }
@@ -94,7 +92,7 @@ export async function syncFeedLiveActivity(opts: {
   const payload = {
     title: opts.title,
     subtitle: opts.subtitle,
-    dueAtMs: dueAt,
+    dueAtMs: lastFeedAt,
   };
 
   const existing = readStoredId();

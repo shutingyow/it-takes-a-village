@@ -224,9 +224,11 @@ html {
   @apply w-full min-w-0 max-w-full box-border px-4 py-3 border border-border rounded-xl bg-surface text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors;
 }
 
-/* iOS datetime-local has a large intrinsic min-width that blows past the sheet. */
+/* iOS date/time controls have a large intrinsic min-width that blows past the sheet. */
 .input-datetime,
-input[type="datetime-local"].input-field {
+input[type="datetime-local"].input-field,
+input[type="date"].input-field,
+input[type="time"].input-field {
   display: block;
   width: 100%;
   max-width: 100%;

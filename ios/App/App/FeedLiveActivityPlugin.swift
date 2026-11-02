@@ -4,8 +4,9 @@ import ActivityKit
 import FeedCountdownShared
 
 /**
- * Native Live Activity bridge for next-feed countdown.
+ * Native Live Activity bridge for time-since-last-feed.
  * Registered manually from AppBridgeViewController (not an npm Cap plugin).
+ * `dueAtMs` is the last feed timestamp — the widget timer counts up from it.
  */
 @objc(FeedLiveActivityPlugin)
 public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -84,7 +85,8 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 if let activityId {
                     return activity.id == activityId
                 }
-                return activity.attributes.kind == "next-feed"
+                return activity.attributes.kind == "last-feed"
+                    || activity.attributes.kind == "next-feed"
             }
 
             if matches.isEmpty {
@@ -99,7 +101,7 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
             let content = ActivityContent(
                 state: state,
-                staleDate: state.dueAt.addingTimeInterval(30 * 60)
+                staleDate: state.dueAt.addingTimeInterval(24 * 60 * 60)
             )
             for activity in matches {
                 await activity.update(content)
@@ -120,7 +122,8 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 if let activityId {
                     return activity.id == activityId
                 }
-                return activity.attributes.kind == "next-feed"
+                return activity.attributes.kind == "last-feed"
+                    || activity.attributes.kind == "next-feed"
             }
             for activity in matches {
                 await activity.end(
@@ -155,10 +158,10 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @available(iOS 16.2, *)
     private static func requestActivity(state: FeedCountdownAttributes.ContentState) throws -> String {
-        let attributes = FeedCountdownAttributes(kind: "next-feed")
+        let attributes = FeedCountdownAttributes(kind: "last-feed")
         let content = ActivityContent(
             state: state,
-            staleDate: state.dueAt.addingTimeInterval(30 * 60)
+            staleDate: state.dueAt.addingTimeInterval(24 * 60 * 60)
         )
         let activity = try Activity.request(
             attributes: attributes,

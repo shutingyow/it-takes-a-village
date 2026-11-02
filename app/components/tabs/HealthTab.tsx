@@ -63,8 +63,7 @@ export function HealthTab({ trackerId, selectedCaregiver }: HealthTabProps) {
 
   return (
     <div className="p-4">
-      <p className="section-label">{t("healthLogging")}</p>
-      <p className="text-sm text-muted mb-4 -mt-2">{t("healthGrowthHint")}</p>
+      <p className="section-label mb-4">{t("healthLogging")}</p>
       <div className="space-y-3">
         {healthItems.map((item) => (
           <button

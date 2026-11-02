@@ -40,12 +40,9 @@ interface ReminderSettingsViewProps {
   nightFeedWindowStart?: string;
   nightFeedWindowEnd?: string;
   notifyBeforeMinutes?: number;
+  feedRemindersEnabled?: boolean;
   wakeWindowMinutes?: number;
-  medicationReminders?: Array<{
-    name: string;
-    intervalHours: number;
-    lastLoggedAt?: number;
-  }>;
+  napRemindersEnabled?: boolean;
   pumpSchedule?: {
     enabled: boolean;
     times: string[];
@@ -57,16 +54,33 @@ interface ReminderSettingsViewProps {
   onBack: () => void;
 }
 
-type MedReminder = {
-  name: string;
-  intervalHours: number;
-};
-
 type PumpMode = "fixed" | "interval";
 
 function notifyRemindersChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event("deviceRemindersChanged"));
+}
+
+function ReminderToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-3 mb-3">
+      <span className="text-sm font-semibold text-foreground">{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="size-4 accent-primary shrink-0"
+      />
+    </label>
+  );
 }
 
 export function ReminderSettingsView({
@@ -79,17 +93,19 @@ export function ReminderSettingsView({
   nightFeedWindowStart: initialNightStart,
   nightFeedWindowEnd: initialNightEnd,
   notifyBeforeMinutes: initialNotifyBefore,
+  feedRemindersEnabled: initialFeedEnabled,
   wakeWindowMinutes: initialWakeWindow,
-  medicationReminders: initialMeds,
+  napRemindersEnabled: initialNapEnabled,
   pumpSchedule: initialPump,
   onBack,
 }: ReminderSettingsViewProps) {
   const { t } = useLanguage();
   const updateSettings = useMutation(api.trackers.updateReminderSettings);
 
+  const [feedEnabled, setFeedEnabled] = useState(initialFeedEnabled ?? true);
   const [feedHours, setFeedHours] = useState(String(initialFeedHours ?? 2.5));
   const [nightEnabled, setNightEnabled] = useState(
-    initialNightEnabled ?? true
+    initialNightEnabled ?? false
   );
   const [nightHours, setNightHours] = useState(
     String(initialNightHours ?? DEFAULT_NIGHT_FEED_INTERVAL_HOURS)
@@ -103,15 +119,10 @@ export function ReminderSettingsView({
   const [notifyBefore, setNotifyBefore] = useState(
     String(initialNotifyBefore ?? DEFAULT_NOTIFY_BEFORE_MINUTES)
   );
+  const [napEnabled, setNapEnabled] = useState(initialNapEnabled ?? true);
   const [wakeWindow, setWakeWindow] = useState(
     String(initialWakeWindow ?? DEFAULT_WAKE_WINDOW_MINUTES)
   );
-  const [meds, setMeds] = useState<MedReminder[]>(
-    initialMeds?.map((m) => ({ name: m.name, intervalHours: m.intervalHours })) ??
-      []
-  );
-  const [newMedName, setNewMedName] = useState("");
-  const [newMedHours, setNewMedHours] = useState("12");
 
   const [pumpEnabled, setPumpEnabled] = useState(initialPump?.enabled ?? false);
   const [pumpMode, setPumpMode] = useState<PumpMode>(
@@ -201,7 +212,7 @@ export function ReminderSettingsView({
       ) {
         throw new Error("Invalid night feed interval");
       }
-      if (!nightStart || !nightEnd) {
+      if (nightEnabled && (!nightStart || !nightEnd)) {
         throw new Error("Night window times required");
       }
       const lead = parseInt(notifyBefore, 10);
@@ -209,7 +220,10 @@ export function ReminderSettingsView({
         throw new Error("Invalid notify-before minutes");
       }
       const wakeMins = parseInt(wakeWindow, 10);
-      if (isNaN(wakeMins) || wakeMins < 15 || wakeMins > 240) {
+      if (
+        napEnabled &&
+        (isNaN(wakeMins) || wakeMins < 15 || wakeMins > 240)
+      ) {
         throw new Error("Wake window must be between 15 and 240 minutes");
       }
       const amountMl = parseFloat(pumpAmount);
@@ -224,12 +238,13 @@ export function ReminderSettingsView({
         throw new Error("Invalid pump interval");
       }
       const times = normalizePumpTimes(pumpTimes);
-      if (pumpMode === "fixed" && times.length === 0) {
+      if (pumpMode === "fixed" && pumpEnabled && times.length === 0) {
         throw new Error("Add at least one pump time");
       }
       await updateSettings({
         secretLink,
         actingCaregiverName: selectedCaregiver,
+        feedRemindersEnabled: feedEnabled,
         feedIntervalHours: parsed,
         nightFeedIntervalEnabled: nightEnabled,
         nightFeedIntervalHours: nightEnabled
@@ -238,8 +253,12 @@ export function ReminderSettingsView({
         nightFeedWindowStart: nightStart,
         nightFeedWindowEnd: nightEnd,
         notifyBeforeMinutes: lead,
-        wakeWindowMinutes: wakeMins,
-        medicationReminders: meds,
+        napRemindersEnabled: napEnabled,
+        wakeWindowMinutes:
+          !isNaN(wakeMins) && wakeMins >= 15 && wakeMins <= 240
+            ? wakeMins
+            : DEFAULT_WAKE_WINDOW_MINUTES,
+        medicationReminders: [],
         pumpSchedule: {
           enabled: pumpEnabled,
           times: times.length > 0 ? times : [...DEFAULT_PUMP_TIMES],
@@ -260,19 +279,6 @@ export function ReminderSettingsView({
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleAddMed = () => {
-    const name = newMedName.trim();
-    const hours = parseFloat(newMedHours);
-    if (!name || isNaN(hours) || hours <= 0) return;
-    setMeds([...meds, { name, intervalHours: hours }]);
-    setNewMedName("");
-    setNewMedHours("12");
-  };
-
-  const handleRemoveMed = (index: number) => {
-    setMeds(meds.filter((_, i) => i !== index));
   };
 
   const handleAddPumpTime = () => {
@@ -353,281 +359,223 @@ export function ReminderSettingsView({
       </div>
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <p className="text-sm font-semibold text-foreground mb-3">
-          {t("feedReminders")}
-        </p>
-        <label className="label-field">{t("feedIntervalHours")}</label>
-        <input
-          type="number"
-          min="0.5"
-          max="24"
-          step="0.5"
-          value={feedHours}
-          onChange={(e) => setFeedHours(e.target.value)}
-          className="input-field mb-3"
+        <ReminderToggleRow
+          label={t("feedReminders")}
+          checked={feedEnabled}
+          onChange={setFeedEnabled}
         />
-        <label className="label-field">{t("notifyBeforeMinutes")}</label>
-        <select
-          value={notifyBefore}
-          onChange={(e) => setNotifyBefore(e.target.value)}
-          className="input-field mb-4"
-        >
-          {NOTIFY_BEFORE_OPTIONS.map((mins) => (
-            <option key={mins} value={String(mins)}>
-              {mins === 0
-                ? t("notifyBeforeAtDue")
-                : t("notifyBeforeOption", { minutes: String(mins) })}
-            </option>
-          ))}
-        </select>
-
-        <div className="border-t border-border pt-3">
-          <label className="flex items-center justify-between gap-3 mb-2">
-            <span className="text-sm font-semibold text-foreground">
-              {t("nightFeedReminders")}
-            </span>
-            <input
-              type="checkbox"
-              checked={nightEnabled}
-              onChange={(e) => setNightEnabled(e.target.checked)}
-              className="size-4 accent-primary"
-            />
-          </label>
-          <p className="text-xs text-muted mb-3 leading-snug">
-            {t("nightFeedRemindersHint")}
-          </p>
-          {nightEnabled && (
-            <>
-              <label className="label-field">
-                {t("nightFeedIntervalHours")}
-              </label>
-              <input
-                type="number"
-                min="0.5"
-                max="24"
-                step="0.5"
-                value={nightHours}
-                onChange={(e) => setNightHours(e.target.value)}
-                className="input-field mb-3"
-              />
-              <p className="text-xs font-medium text-muted mb-2">
-                {t("nightFeedWindow")} · Asia/Singapore
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="label-field">
-                    {t("nightFeedWindowStart")}
-                  </label>
-                  <input
-                    type="time"
-                    value={nightStart}
-                    onChange={(e) => setNightStart(e.target.value)}
-                    className="input-field"
-                  />
-                </div>
-                <div>
-                  <label className="label-field">
-                    {t("nightFeedWindowEnd")}
-                  </label>
-                  <input
-                    type="time"
-                    value={nightEnd}
-                    onChange={(e) => setNightEnd(e.target.value)}
-                    className="input-field"
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <p className="text-sm font-semibold text-foreground mb-3">
-          {t("wakeWindowLabel")}
-        </p>
-        <label className="label-field">{t("wakeWindowMinutes")}</label>
-        <input
-          type="number"
-          min="15"
-          max="240"
-          step="5"
-          value={wakeWindow}
-          onChange={(e) => setWakeWindow(e.target.value)}
-          className="input-field"
-        />
-      </div>
-
-      <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <p className="text-sm font-semibold text-foreground">
-            {t("pumpSchedule")}
-          </p>
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={pumpEnabled}
-              onChange={(e) => setPumpEnabled(e.target.checked)}
-              className="size-4 accent-primary"
-            />
-            {t("pumpRemindersEnabled")}
-          </label>
-        </div>
-
-        <p className="text-xs font-medium text-muted mb-2">
-          {t("pumpReminderMode")}
-        </p>
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <button
-            type="button"
-            onClick={() => setPumpMode("fixed")}
-            className={`rounded-xl px-3 py-2.5 text-sm font-semibold border ${
-              pumpMode === "fixed"
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border bg-[#faf6f2] text-foreground"
-            }`}
-          >
-            {t("pumpModeFixed")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setPumpMode("interval")}
-            className={`rounded-xl px-3 py-2.5 text-sm font-semibold border ${
-              pumpMode === "interval"
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border bg-[#faf6f2] text-foreground"
-            }`}
-          >
-            {t("pumpModeInterval")}
-          </button>
-        </div>
-
-        <label className="label-field">{t("pumpDefaultAmount")}</label>
-        <input
-          type="number"
-          min="0"
-          max="1000"
-          step="10"
-          value={pumpAmount}
-          onChange={(e) => setPumpAmount(e.target.value)}
-          className="input-field mb-3"
-        />
-
-        {pumpMode === "interval" ? (
+        {feedEnabled && (
           <>
-            <label className="label-field">{t("pumpIntervalHours")}</label>
+            <label className="label-field">{t("feedIntervalHours")}</label>
             <input
               type="number"
               min="0.5"
               max="24"
               step="0.5"
-              value={pumpIntervalHours}
-              onChange={(e) => setPumpIntervalHours(e.target.value)}
-              className="input-field"
+              value={feedHours}
+              onChange={(e) => setFeedHours(e.target.value)}
+              className="input-field mb-3"
             />
-          </>
-        ) : (
-          <>
-            <p className="text-xs font-medium text-muted mb-2">
-              {t("pumpTimesLabel")} · {pumpTimezone}
-            </p>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {pumpTimes.map((time) => (
-                <button
-                  key={time}
-                  type="button"
-                  onClick={() => handleRemovePumpTime(time)}
-                  className="rounded-xl bg-[#faf6f2] px-3 py-1.5 text-sm font-medium text-foreground"
-                  title={t("remove")}
-                >
-                  {time} ×
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2 mb-3">
-              <input
-                type="time"
-                value={newPumpTime}
-                onChange={(e) => setNewPumpTime(e.target.value)}
-                className="input-field flex-1"
-              />
-              <button
-                type="button"
-                onClick={handleAddPumpTime}
-                disabled={!newPumpTime}
-                className="shrink-0 px-3 py-2 rounded-xl bg-secondary text-white font-semibold text-sm disabled:opacity-50"
-              >
-                {t("add")}
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleDownloadCalendar}
-              className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
+            <label className="label-field">{t("notifyBeforeMinutes")}</label>
+            <select
+              value={notifyBefore}
+              onChange={(e) => setNotifyBefore(e.target.value)}
+              className="input-field mb-4"
             >
-              {t("addPumpAlarmsToCalendar")}
-            </button>
+              {NOTIFY_BEFORE_OPTIONS.map((mins) => (
+                <option key={mins} value={String(mins)}>
+                  {mins === 0
+                    ? t("notifyBeforeAtDue")
+                    : t("notifyBeforeOption", { minutes: String(mins) })}
+                </option>
+              ))}
+            </select>
+
+            <div className="border-t border-border pt-3">
+              <ReminderToggleRow
+                label={t("nightFeedReminders")}
+                checked={nightEnabled}
+                onChange={setNightEnabled}
+              />
+              <p className="text-xs text-muted mb-3 leading-snug">
+                {t("nightFeedRemindersHint")}
+              </p>
+              {nightEnabled && (
+                <>
+                  <label className="label-field">
+                    {t("nightFeedIntervalHours")}
+                  </label>
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="24"
+                    step="0.5"
+                    value={nightHours}
+                    onChange={(e) => setNightHours(e.target.value)}
+                    className="input-field mb-3"
+                  />
+                  <p className="text-xs font-medium text-muted mb-2">
+                    {t("nightFeedWindow")}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 min-w-0">
+                    <div className="min-w-0">
+                      <label className="label-field">
+                        {t("nightFeedWindowStart")}
+                      </label>
+                      <input
+                        type="time"
+                        value={nightStart}
+                        onChange={(e) => setNightStart(e.target.value)}
+                        className="input-field"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <label className="label-field">
+                        {t("nightFeedWindowEnd")}
+                      </label>
+                      <input
+                        type="time"
+                        value={nightEnd}
+                        onChange={(e) => setNightEnd(e.target.value)}
+                        className="input-field"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </>
         )}
       </div>
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <p className="text-sm font-semibold text-foreground mb-3">
-          {t("medicationReminders")}
-        </p>
-
-        {meds.length > 0 && (
-          <div className="space-y-2 mb-3">
-            {meds.map((med, i) => (
-              <div
-                key={`${med.name}-${i}`}
-                className="flex items-center justify-between bg-[#faf6f2] rounded-xl px-3 py-2"
+        <ReminderToggleRow
+          label={t("pumpReminders")}
+          checked={pumpEnabled}
+          onChange={setPumpEnabled}
+        />
+        {pumpEnabled && (
+          <>
+            <p className="text-xs font-medium text-muted mb-2">
+              {t("pumpReminderMode")}
+            </p>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setPumpMode("fixed")}
+                className={`rounded-xl px-3 py-2.5 text-sm font-semibold border ${
+                  pumpMode === "fixed"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-[#faf6f2] text-foreground"
+                }`}
               >
-                <div>
-                  <span className="font-medium text-sm">{med.name}</span>
-                  <span className="text-xs text-muted ml-2">
-                    {t("intervalHours", { hours: String(med.intervalHours) })}
-                  </span>
+                {t("pumpModeFixed")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPumpMode("interval")}
+                className={`rounded-xl px-3 py-2.5 text-sm font-semibold border ${
+                  pumpMode === "interval"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-[#faf6f2] text-foreground"
+                }`}
+              >
+                {t("pumpModeInterval")}
+              </button>
+            </div>
+
+            <label className="label-field">{t("pumpDefaultAmount")}</label>
+            <input
+              type="number"
+              min="0"
+              max="1000"
+              step="10"
+              value={pumpAmount}
+              onChange={(e) => setPumpAmount(e.target.value)}
+              className="input-field mb-3"
+            />
+
+            {pumpMode === "interval" ? (
+              <>
+                <label className="label-field">{t("pumpIntervalHours")}</label>
+                <input
+                  type="number"
+                  min="0.5"
+                  max="24"
+                  step="0.5"
+                  value={pumpIntervalHours}
+                  onChange={(e) => setPumpIntervalHours(e.target.value)}
+                  className="input-field"
+                />
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-medium text-muted mb-2">
+                  {t("pumpTimesLabel")}
+                </p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {pumpTimes.map((time) => (
+                    <button
+                      key={time}
+                      type="button"
+                      onClick={() => handleRemovePumpTime(time)}
+                      className="rounded-xl bg-[#faf6f2] px-3 py-1.5 text-sm font-medium text-foreground"
+                      title={t("remove")}
+                    >
+                      {time} ×
+                    </button>
+                  ))}
                 </div>
+                <div className="flex gap-2 mb-3 min-w-0">
+                  <input
+                    type="time"
+                    value={newPumpTime}
+                    onChange={(e) => setNewPumpTime(e.target.value)}
+                    className="input-field flex-1 min-w-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddPumpTime}
+                    disabled={!newPumpTime}
+                    className="shrink-0 px-3 py-2 rounded-xl bg-secondary text-white font-semibold text-sm disabled:opacity-50"
+                  >
+                    {t("add")}
+                  </button>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => handleRemoveMed(i)}
-                  className="text-xs text-[#9b3b3b] font-medium"
+                  onClick={handleDownloadCalendar}
+                  className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
                 >
-                  {t("remove")}
+                  {t("addPumpAlarmsToCalendar")}
                 </button>
-              </div>
-            ))}
-          </div>
+              </>
+            )}
+          </>
         )}
+      </div>
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newMedName}
-            onChange={(e) => setNewMedName(e.target.value)}
-            placeholder={t("medNamePlaceholder")}
-            className="input-field flex-1"
-          />
-          <input
-            type="number"
-            min="1"
-            max="48"
-            value={newMedHours}
-            onChange={(e) => setNewMedHours(e.target.value)}
-            className="input-field w-20"
-            aria-label={t("hours")}
-          />
-          <button
-            type="button"
-            onClick={handleAddMed}
-            disabled={!newMedName.trim()}
-            className="shrink-0 px-3 py-2 rounded-xl bg-secondary text-white font-semibold text-sm disabled:opacity-50"
-          >
-            {t("add")}
-          </button>
-        </div>
+      <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+        <ReminderToggleRow
+          label={t("napReminders")}
+          checked={napEnabled}
+          onChange={setNapEnabled}
+        />
+        {napEnabled && (
+          <>
+            <label className="label-field">{t("wakeWindowMinutes")}</label>
+            <input
+              type="number"
+              min="15"
+              max="240"
+              step="5"
+              value={wakeWindow}
+              onChange={(e) => setWakeWindow(e.target.value)}
+              className="input-field"
+            />
+          </>
+        )}
       </div>
 
       <button

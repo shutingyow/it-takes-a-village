@@ -56,7 +56,9 @@ const trackerReturnValidator = v.object({
   nightFeedWindowStart: v.optional(v.string()),
   nightFeedWindowEnd: v.optional(v.string()),
   notifyBeforeMinutes: v.optional(v.number()),
+  feedRemindersEnabled: v.optional(v.boolean()),
   wakeWindowMinutes: v.optional(v.number()),
+  napRemindersEnabled: v.optional(v.boolean()),
   medicationReminders: v.optional(v.array(medicationReminderValidator)),
   pumpSchedule: v.optional(pumpScheduleValidator),
   createdAt: v.number(),
@@ -303,7 +305,9 @@ export const updateReminderSettings = mutation({
     nightFeedWindowStart: v.optional(v.string()),
     nightFeedWindowEnd: v.optional(v.string()),
     notifyBeforeMinutes: v.optional(v.number()),
+    feedRemindersEnabled: v.optional(v.boolean()),
     wakeWindowMinutes: v.optional(v.number()),
+    napRemindersEnabled: v.optional(v.boolean()),
     medicationReminders: v.optional(
       v.array(
         v.object({
@@ -330,7 +334,9 @@ export const updateReminderSettings = mutation({
       nightFeedWindowStart?: string;
       nightFeedWindowEnd?: string;
       notifyBeforeMinutes?: number;
+      feedRemindersEnabled?: boolean;
       wakeWindowMinutes?: number;
+      napRemindersEnabled?: boolean;
       medicationReminders?: Array<{
         name: string;
         intervalHours: number;
@@ -397,6 +403,10 @@ export const updateReminderSettings = mutation({
       updates.notifyBeforeMinutes = args.notifyBeforeMinutes;
     }
 
+    if (args.feedRemindersEnabled !== undefined) {
+      updates.feedRemindersEnabled = args.feedRemindersEnabled;
+    }
+
     if (args.wakeWindowMinutes !== undefined) {
       if (
         !Number.isFinite(args.wakeWindowMinutes) ||
@@ -406,6 +416,10 @@ export const updateReminderSettings = mutation({
         throw new Error("Wake window must be between 15 and 240 minutes");
       }
       updates.wakeWindowMinutes = Math.round(args.wakeWindowMinutes);
+    }
+
+    if (args.napRemindersEnabled !== undefined) {
+      updates.napRemindersEnabled = args.napRemindersEnabled;
     }
 
     if (args.medicationReminders !== undefined) {

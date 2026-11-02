@@ -20,10 +20,10 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		A1FEED01B0070001FEED0001 /* FeedLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1FEED01B0070001FEED0002 /* FeedLiveActivityPlugin.swift */; };
-		A1FEED01B0070001FEED0010 /* AppBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1FEED01B0070001FEED0011 /* AppBridgeViewController.swift */; };
 		A1FEED01B0070001FEED0003 /* FeedCountdownShared in Frameworks */ = {isa = PBXBuildFile; productRef = A1FEED01B0070001FEED0004 /* FeedCountdownShared */; };
 		A1FEED01B0070001FEED0005 /* FeedCountdownShared in Frameworks */ = {isa = PBXBuildFile; productRef = A1FEED01B0070001FEED0006 /* FeedCountdownShared */; };
 		A1FEED01B0070001FEED0007 /* ActivityKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1FEED01B0070001FEED0008 /* ActivityKit.framework */; };
+		A1FEED01B0070001FEED0010 /* AppBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1FEED01B0070001FEED0011 /* AppBridgeViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -66,8 +66,8 @@
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		A1FEED01B0070001FEED0002 /* FeedLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedLiveActivityPlugin.swift; sourceTree = "<group>"; };
-		A1FEED01B0070001FEED0011 /* AppBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridgeViewController.swift; sourceTree = "<group>"; };
 		A1FEED01B0070001FEED0008 /* ActivityKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ActivityKit.framework; path = System/Library/Frameworks/ActivityKit.framework; sourceTree = SDKROOT; };
+		A1FEED01B0070001FEED0011 /* AppBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridgeViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -236,7 +236,7 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
-				A1FEED01B0070001FEED0009 /* XCLocalSwiftPackageReference "FeedCountdownShared" */,
+				A1FEED01B0070001FEED0009 /* XCLocalSwiftPackageReference "../Packages/FeedCountdownShared" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
@@ -598,13 +598,13 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		A1FEED01B0070001FEED0009 /* XCLocalSwiftPackageReference "../Packages/FeedCountdownShared" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/FeedCountdownShared;
+		};
 		D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "CapApp-SPM";
-		};
-		A1FEED01B0070001FEED0009 /* XCLocalSwiftPackageReference "FeedCountdownShared" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../Packages/FeedCountdownShared;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -616,12 +616,12 @@
 		};
 		A1FEED01B0070001FEED0004 /* FeedCountdownShared */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A1FEED01B0070001FEED0009 /* XCLocalSwiftPackageReference "FeedCountdownShared" */;
+			package = A1FEED01B0070001FEED0009 /* XCLocalSwiftPackageReference "../Packages/FeedCountdownShared" */;
 			productName = FeedCountdownShared;
 		};
 		A1FEED01B0070001FEED0006 /* FeedCountdownShared */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A1FEED01B0070001FEED0009 /* XCLocalSwiftPackageReference "FeedCountdownShared" */;
+			package = A1FEED01B0070001FEED0009 /* XCLocalSwiftPackageReference "../Packages/FeedCountdownShared" */;
 			productName = FeedCountdownShared;
 		};
 /* End XCSwiftPackageProductDependency section */

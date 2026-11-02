@@ -56,12 +56,9 @@ interface MoreTabProps {
   nightFeedWindowStart?: string;
   nightFeedWindowEnd?: string;
   notifyBeforeMinutes?: number;
+  feedRemindersEnabled?: boolean;
   wakeWindowMinutes?: number;
-  medicationReminders?: Array<{
-    name: string;
-    intervalHours: number;
-    lastLoggedAt?: number;
-  }>;
+  napRemindersEnabled?: boolean;
   pumpSchedule?: {
     enabled: boolean;
     times: string[];
@@ -85,8 +82,9 @@ export function MoreTab({
   nightFeedWindowStart,
   nightFeedWindowEnd,
   notifyBeforeMinutes,
+  feedRemindersEnabled,
   wakeWindowMinutes,
-  medicationReminders,
+  napRemindersEnabled,
   pumpSchedule,
   openView,
 }: MoreTabProps) {
@@ -289,8 +287,9 @@ export function MoreTab({
         nightFeedWindowStart={nightFeedWindowStart}
         nightFeedWindowEnd={nightFeedWindowEnd}
         notifyBeforeMinutes={notifyBeforeMinutes}
+        feedRemindersEnabled={feedRemindersEnabled}
         wakeWindowMinutes={wakeWindowMinutes}
-        medicationReminders={medicationReminders}
+        napRemindersEnabled={napRemindersEnabled}
         pumpSchedule={pumpSchedule}
         onBack={() => setView("menu")}
       />

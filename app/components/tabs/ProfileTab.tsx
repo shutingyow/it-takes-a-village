@@ -53,8 +53,20 @@ export function ProfileTab({
     id: ProfileView;
     icon: React.ReactNode;
     label: string;
-    description: string;
+    description?: string;
   }[] = [
+    {
+      id: "history",
+      icon: <IconHistory size={20} className="text-muted" />,
+      label: t("history"),
+      description: t("historyDesc"),
+    },
+    {
+      id: "growth",
+      icon: <IconGrowth size={20} className="text-muted" />,
+      label: t("growth"),
+      description: t("growthDesc"),
+    },
     {
       id: "notes",
       icon: <IconNotes size={20} className="text-terracotta" />,
@@ -71,19 +83,6 @@ export function ProfileTab({
       id: "health",
       icon: <IconHealth size={20} className="text-accent-diaper" />,
       label: t("health"),
-      description: t("healthDesc"),
-    },
-    {
-      id: "history",
-      icon: <IconHistory size={20} className="text-muted" />,
-      label: t("history"),
-      description: t("historyDesc"),
-    },
-    {
-      id: "growth",
-      icon: <IconGrowth size={20} className="text-muted" />,
-      label: t("growth"),
-      description: t("growthDesc"),
     },
     {
       id: "milestones",
@@ -165,7 +164,9 @@ export function ProfileTab({
               </span>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold">{item.label}</div>
-                <div className="text-sm text-muted">{item.description}</div>
+                {item.description ? (
+                  <div className="text-sm text-muted">{item.description}</div>
+                ) : null}
               </div>
               <IconChevronRight size={18} className="text-muted shrink-0" />
             </div>

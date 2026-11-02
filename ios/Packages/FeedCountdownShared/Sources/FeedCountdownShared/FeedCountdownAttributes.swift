@@ -6,7 +6,7 @@ public struct FeedCountdownAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable, Sendable {
         public var title: String
         public var subtitle: String
-        /// Absolute due time for the next feed (ActivityKit timer drives UI).
+        /// Last feed time — Text(..., .timer) counts *up* from a past date.
         public var dueAt: Date
 
         public init(title: String, subtitle: String, dueAt: Date) {
@@ -16,10 +16,10 @@ public struct FeedCountdownAttributes: ActivityAttributes {
         }
     }
 
-    /// Stable key so we only keep one next-feed activity.
+    /// Stable key so we only keep one last-feed activity.
     public var kind: String
 
-    public init(kind: String = "next-feed") {
+    public init(kind: String = "last-feed") {
         self.kind = kind
     }
 }

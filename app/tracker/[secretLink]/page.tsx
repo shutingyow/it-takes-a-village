@@ -36,6 +36,7 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ReminderScheduler } from "@/app/components/ReminderScheduler";
 import { FeedTimerBanner } from "@/app/components/FeedTimerBanner";
 import { useAppShell } from "@/app/lib/appShell";
+import { isNativePlatform } from "@/app/lib/deviceNotifications";
 import { cn } from "@/app/lib/utils";
 
 type LogType = "feed" | "diaper" | "pump" | "activity" | "nap" | "moment";
@@ -243,7 +244,13 @@ export default function TrackerPage({
 
   if (needsPick || !lockedCaregiver || !lockedInfo) {
     return (
-      <div className="min-h-screen flex flex-col bg-background safe-top">
+      <div
+        className={cn(
+          "min-h-screen flex flex-col bg-background",
+          // Capacitor contentInset already pads the WebView — avoid a double gap.
+          !isNativePlatform() && "safe-top"
+        )}
+      >
         <CaregiverLockScreen
           caregivers={tracker.caregivers}
           viewerIsOwner={tracker.viewerIsOwner}
@@ -258,7 +265,12 @@ export default function TrackerPage({
   }
 
   return (
-    <div className="relative h-dvh max-h-dvh flex flex-col tracker-shell app-shell overflow-hidden safe-top">
+    <div
+      className={cn(
+        "relative h-dvh max-h-dvh flex flex-col tracker-shell app-shell overflow-hidden",
+        !isNativePlatform() && "safe-top"
+      )}
+    >
       {/* Brand line only in browser tabs — native/PWA already has the app name */}
       {!appShell && (
         <header className="px-4 pt-1 pb-0.5 shrink-0">
@@ -316,7 +328,9 @@ export default function TrackerPage({
           secretLink={secretLink}
           feedIntervalHours={tracker.feedIntervalHours}
           notifyBeforeMinutes={tracker.notifyBeforeMinutes}
+          feedRemindersEnabled={tracker.feedRemindersEnabled}
           wakeWindowMinutes={tracker.wakeWindowMinutes}
+          napRemindersEnabled={tracker.napRemindersEnabled}
           pumpSchedule={tracker.pumpSchedule}
         />
         {activeTab === "insights" && (
@@ -351,8 +365,9 @@ export default function TrackerPage({
             nightFeedWindowStart={tracker.nightFeedWindowStart}
             nightFeedWindowEnd={tracker.nightFeedWindowEnd}
             notifyBeforeMinutes={tracker.notifyBeforeMinutes}
+            feedRemindersEnabled={tracker.feedRemindersEnabled}
             wakeWindowMinutes={tracker.wakeWindowMinutes}
-            medicationReminders={tracker.medicationReminders}
+            napRemindersEnabled={tracker.napRemindersEnabled}
             pumpSchedule={tracker.pumpSchedule}
             viewerIsOwner={tracker.viewerIsOwner}
           />

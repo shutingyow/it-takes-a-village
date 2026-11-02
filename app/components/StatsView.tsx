@@ -348,15 +348,22 @@ export function StatsView({
   const day = dailyStats?.day;
   const days = weeklySummary?.days;
 
+  /** Complete days only — exclude today so a partial day doesn’t skew the average. */
+  const daysForAverage =
+    days?.filter((d) => d.date < todayKey) ?? [];
   const totalCount =
     rangeMode === "daily"
       ? day
         ? getCountValue(day)
         : 0
       : (days?.reduce((sum, d) => sum + getCountValue(d), 0) ?? 0);
+  const totalCountForAvg =
+    rangeMode === "weekly"
+      ? daysForAverage.reduce((sum, d) => sum + getCountValue(d), 0)
+      : totalCount;
   const avgCountPerDay =
-    rangeMode === "weekly" && days && days.length > 0
-      ? Math.round((totalCount / days.length) * 10) / 10
+    rangeMode === "weekly" && daysForAverage.length > 0
+      ? Math.round((totalCountForAvg / daysForAverage.length) * 10) / 10
       : totalCount;
   const countMax = Math.max(
     ...(days?.map((d) => getCountValue(d)) ?? [0]),
@@ -381,9 +388,16 @@ export function StatsView({
       ? (day?.breastmilkMl ?? 0)
       : (days?.reduce((sum, d) => sum + d.breastmilkMl, 0) ?? 0);
   const totalMilkMl = totalFormulaMl + totalBreastmilkMl;
+  const totalMilkMlForAvg =
+    rangeMode === "weekly"
+      ? daysForAverage.reduce(
+          (sum, d) => sum + d.formulaMl + d.breastmilkMl,
+          0
+        )
+      : totalMilkMl;
   const avgMilkMlPerDay =
-    rangeMode === "weekly" && days && days.length > 0
-      ? Math.round(totalMilkMl / days.length)
+    rangeMode === "weekly" && daysForAverage.length > 0
+      ? Math.round(totalMilkMlForAvg / daysForAverage.length)
       : totalMilkMl;
   const milkMax = Math.max(
     ...(days?.map((d) => d.formulaMl + d.breastmilkMl) ?? [0]),

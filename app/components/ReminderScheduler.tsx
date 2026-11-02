@@ -21,7 +21,9 @@ interface ReminderSchedulerProps {
   secretLink: string;
   feedIntervalHours?: number;
   notifyBeforeMinutes?: number;
+  feedRemindersEnabled?: boolean;
   wakeWindowMinutes?: number;
+  napRemindersEnabled?: boolean;
   pumpSchedule?: {
     enabled: boolean;
     times: string[];
@@ -48,7 +50,9 @@ export function ReminderScheduler({
   secretLink,
   feedIntervalHours,
   notifyBeforeMinutes: notifyBeforeProp,
+  feedRemindersEnabled = true,
   wakeWindowMinutes,
+  napRemindersEnabled = true,
   pumpSchedule,
 }: ReminderSchedulerProps) {
   const { t } = useLanguage();
@@ -97,6 +101,7 @@ export function ReminderScheduler({
     trackerId,
     now,
   });
+  const lastFeed = useQuery(api.feedEntries.getLast, { trackerId });
   const lastPump = useQuery(api.pumpEntries.getLast, { trackerId });
   const recentSleep = useQuery(api.sleepEntries.getRecent, {
     trackerId,
@@ -163,10 +168,17 @@ export function ReminderScheduler({
 
     const recording = isFeedTimerRecording(secretLink);
     const feedDueAt =
-      enabled && feedItem && !recording ? feedItem.dueAt : null;
+      enabled && feedRemindersEnabled && feedItem && !recording
+        ? feedItem.dueAt
+        : null;
 
     let napDueAt: number | null = null;
-    if (enabled && wakeWindowMinutes != null && wakeWindowMinutes > 0) {
+    if (
+      enabled &&
+      napRemindersEnabled &&
+      wakeWindowMinutes != null &&
+      wakeWindowMinutes > 0
+    ) {
       const lastNap = recentSleep?.find(
         (entry) => entry.type === "nap" && entry.endTime !== undefined
       );
@@ -174,9 +186,6 @@ export function ReminderScheduler({
         napDueAt = lastNap.endTime + wakeWindowMinutes * 60_000;
       }
     }
-
-    const feedOverdue =
-      feedItem != null && feedItem.status === "overdue" && feedDueAt !== null;
 
     void syncDueNotifications({
       feedDueAt,
@@ -215,12 +224,17 @@ export function ReminderScheduler({
       formatClock: formatTime,
     });
 
+    // Lock screen: time since last feed (counts up), not next-due countdown.
+    const lastMilkFeedAt = lastFeed?.timestamp ?? null;
     void syncFeedLiveActivity({
-      // Overdue: end the Live Activity (don't let the lock-screen timer count up).
-      enabled: enabled && !recording && !feedOverdue,
-      feedDueAt: feedOverdue ? null : feedDueAt,
-      title: t("nextFeedDue"),
-      subtitle: t("liveActivityFeedSubtitle"),
+      enabled: enabled && !recording,
+      lastFeedAt: lastMilkFeedAt,
+      title: t("liveActivityLastFeedTitle"),
+      subtitle: lastMilkFeedAt
+        ? t("liveActivityLastFeedSubtitle", {
+            time: formatTime(lastMilkFeedAt),
+          })
+        : t("liveActivityLastFeedSubtitleEmpty"),
     });
   }, [
     dueStatus,
@@ -229,12 +243,15 @@ export function ReminderScheduler({
     feedDueKey,
     pumpDueKey,
     hourBucket,
+    lastFeed,
     lastPump,
     recentSleep,
     pumpSchedule,
     feedIntervalHours,
     notifyBeforeProp,
+    feedRemindersEnabled,
     wakeWindowMinutes,
+    napRemindersEnabled,
     secretLink,
     t,
     optInTick,

@@ -72,8 +72,12 @@ export default defineSchema({
     nightFeedWindowEnd: v.optional(v.string()),
     /** Minutes before due time to fire device notifications (0 = at due). Default 10. */
     notifyBeforeMinutes: v.optional(v.number()),
+    /** When false, skip feed due notifications. Default true when unset. */
+    feedRemindersEnabled: v.optional(v.boolean()),
     /** Typical awake time after a nap ends before the next nap is due (minutes). */
     wakeWindowMinutes: v.optional(v.number()),
+    /** When false, skip nap wake-window notifications. Default true when unset. */
+    napRemindersEnabled: v.optional(v.boolean()),
     medicationReminders: v.optional(v.array(medicationReminderValidator)),
     pumpSchedule: v.optional(pumpScheduleValidator),
     createdAt: v.number(),
