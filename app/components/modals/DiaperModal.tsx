@@ -13,6 +13,7 @@ import { EntryPhotoField } from "../EntryPhotoField";
 import { EntryTimeField } from "../EntryTimeField";
 import type { ActivityEntry } from "../ActivityEntryCard";
 import { LoggedByHint } from "../LoggedByHint";
+import { hapticSuccess } from "@/app/lib/haptics";
 
 type DiaperEditEntry = Extract<ActivityEntry, { entryType: "diaper" }>;
 
@@ -124,7 +125,6 @@ export function DiaperModal({
           ...payload,
         });
       }
-      const { hapticSuccess } = await import("@/app/lib/haptics");
       void hapticSuccess();
       onClose();
     } catch (error) {

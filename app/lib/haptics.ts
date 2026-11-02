@@ -1,11 +1,12 @@
 import { Capacitor } from "@capacitor/core";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
-/** Light success tap after logging an entry. No-ops on web. */
+/** Noticeable tap after logging an entry. No-ops on web. */
 export async function hapticSuccess(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
-    const { Haptics, ImpactStyle } = await import("@capacitor/haptics");
-    await Haptics.impact({ style: ImpactStyle.Light });
+    // Medium is easier to feel than Light on a phone in hand.
+    await Haptics.impact({ style: ImpactStyle.Medium });
   } catch {
     // Plugin missing or unsupported.
   }
@@ -15,7 +16,6 @@ export async function hapticSuccess(): Promise<void> {
 export async function hapticSelection(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
-    const { Haptics } = await import("@capacitor/haptics");
     await Haptics.selectionChanged();
   } catch {
     // ignore
