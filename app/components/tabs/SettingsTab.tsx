@@ -310,7 +310,7 @@ export function SettingsTab({
       id: "stash",
       icon: <IconPump size={20} className="text-accent-pump" />,
       label: t("milkStashTitle"),
-      description: t("milkStashHint"),
+      description: "",
     },
     {
       id: "supply",

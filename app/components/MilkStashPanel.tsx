@@ -70,7 +70,6 @@ export function MilkStashPanel({
         <p className="text-sm font-semibold text-foreground">
           {t("milkStashTitle")}
         </p>
-        <p className="text-xs text-muted mt-1">{t("milkStashHint")}</p>
         <p className="text-sm text-foreground mt-2">
           {t("stashAvailableMl", {
             ml: String(totalMl ?? 0),
@@ -110,7 +109,6 @@ export function MilkStashPanel({
             onChange={(e) => setFrozenOn(e.target.value)}
             className="input-field min-h-11"
           />
-          <p className="text-xs text-muted mt-1">{t("stashFrozenDateHint")}</p>
         </div>
         {error && (
           <p className="text-xs text-red-600" role="alert">

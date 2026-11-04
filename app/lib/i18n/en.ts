@@ -793,13 +793,11 @@ export const translations = {
   sexUnspecified: "Prefer not to say",
 
   milkStashTitle: "Milk stash",
-  milkStashHint: "Track freezer bags by freeze date. See how long each bag has been stored.",
   stashAvailableMl: "{ml} ml available",
   stashAddBag: "Add bag",
   stashAmountLabel: "Amount (ml)",
   stashAmountPlaceholder: "e.g. 120",
   stashFrozenDate: "Frozen on",
-  stashFrozenDateHint: "Used to show how many days this bag has been in the freezer.",
   stashFrozenDateRequired: "Choose the freeze date",
   stashFrozenFor: "Frozen for {days} days",
   stashAmountRequired: "Enter a bag amount in ml",

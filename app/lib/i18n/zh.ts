@@ -753,13 +753,11 @@ export const zh: Translations = {
   sexUnspecified: "不愿说明",
 
   milkStashTitle: "母乳库存",
-  milkStashHint: "按冷冻日期记录母乳袋，并显示已冷冻多久。",
   stashAvailableMl: "现有 {ml} ml",
   stashAddBag: "添加一袋",
   stashAmountLabel: "毫升",
   stashAmountPlaceholder: "例如 120",
   stashFrozenDate: "冷冻日期",
-  stashFrozenDateHint: "用来显示这袋母乳已冷冻多少天。",
   stashFrozenDateRequired: "请选择冷冻日期",
   stashFrozenFor: "已冷冻 {days} 天",
   stashAmountRequired: "请输入毫升数",
