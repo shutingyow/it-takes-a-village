@@ -126,6 +126,7 @@ export function ReminderScheduler({
     trackerId,
     limit: 10,
   });
+  const activeSleep = useQuery(api.sleepEntries.getActive, { trackerId });
 
   const feedItem = dueStatus?.items.find((item) => item.type === "feed");
   const pumpItem = dueStatus?.items.find((item) => item.type === "pump");
@@ -191,12 +192,15 @@ export function ReminderScheduler({
         ? feedItem.dueAt
         : null;
 
+    // Same idea as pausing feed alerts while a feed timer is running:
+    // don't nag "nap due" while a live nap/night sleep is already in progress.
     let napDueAt: number | null = null;
     if (
       enabled &&
       napRemindersEnabled &&
       wakeWindowMinutes != null &&
-      wakeWindowMinutes > 0
+      wakeWindowMinutes > 0 &&
+      !activeSleep
     ) {
       const lastNap = recentSleep?.find(
         (entry) => entry.type === "nap" && entry.endTime !== undefined
@@ -265,6 +269,7 @@ export function ReminderScheduler({
     lastFeed,
     lastPump,
     recentSleep,
+    activeSleep,
     pumpSchedule,
     feedIntervalHours,
     notifyBeforeProp,
