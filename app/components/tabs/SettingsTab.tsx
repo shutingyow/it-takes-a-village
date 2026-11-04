@@ -516,7 +516,9 @@ export function SettingsTab({
                         </span>
                       )}
                   </div>
-                  <div className="text-sm text-muted">{item.description}</div>
+                  {item.description ? (
+                    <div className="text-sm text-muted">{item.description}</div>
+                  ) : null}
                 </div>
                 <IconChevronRight size={18} className="text-muted shrink-0" />
               </div>
