@@ -162,13 +162,13 @@ export function MilkStashPanel({
                   className="border-b border-border pb-3 last:border-b-0 last:pb-0"
                 >
                   <div className="flex items-baseline justify-between gap-3 mb-2.5">
-                    <p className="font-semibold text-foreground text-sm">
-                      {bag.amountMl} ml
-                    </p>
-                    <p className="text-xs text-muted text-right">
+                    <p className="text-xs text-muted min-w-0">
                       {frozen}
                       {" · "}
                       {t("stashFrozenFor", { days: String(days) })}
+                    </p>
+                    <p className="font-semibold text-foreground text-sm tabular-nums shrink-0">
+                      {bag.amountMl} ml
                     </p>
                   </div>
                   <div className="flex gap-2">
