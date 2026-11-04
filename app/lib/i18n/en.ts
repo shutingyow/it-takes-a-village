@@ -805,7 +805,7 @@ export const translations = {
   stashEmpty: "No bags in the stash yet",
   stashMarkUsed: "Used",
   stashDiscard: "Discard",
-  stashAddFromPump: "Also add this pump to the stash",
+  stashAddFromPump: "Add expressed milk to freezer stash",
   stashUseBag: "Use a stash bag (optional)",
   stashUseNone: "Don’t mark a bag",
 

@@ -765,7 +765,7 @@ export const zh: Translations = {
   stashEmpty: "还没有库存",
   stashMarkUsed: "已使用",
   stashDiscard: "丢弃",
-  stashAddFromPump: "同时加入库存",
+  stashAddFromPump: "将挤出的母乳加入冷冻库存",
   stashUseBag: "使用库存袋（可选）",
   stashUseNone: "不关联库存袋",
 
