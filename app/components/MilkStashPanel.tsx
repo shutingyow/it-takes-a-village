@@ -82,25 +82,35 @@ export function MilkStashPanel({
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">
           {t("stashAddBag")}
         </p>
-        <input
-          type="number"
-          inputMode="decimal"
-          min={1}
-          step={1}
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder={t("stashAmountPlaceholder")}
-          className="input-field"
-        />
         <div>
-          <label className="label-field">{t("stashFrozenDate")}</label>
+          <label htmlFor="stash-amount-ml" className="label-field">
+            {t("stashAmountLabel")}
+          </label>
           <input
+            id="stash-amount-ml"
+            type="number"
+            inputMode="decimal"
+            min={1}
+            step={1}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder={t("stashAmountPlaceholder")}
+            className="input-field"
+          />
+        </div>
+        <div>
+          <label htmlFor="stash-frozen-on" className="label-field">
+            {t("stashFrozenDate")}
+          </label>
+          <input
+            id="stash-frozen-on"
             type="date"
             value={frozenOn}
             max={toLocalIsoDate()}
             onChange={(e) => setFrozenOn(e.target.value)}
-            className="input-field"
+            className="input-field min-h-11"
           />
+          <p className="text-xs text-muted mt-1">{t("stashFrozenDateHint")}</p>
         </div>
         {error && (
           <p className="text-xs text-red-600" role="alert">
