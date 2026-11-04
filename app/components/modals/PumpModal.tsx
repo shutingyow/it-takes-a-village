@@ -48,6 +48,8 @@ export function PumpModal({
     () => editEntry?.timestamp ?? Date.now()
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [addToStash, setAddToStash] = useState(!editEntry);
+  const addBag = useMutation(api.milkStash.addBag);
 
   const handleSubmit = async () => {
     if (!selectedCaregiver) {
@@ -68,11 +70,20 @@ export function PumpModal({
       if (editEntry) {
         await updatePump({ entryId: editEntry._id, ...payload });
       } else {
-        await createPump({
+        const pumpId = await createPump({
           trackerId,
           caregiverName: selectedCaregiver,
           ...payload,
         });
+        if (addToStash && amount > 0) {
+          await addBag({
+            trackerId,
+            caregiverName: selectedCaregiver,
+            amountMl: amount,
+            pumpedAt: timestamp,
+            pumpEntryId: pumpId,
+          });
+        }
       }
       void hapticSuccess();
       onClose();
@@ -164,6 +175,18 @@ export function PumpModal({
         />
 
         <EntryTimeField value={timestamp} onChange={setTimestamp} />
+
+        {!isEditing && (
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={addToStash}
+              onChange={(e) => setAddToStash(e.target.checked)}
+              className="rounded border-border"
+            />
+            {t("stashAddFromPump")}
+          </label>
+        )}
 
         <button
           type="button"

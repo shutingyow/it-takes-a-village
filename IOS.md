@@ -146,17 +146,22 @@ The web app schedules **on-device** feed / pump reminders via `@capacitor/local-
 | Browser / Safari tab while page stays open | iOS Safari tabs are unreliable for background alerts |
 | Reschedule when a feed/pump is logged (while app open) | |
 
-**Apple Push (APNs) — not in v1.** True remote push when the app has been killed for days needs:
+**Apple Push (APNs) — Live Activity updates.** When another caregiver logs a milk feed, Convex sends an ActivityKit push so the lock-screen timer resets without opening the app.
 
-1. Apple Developer Push capability + APNs key/cert for `com.ittakesavillage.app`
-2. A server (e.g. Convex action + cron) that knows next feed/pump due times and sends APNs
-3. Device token registration from the Capacitor app
+1. Apple Developer → Keys → Apple Push Notifications service (`.p8`)
+2. Xcode App target → Signing & Capabilities → **Push Notifications** (and Live Activities)
+3. Convex env (production):
+   - `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_TOPIC=com.ittakesavillage.app`
+   - `APNS_PRIVATE_KEY` (PKCS8 PEM; use `\n` for newlines)
+   - `APNS_PRODUCTION=true` for TestFlight / App Store (omit or false for sandbox)
+4. Rebuild/Archive the iOS app after native `pushType: .token` changes
+5. Tokens register via `pushRegistrations.upsertLiveActivity` when Live Activity starts
 
-Local notifications typically do **not** require an `NS*UsageDescription` Info.plist string (unlike camera/photos). Remote push would use the Push Notifications capability in Xcode.
+Local notifications still reschedule when the app is open or returns to foreground. Silent device wakes for local-notif reschedule can use `devicePushTokens` once a device APNs token is wired.
 
 ## Live Activities / Dynamic Island (Lock Screen countdown)
 
-Native next-feed countdown is implemented in-repo (not Capgo — their plugin does not call ActivityKit yet):
+Native last-feed timer is implemented in-repo:
 
 | Piece | Location |
 |-------|----------|
@@ -164,8 +169,9 @@ Native next-feed countdown is implemented in-repo (not Capgo — their plugin do
 | Capacitor bridge | `ios/App/App/FeedLiveActivityPlugin.swift` (`FeedLiveActivity` JS plugin) |
 | Widget / Dynamic Island UI | `ios/App/FeedLiveActivity/` |
 | Web caller | `app/lib/feedLiveActivity.ts` (when device reminders are on) |
+| Server push | `convex/apns.ts` + `liveActivityRegistrations` |
 
-`Info.plist` has `NSSupportsLiveActivities = true`. Local notification milestones still fire as a fallback.
+`Info.plist` has `NSSupportsLiveActivities = true`. Activities request `pushType: .token` so Convex can update them remotely.
 
 ### Build / run on your iPhone
 

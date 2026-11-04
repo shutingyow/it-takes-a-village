@@ -23,7 +23,7 @@ import { FeedModal } from "@/app/components/modals/FeedModal";
 import { DiaperModal } from "@/app/components/modals/DiaperModal";
 import { PumpModal } from "@/app/components/modals/PumpModal";
 import { ActivityModal } from "@/app/components/modals/ActivityModal";
-import { NapModal } from "@/app/components/modals/NapModal";
+import { SleepModal } from "@/app/components/modals/SleepModal";
 import { MomentModal } from "@/app/components/modals/MomentModal";
 import { IconLink } from "@/app/components/icons";
 import {
@@ -404,6 +404,7 @@ export default function TrackerPage({
             caregivers={tracker.caregivers}
             babyName={tracker.babyName}
             birthDate={tracker.birthDate}
+            sex={tracker.sex}
             feedIntervalHours={tracker.feedIntervalHours}
             nightFeedIntervalEnabled={tracker.nightFeedIntervalEnabled}
             nightFeedIntervalHours={tracker.nightFeedIntervalHours}
@@ -471,7 +472,8 @@ export default function TrackerPage({
         />
       )}
       {activeLogModal === "nap" && (
-        <NapModal
+        <SleepModal
+          trackerId={tracker._id}
           secretLink={secretLink}
           selectedCaregiver={lockedCaregiver}
           onClose={() => setActiveLogModal(null)}

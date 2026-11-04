@@ -52,7 +52,7 @@ const TILES: Array<{
   },
   {
     id: "nap",
-    labelKey: "nap",
+    labelKey: "sleep",
     icon: "nap",
     fill: "bg-accent-sleep-light",
   },

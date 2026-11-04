@@ -4,7 +4,6 @@ import {
   clampFeedAtForSkew,
   computeFeedDueAt,
   DEFAULT_FEED_INTERVAL_HOURS,
-  effectiveFeedIntervalHours as resolveEffectiveFeedIntervalHours,
   resolveNightFeedSettings,
 } from "./lib/feedSchedule";
 import {
@@ -111,21 +110,17 @@ export const getDueStatus = query({
     );
 
     if (lastFeed) {
-      // last feed + day or night interval (never a hardcoded 3h).
+      // last feed + day or night interval (cutover may shorten night → day).
       const feedAt = clampFeedAtForSkew(lastFeed.timestamp, args.now);
-      effectiveFeedIntervalHours = resolveEffectiveFeedIntervalHours(
-        feedAt,
-        feedIntervalHours,
-        night
-      );
-      usingNightInterval =
-        night.enabled && effectiveFeedIntervalHours > feedIntervalHours + 1e-9;
       const dueAt = computeFeedDueAt(
         lastFeed.timestamp,
         feedIntervalHours,
         night,
         { now: args.now }
       );
+      effectiveFeedIntervalHours = (dueAt - feedAt) / (60 * 60 * 1000);
+      usingNightInterval =
+        night.enabled && effectiveFeedIntervalHours > feedIntervalHours + 1e-9;
       const due = computeDueStatus(dueAt, args.now);
       items.push({
         type: "feed",

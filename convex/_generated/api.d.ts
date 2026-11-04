@@ -9,6 +9,8 @@
  */
 
 import type * as activityEntries from "../activityEntries.js";
+import type * as apns from "../apns.js";
+import type * as apnsHelpers from "../apnsHelpers.js";
 import type * as appointments from "../appointments.js";
 import type * as auth from "../auth.js";
 import type * as dailySummary from "../dailySummary.js";
@@ -24,13 +26,16 @@ import type * as http from "../http.js";
 import type * as importBabyLog from "../importBabyLog.js";
 import type * as lib_caregivers from "../lib/caregivers.js";
 import type * as lib_dayBounds from "../lib/dayBounds.js";
+import type * as lib_entryValidation from "../lib/entryValidation.js";
 import type * as lib_feedSchedule from "../lib/feedSchedule.js";
 import type * as lib_feeds from "../lib/feeds.js";
 import type * as lib_pumpSchedule from "../lib/pumpSchedule.js";
 import type * as milestones from "../milestones.js";
+import type * as milkStash from "../milkStash.js";
 import type * as momentEntries from "../momentEntries.js";
 import type * as notes from "../notes.js";
 import type * as pumpEntries from "../pumpEntries.js";
+import type * as pushRegistrations from "../pushRegistrations.js";
 import type * as reminders from "../reminders.js";
 import type * as sleepEntries from "../sleepEntries.js";
 import type * as stats from "../stats.js";
@@ -46,6 +51,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activityEntries: typeof activityEntries;
+  apns: typeof apns;
+  apnsHelpers: typeof apnsHelpers;
   appointments: typeof appointments;
   auth: typeof auth;
   dailySummary: typeof dailySummary;
@@ -61,13 +68,16 @@ declare const fullApi: ApiFromModules<{
   importBabyLog: typeof importBabyLog;
   "lib/caregivers": typeof lib_caregivers;
   "lib/dayBounds": typeof lib_dayBounds;
+  "lib/entryValidation": typeof lib_entryValidation;
   "lib/feedSchedule": typeof lib_feedSchedule;
   "lib/feeds": typeof lib_feeds;
   "lib/pumpSchedule": typeof lib_pumpSchedule;
   milestones: typeof milestones;
+  milkStash: typeof milkStash;
   momentEntries: typeof momentEntries;
   notes: typeof notes;
   pumpEntries: typeof pumpEntries;
+  pushRegistrations: typeof pushRegistrations;
   reminders: typeof reminders;
   sleepEntries: typeof sleepEntries;
   stats: typeof stats;

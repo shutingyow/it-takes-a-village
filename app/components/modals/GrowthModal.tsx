@@ -59,6 +59,12 @@ export function GrowthModal({
       : ""
   );
   const [notes, setNotes] = useState(editEntry?.notes ?? "");
+  const [measurementSource, setMeasurementSource] = useState<
+    "home" | "clinic"
+  >(
+    (editEntry as { measurementSource?: "home" | "clinic" } | undefined)
+      ?.measurementSource ?? "home"
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +84,7 @@ export function GrowthModal({
         weight: w,
         length: len,
         headCircumference: hc,
+        measurementSource,
         notes: notes || undefined,
         timestamp: editEntry?.timestamp ?? Date.now(),
       };
@@ -159,6 +166,30 @@ export function GrowthModal({
             placeholder="e.g. 36"
             className="input-field"
           />
+        </div>
+        <div>
+          <label className="label-field">{t("measurementSource")}</label>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["home", t("measurementHome")],
+                ["clinic", t("measurementClinic")],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setMeasurementSource(id)}
+                className={`rounded-xl border text-sm font-semibold py-2.5 ${
+                  measurementSource === id
+                    ? "border-primary bg-primary-light"
+                    : "border-border bg-background text-muted"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         <div>
           <label className="label-field">{t("notesOptional")}</label>

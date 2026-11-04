@@ -1,42 +1,89 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import {
+  assertNotFarFuture,
+  assertRange,
+} from "./lib/entryValidation";
 
-// Create a health entry
+const healthTypeValidator = v.union(
+  v.literal("temperature"),
+  v.literal("medication"),
+  v.literal("weight"),
+  v.literal("vaccine"),
+  v.literal("spitup")
+);
+
+function validateHealthFields(args: {
+  type:
+    | "temperature"
+    | "medication"
+    | "weight"
+    | "vaccine"
+    | "spitup";
+  temperature?: number;
+  medicationName?: string;
+  dosage?: string;
+  weight?: number;
+  vaccineName?: string;
+  timestamp: number;
+}) {
+  assertNotFarFuture(args.timestamp);
+  if (args.type === "temperature") {
+    if (args.temperature === undefined) {
+      throw new Error("Temperature is required");
+    }
+    assertRange(args.temperature, 35, 42, "Temperature (°C)");
+  }
+  if (args.type === "weight") {
+    if (args.weight === undefined) {
+      throw new Error("Weight is required");
+    }
+    assertRange(args.weight, 1, 30, "Weight (kg)");
+  }
+  if (args.type === "medication" && !args.medicationName?.trim()) {
+    throw new Error("Medication name is required");
+  }
+  if (args.type === "vaccine" && !args.vaccineName?.trim()) {
+    throw new Error("Vaccine name is required");
+  }
+}
+
 export const create = mutation({
   args: {
     trackerId: v.id("trackers"),
     caregiverName: v.string(),
-    type: v.union(v.literal("temperature"), v.literal("medication"), v.literal("weight")),
+    type: healthTypeValidator,
     temperature: v.optional(v.number()),
     medicationName: v.optional(v.string()),
     dosage: v.optional(v.string()),
     weight: v.optional(v.number()),
+    vaccineName: v.optional(v.string()),
     timestamp: v.number(),
     notes: v.optional(v.string()),
   },
   returns: v.id("healthEntries"),
   handler: async (ctx, args) => {
-    if (args.type === "temperature") {
-      if (args.temperature === undefined) {
-        throw new Error("Temperature is required");
-      }
-      if (args.temperature < 35 || args.temperature > 42) {
-        throw new Error("Temperature must be between 35°C and 42°C");
-      }
-    }
-    if (args.type === "weight") {
-      if (args.weight === undefined) {
-        throw new Error("Weight is required");
-      }
-      if (args.weight < 1 || args.weight > 30) {
-        throw new Error("Weight must be between 1 kg and 30 kg");
-      }
-    }
-    return await ctx.db.insert("healthEntries", args);
+    validateHealthFields(args);
+    return await ctx.db.insert("healthEntries", {
+      trackerId: args.trackerId,
+      caregiverName: args.caregiverName,
+      type: args.type,
+      temperature:
+        args.type === "temperature" ? args.temperature : undefined,
+      medicationName:
+        args.type === "medication"
+          ? args.medicationName?.trim()
+          : undefined,
+      dosage: args.type === "medication" ? args.dosage?.trim() : undefined,
+      weight: args.type === "weight" ? args.weight : undefined,
+      vaccineName:
+        args.type === "vaccine" ? args.vaccineName?.trim() : undefined,
+      timestamp: args.timestamp,
+      notes: args.notes?.trim() || undefined,
+    });
   },
 });
 
-// Get recent health entries
 export const getRecent = query({
   args: {
     trackerId: v.id("trackers"),
@@ -44,7 +91,6 @@ export const getRecent = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50;
-    
     return await ctx.db
       .query("healthEntries")
       .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
@@ -53,19 +99,17 @@ export const getRecent = query({
   },
 });
 
-// Get recent health entries by type
 export const getByType = query({
   args: {
     trackerId: v.id("trackers"),
-    type: v.union(v.literal("temperature"), v.literal("medication"), v.literal("weight")),
+    type: healthTypeValidator,
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50;
-    
     return await ctx.db
       .query("healthEntries")
-      .withIndex("by_tracker_and_type", (q) => 
+      .withIndex("by_tracker_and_type", (q) =>
         q.eq("trackerId", args.trackerId).eq("type", args.type)
       )
       .order("desc")
@@ -73,19 +117,15 @@ export const getByType = query({
   },
 });
 
-// Update a health entry (full replace of editable fields)
 export const update = mutation({
   args: {
     entryId: v.id("healthEntries"),
-    type: v.union(
-      v.literal("temperature"),
-      v.literal("medication"),
-      v.literal("weight")
-    ),
+    type: healthTypeValidator,
     temperature: v.optional(v.number()),
     medicationName: v.optional(v.string()),
     dosage: v.optional(v.string()),
     weight: v.optional(v.number()),
+    vaccineName: v.optional(v.string()),
     timestamp: v.number(),
     notes: v.optional(v.string()),
   },
@@ -95,44 +135,29 @@ export const update = mutation({
     if (!existing) {
       throw new Error("Health entry not found");
     }
-
-    if (args.type === "temperature") {
-      if (args.temperature === undefined) {
-        throw new Error("Temperature is required");
-      }
-      if (args.temperature < 35 || args.temperature > 42) {
-        throw new Error("Temperature must be between 35°C and 42°C");
-      }
-    }
-    if (args.type === "weight") {
-      if (args.weight === undefined) {
-        throw new Error("Weight is required");
-      }
-      if (args.weight < 1 || args.weight > 30) {
-        throw new Error("Weight must be between 1 kg and 30 kg");
-      }
-    }
-    if (args.type === "medication" && !args.medicationName?.trim()) {
-      throw new Error("Medication name is required");
-    }
+    validateHealthFields(args);
 
     await ctx.db.replace(args.entryId, {
       trackerId: existing.trackerId,
       caregiverName: existing.caregiverName,
       type: args.type,
-      temperature: args.type === "temperature" ? args.temperature : undefined,
+      temperature:
+        args.type === "temperature" ? args.temperature : undefined,
       medicationName:
-        args.type === "medication" ? args.medicationName : undefined,
-      dosage: args.type === "medication" ? args.dosage : undefined,
+        args.type === "medication"
+          ? args.medicationName?.trim()
+          : undefined,
+      dosage: args.type === "medication" ? args.dosage?.trim() : undefined,
       weight: args.type === "weight" ? args.weight : undefined,
+      vaccineName:
+        args.type === "vaccine" ? args.vaccineName?.trim() : undefined,
       timestamp: args.timestamp,
-      notes: args.notes,
+      notes: args.notes?.trim() || undefined,
     });
     return null;
   },
 });
 
-// Delete a health entry
 export const remove = mutation({
   args: {
     entryId: v.id("healthEntries"),

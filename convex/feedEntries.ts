@@ -1,7 +1,33 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getTrackerBySecret } from "./lib/caregivers";
 import { isMilkFeed } from "./lib/feeds";
+import {
+  assertNonNegative,
+  assertNotFarFuture,
+  assertPositive,
+} from "./lib/entryValidation";
+import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+
+async function scheduleFeedPush(
+  ctx: MutationCtx,
+  trackerId: Id<"trackers">
+) {
+  const tracker = await ctx.db.get(trackerId);
+  const recent = await ctx.db
+    .query("feedEntries")
+    .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", trackerId))
+    .order("desc")
+    .take(40);
+  const lastMilk = recent.find((f) => isMilkFeed(f.type));
+  await ctx.scheduler.runAfter(0, internal.apns.notifyFeedChanged, {
+    trackerId,
+    lastFeedAt: lastMilk?.timestamp ?? null,
+    babyName: tracker?.babyName,
+  });
+}
 
 const feedTypeValidator = v.union(
   v.literal("breast"),
@@ -75,11 +101,23 @@ export const create = mutation({
   },
   returns: v.id("feedEntries"),
   handler: async (ctx, args) => {
+    assertNotFarFuture(args.timestamp);
+    assertNonNegative(args.durationMinutes ?? args.duration, "Duration");
+    if (args.type === "bottle") {
+      assertPositive(args.amount, "Bottle amount");
+      if (!args.bottleMilk) {
+        throw new Error("Choose breast milk or formula");
+      }
+    }
+    if (args.type === "solids") {
+      assertNonNegative(args.amountGrams, "Solids amount");
+    }
+
     const minutes =
       args.type === "solids"
         ? undefined
         : storedDurationMinutes(args.durationMinutes, args.duration);
-    return await ctx.db.insert("feedEntries", {
+    const id = await ctx.db.insert("feedEntries", {
       trackerId: args.trackerId,
       caregiverName: args.caregiverName,
       type: args.type,
@@ -97,6 +135,10 @@ export const create = mutation({
       notes: args.notes,
       photoIds: args.photoIds,
     });
+    if (isMilkFeed(args.type)) {
+      await scheduleFeedPush(ctx, args.trackerId);
+    }
+    return id;
   },
 });
 
@@ -173,6 +215,15 @@ export const update = mutation({
       throw new Error("Feed entry not found");
     }
 
+    assertNotFarFuture(args.timestamp);
+    assertNonNegative(args.durationMinutes ?? args.duration, "Duration");
+    if (args.type === "bottle") {
+      assertPositive(args.amount, "Bottle amount");
+      if (!args.bottleMilk) {
+        throw new Error("Choose breast milk or formula");
+      }
+    }
+
     const minutes =
       args.type === "solids"
         ? undefined
@@ -196,6 +247,9 @@ export const update = mutation({
       notes: args.notes,
       photoIds: args.photoIds,
     });
+    if (isMilkFeed(args.type) || isMilkFeed(existing.type)) {
+      await scheduleFeedPush(ctx, existing.trackerId);
+    }
     return null;
   },
 });
@@ -207,7 +261,12 @@ export const remove = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.entryId);
+    if (!existing) return null;
     await ctx.db.delete(args.entryId);
+    if (isMilkFeed(existing.type)) {
+      await scheduleFeedPush(ctx, existing.trackerId);
+    }
     return null;
   },
 });

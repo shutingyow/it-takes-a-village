@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { Capacitor } from "@capacitor/core";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -13,7 +13,11 @@ import {
   getDeviceRemindersEnabled,
   syncDueNotifications,
 } from "@/app/lib/deviceNotifications";
-import { syncFeedLiveActivity } from "@/app/lib/feedLiveActivity";
+import {
+  getOrCreateDeviceId,
+  setLiveActivityPushTokenHandler,
+  syncFeedLiveActivity,
+} from "@/app/lib/feedLiveActivity";
 import { isFeedTimerRecording } from "@/app/lib/feedTimer";
 
 interface ReminderSchedulerProps {
@@ -56,7 +60,22 @@ export function ReminderScheduler({
   pumpSchedule,
 }: ReminderSchedulerProps) {
   const { t } = useLanguage();
+  const upsertLiveActivity = useMutation(
+    api.pushRegistrations.upsertLiveActivity
+  );
   const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    setLiveActivityPushTokenHandler(({ activityId, pushToken }) => {
+      void upsertLiveActivity({
+        trackerId,
+        activityId,
+        pushToken,
+        deviceId: getOrCreateDeviceId(),
+      });
+    });
+    return () => setLiveActivityPushTokenHandler(null);
+  }, [trackerId, upsertLiveActivity]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);

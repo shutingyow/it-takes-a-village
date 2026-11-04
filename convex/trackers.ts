@@ -48,6 +48,13 @@ const trackerReturnValidator = v.object({
   ownerUserId: v.optional(v.id("users")),
   babyName: v.optional(v.string()),
   birthDate: v.optional(v.string()),
+  sex: v.optional(
+    v.union(
+      v.literal("female"),
+      v.literal("male"),
+      v.literal("unspecified")
+    )
+  ),
   photoStorageId: v.optional(v.id("_storage")),
   caregivers: v.array(caregiverValidator),
   feedIntervalHours: v.optional(v.number()),
@@ -511,6 +518,29 @@ export const updateBirthDate = mutation({
     );
     const birthDate = normalizeBirthDate(args.birthDate);
     await ctx.db.patch(tracker._id, { birthDate });
+    return null;
+  },
+});
+
+/** Admin only — optional sex for export / percentiles. */
+export const updateSex = mutation({
+  args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
+    sex: v.union(
+      v.literal("female"),
+      v.literal("male"),
+      v.literal("unspecified")
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { tracker } = await verifyAdmin(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
+    await ctx.db.patch(tracker._id, { sex: args.sex });
     return null;
   },
 });

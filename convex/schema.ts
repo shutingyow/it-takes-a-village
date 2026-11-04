@@ -48,6 +48,14 @@ export default defineSchema({
     ownerUserId: v.optional(v.id("users")),
     babyName: v.optional(v.string()), // Optional baby name for personalization
     birthDate: v.optional(v.string()), // YYYY-MM-DD for age display
+    /** Optional sex for growth percentiles / export. */
+    sex: v.optional(
+      v.union(
+        v.literal("female"),
+        v.literal("male"),
+        v.literal("unspecified")
+      )
+    ),
     photoStorageId: v.optional(v.id("_storage")),
     caregivers: v.optional(
       v.array(
@@ -164,14 +172,22 @@ export default defineSchema({
   healthEntries: defineTable({
     trackerId: v.id("trackers"),
     caregiverName: v.string(),
-    type: v.union(v.literal("temperature"), v.literal("medication"), v.literal("weight")),
+    type: v.union(
+      v.literal("temperature"),
+      v.literal("medication"),
+      v.literal("weight"),
+      v.literal("vaccine"),
+      v.literal("spitup")
+    ),
     // Temperature
     temperature: v.optional(v.number()), // Celsius
-    // Medication
+    // Medication / vitamins
     medicationName: v.optional(v.string()),
     dosage: v.optional(v.string()),
-    // Weight
+    // Weight (legacy — prefer growthEntries)
     weight: v.optional(v.number()), // kg
+    // Vaccine
+    vaccineName: v.optional(v.string()),
     timestamp: v.number(),
     notes: v.optional(v.string()),
   })
@@ -239,11 +255,58 @@ export default defineSchema({
     weight: v.optional(v.number()), // kg
     length: v.optional(v.number()), // height/length in cm
     headCircumference: v.optional(v.number()), // cm
+    measurementSource: v.optional(
+      v.union(v.literal("home"), v.literal("clinic"))
+    ),
     notes: v.optional(v.string()),
     timestamp: v.number(),
   })
     .index("by_tracker", ["trackerId"])
     .index("by_tracker_and_date", ["trackerId", "date"]),
+
+  // Freezer / fridge milk bags (bag-by-bag stash)
+  milkStashBags: defineTable({
+    trackerId: v.id("trackers"),
+    caregiverName: v.string(),
+    amountMl: v.number(),
+    status: v.union(
+      v.literal("available"),
+      v.literal("used"),
+      v.literal("discarded")
+    ),
+    createdAt: v.number(),
+    pumpedAt: v.optional(v.number()),
+    pumpEntryId: v.optional(v.id("pumpEntries")),
+    label: v.optional(v.string()),
+    usedAt: v.optional(v.number()),
+    usedByCaregiverName: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  })
+    .index("by_tracker", ["trackerId"])
+    .index("by_tracker_and_status", ["trackerId", "status"])
+    .index("by_tracker_and_created", ["trackerId", "createdAt"]),
+
+  // ActivityKit Live Activity push tokens (lock-screen timer)
+  liveActivityRegistrations: defineTable({
+    trackerId: v.id("trackers"),
+    activityId: v.string(),
+    pushToken: v.string(), // hex
+    deviceId: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_tracker", ["trackerId"])
+    .index("by_activity", ["activityId"])
+    .index("by_device", ["deviceId"]),
+
+  // APNs device tokens for silent wakes (reschedule local notifications)
+  devicePushTokens: defineTable({
+    trackerId: v.id("trackers"),
+    token: v.string(),
+    deviceId: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_tracker", ["trackerId"])
+    .index("by_device", ["deviceId"]),
 
   // Timed play / care activities (tummy, playmat, shower, massage)
   activityEntries: defineTable({

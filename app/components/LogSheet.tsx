@@ -44,7 +44,7 @@ export function LogSheet({ onSelect, onClose }: LogSheetProps) {
     },
     {
       type: "nap",
-      label: t("filterNap"),
+      label: t("sleep"),
       bg: "bg-[#e6f6ec]",
       text: "text-[#1f7a45]",
       icon: "nap",

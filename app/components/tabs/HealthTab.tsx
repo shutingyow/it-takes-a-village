@@ -18,7 +18,7 @@ interface HealthTabProps {
   selectedCaregiver: string;
 }
 
-type HealthType = "temperature" | "medication";
+type HealthType = "temperature" | "medication" | "vaccine" | "spitup";
 
 export function HealthTab({ trackerId, selectedCaregiver }: HealthTabProps) {
   const { t } = useLanguage();
@@ -37,7 +37,17 @@ export function HealthTab({ trackerId, selectedCaregiver }: HealthTabProps) {
     {
       id: "medication",
       icon: <IconMedication size={20} className="text-secondary" />,
-      label: t("medication"),
+      label: t("medicationVitamins"),
+    },
+    {
+      id: "vaccine",
+      icon: <IconMedication size={20} className="text-terracotta" />,
+      label: t("vaccine"),
+    },
+    {
+      id: "spitup",
+      icon: <IconTemperature size={20} className="text-muted" />,
+      label: t("spitUp"),
     },
   ];
 
@@ -51,6 +61,16 @@ export function HealthTab({ trackerId, selectedCaregiver }: HealthTabProps) {
     type: "medication",
     limit: 1,
   });
+  const lastVaccine = useQuery(api.healthEntries.getByType, {
+    trackerId,
+    type: "vaccine",
+    limit: 1,
+  });
+  const lastSpit = useQuery(api.healthEntries.getByType, {
+    trackerId,
+    type: "spitup",
+    limit: 1,
+  });
 
   const lastByType: Record<HealthType, string> = {
     temperature: lastTemp?.[0]
@@ -58,6 +78,12 @@ export function HealthTab({ trackerId, selectedCaregiver }: HealthTabProps) {
       : t("never"),
     medication: lastMed?.[0]
       ? `${lastMed[0].medicationName} · ${formatTimeAgo(lastMed[0].timestamp)}`
+      : t("never"),
+    vaccine: lastVaccine?.[0]
+      ? `${lastVaccine[0].vaccineName} · ${formatTimeAgo(lastVaccine[0].timestamp)}`
+      : t("never"),
+    spitup: lastSpit?.[0]
+      ? formatTimeAgo(lastSpit[0].timestamp)
       : t("never"),
   };
 

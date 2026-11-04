@@ -15,7 +15,12 @@ import { EntryTimeField } from "../EntryTimeField";
 import type { ActivityEntry } from "../ActivityEntryCard";
 import { LoggedByHint } from "../LoggedByHint";
 
-type HealthType = "temperature" | "medication" | "weight";
+type HealthType =
+  | "temperature"
+  | "medication"
+  | "weight"
+  | "vaccine"
+  | "spitup";
 type HealthEditEntry = Extract<ActivityEntry, { entryType: "health" }>;
 
 interface HealthModalProps {
@@ -37,7 +42,7 @@ export function HealthModal({
   const createHealth = useMutation(api.healthEntries.create);
   const updateHealth = useMutation(api.healthEntries.update);
   const isEditing = Boolean(editEntry);
-  const resolvedType: HealthType = editEntry?.type ?? healthType;
+  const resolvedType: HealthType = (editEntry?.type as HealthType) ?? healthType;
 
   const [temperature, setTemperature] = useState(
     editEntry?.temperature ?? 37.0
@@ -47,6 +52,9 @@ export function HealthModal({
   );
   const [dosage, setDosage] = useState(editEntry?.dosage ?? "");
   const [weight, setWeight] = useState(editEntry?.weight ?? 4.0);
+  const [vaccineName, setVaccineName] = useState(
+    (editEntry as { vaccineName?: string } | undefined)?.vaccineName ?? ""
+  );
   const [notes, setNotes] = useState(editEntry?.notes ?? "");
   const [timestamp, setTimestamp] = useState(
     () => editEntry?.timestamp ?? Date.now()
@@ -69,6 +77,14 @@ export function HealthModal({
       label: t("weight"),
       icon: <IconGrowth size={20} />,
     },
+    vaccine: {
+      label: t("logVaccine"),
+      icon: <IconMedication size={20} />,
+    },
+    spitup: {
+      label: t("logSpitUp"),
+      icon: <IconTemperature size={20} />,
+    },
   };
 
   const handleSubmit = async () => {
@@ -81,6 +97,10 @@ export function HealthModal({
       alert(t("medicationRequired"));
       return;
     }
+    if (resolvedType === "vaccine" && !vaccineName.trim()) {
+      alert(t("vaccineRequired"));
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -91,6 +111,8 @@ export function HealthModal({
           resolvedType === "medication" ? medicationName.trim() : undefined,
         dosage: resolvedType === "medication" ? dosage || undefined : undefined,
         weight: resolvedType === "weight" ? weight : undefined,
+        vaccineName:
+          resolvedType === "vaccine" ? vaccineName.trim() : undefined,
         timestamp,
         notes: notes || undefined,
       };
@@ -132,7 +154,9 @@ export function HealthModal({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setTemperature(Math.max(36.0, temperature - 0.1))}
+                onClick={() =>
+                  setTemperature(Math.max(36.0, temperature - 0.1))
+                }
                 className="w-10 h-10 rounded-xl bg-[#f3ede7] font-semibold"
               >
                 −
@@ -148,7 +172,9 @@ export function HealthModal({
               />
               <button
                 type="button"
-                onClick={() => setTemperature(Math.min(40.0, temperature + 0.1))}
+                onClick={() =>
+                  setTemperature(Math.min(40.0, temperature + 0.1))
+                }
                 className="w-10 h-10 rounded-xl bg-[#f3ede7] font-semibold"
               >
                 +
@@ -182,6 +208,23 @@ export function HealthModal({
           </>
         )}
 
+        {resolvedType === "vaccine" && (
+          <div>
+            <label className="label-field">{t("vaccineName")}</label>
+            <input
+              type="text"
+              value={vaccineName}
+              onChange={(e) => setVaccineName(e.target.value)}
+              placeholder={t("vaccinePlaceholder")}
+              className="input-field"
+            />
+          </div>
+        )}
+
+        {resolvedType === "spitup" && (
+          <p className="text-sm text-muted">{t("spitUpHint")}</p>
+        )}
+
         {resolvedType === "weight" && (
           <div>
             <label className="label-field">
@@ -190,7 +233,9 @@ export function HealthModal({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setWeight(Math.max(1, Math.round((weight - 0.1) * 10) / 10))}
+                onClick={() =>
+                  setWeight(Math.max(1, Math.round((weight - 0.1) * 10) / 10))
+                }
                 className="w-10 h-10 rounded-xl bg-[#f3ede7] font-semibold"
               >
                 −
@@ -206,7 +251,9 @@ export function HealthModal({
               />
               <button
                 type="button"
-                onClick={() => setWeight(Math.min(30, Math.round((weight + 0.1) * 10) / 10))}
+                onClick={() =>
+                  setWeight(Math.min(30, Math.round((weight + 0.1) * 10) / 10))
+                }
                 className="w-10 h-10 rounded-xl bg-[#f3ede7] font-semibold"
               >
                 +
@@ -230,7 +277,7 @@ export function HealthModal({
 
         <button
           type="button"
-          onClick={handleSubmit}
+          onClick={() => void handleSubmit()}
           disabled={isSubmitting}
           className="btn-primary"
         >

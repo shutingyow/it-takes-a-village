@@ -15,6 +15,7 @@ import type { TranslationKey } from "@/app/lib/i18n/en";
 import {
   IconChevronRight,
   IconExport,
+  IconPump,
   IconReminders,
   IconUsers,
   IconWarning,
@@ -23,6 +24,8 @@ import type { CaregiverInfo } from "@/app/lib/trackerStorage";
 import { Capacitor } from "@capacitor/core";
 import { signInWithOAuth } from "@/app/lib/oauthSignIn";
 import { BirthDateField } from "../BirthDateField";
+import { BabySexField } from "../BabySexField";
+import { MilkStashPanel } from "../MilkStashPanel";
 import { EmailPasswordForm } from "../EmailPasswordForm";
 
 const PRIVACY_POLICY_URL = "https://it-takes-a-village.vercel.app/privacy";
@@ -44,7 +47,8 @@ export type SettingsView =
   | "menu"
   | "export"
   | "reminders"
-  | "caregivers";
+  | "caregivers"
+  | "stash";
 
 interface SettingsTabProps {
   trackerId: Id<"trackers">;
@@ -52,6 +56,7 @@ interface SettingsTabProps {
   selectedCaregiver: string;
   caregivers: CaregiverInfo[];
   babyName?: string;
+  sex?: "female" | "male" | "unspecified";
   birthDate?: string;
   feedIntervalHours?: number;
   nightFeedIntervalEnabled?: boolean;
@@ -82,6 +87,7 @@ export function SettingsTab({
   caregivers,
   babyName,
   birthDate,
+  sex,
   feedIntervalHours,
   nightFeedIntervalEnabled,
   nightFeedIntervalHours,
@@ -133,6 +139,24 @@ export function SettingsTab({
         babyName={babyName}
         onBack={() => setView("menu")}
       />
+    );
+  }
+
+  if (view === "stash") {
+    return (
+      <div className="p-4">
+        <button
+          type="button"
+          onClick={() => setView("menu")}
+          className="mb-3 text-sm font-semibold text-primary"
+        >
+          {t("backToMore")}
+        </button>
+        <MilkStashPanel
+          trackerId={trackerId}
+          selectedCaregiver={selectedCaregiver}
+        />
+      </div>
     );
   }
 
@@ -283,6 +307,12 @@ export function SettingsTab({
       description: t("exportDesc"),
     },
     {
+      id: "stash",
+      icon: <IconPump size={20} className="text-accent-pump" />,
+      label: t("milkStashTitle"),
+      description: t("milkStashHint"),
+    },
+    {
       id: "supply",
       icon: <IconWarning size={20} className="text-warning" />,
       label: t("supplyAlerts"),
@@ -422,6 +452,12 @@ export function SettingsTab({
         secretLink={secretLink}
         actingCaregiverName={selectedCaregiver}
         birthDate={birthDate}
+        canEdit={isAdmin}
+      />
+      <BabySexField
+        secretLink={secretLink}
+        actingCaregiverName={selectedCaregiver}
+        sex={sex}
         canEdit={isAdmin}
       />
       {!isAdmin && !birthDate && (

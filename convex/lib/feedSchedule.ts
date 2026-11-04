@@ -154,12 +154,30 @@ export function computeFeedDueAt(
   const now = opts?.now ?? Date.now();
   const timeZone = opts?.timeZone ?? DEFAULT_TRACKER_TIMEZONE;
   const feedAt = clampFeedAtForSkew(lastFeedAt, now);
-  const hours = effectiveFeedIntervalHours(
+  const day =
+    Number.isFinite(dayIntervalHours) && dayIntervalHours >= 0.5
+      ? dayIntervalHours
+      : DEFAULT_FEED_INTERVAL_HOURS;
+
+  let hours = effectiveFeedIntervalHours(
     feedAt,
     dayIntervalHours,
     night,
     timeZone
   );
+
+  // Night feed whose due would land in awake hours → use the shorter day gap.
+  if (
+    night.enabled &&
+    hours > day + 1e-9 &&
+    isLocalTimeInNightWindow(feedAt, night.start, night.end, timeZone)
+  ) {
+    const nightDueAt = feedAt + hours * 60 * 60 * 1000;
+    if (!isLocalTimeInNightWindow(nightDueAt, night.start, night.end, timeZone)) {
+      hours = day;
+    }
+  }
+
   return feedAt + hours * 60 * 60 * 1000;
 }
 

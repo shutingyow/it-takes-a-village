@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { assertNotFarFuture } from "./lib/entryValidation";
 
 // Create a diaper entry
 export const create = mutation({
@@ -34,6 +35,7 @@ export const create = mutation({
   },
   returns: v.id("diaperEntries"),
   handler: async (ctx, args) => {
+    assertNotFarFuture(args.timestamp);
     return await ctx.db.insert("diaperEntries", args);
   },
 });

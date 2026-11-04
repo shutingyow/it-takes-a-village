@@ -784,6 +784,42 @@ export const translations = {
   setBirthDatePrompt: "Set a birth date in Settings to see age on this day.",
   ageNotBornYet: "Not born yet on this day.",
   feedingTitle: "Feeding",
+
+  babySex: "Sex",
+  babySexSave: "Save",
+  babySexSaved: "Saved",
+  sexFemale: "Female",
+  sexMale: "Male",
+  sexUnspecified: "Prefer not to say",
+
+  milkStashTitle: "Milk stash",
+  milkStashHint: "Track freezer bags: add, use, or discard.",
+  stashAvailableMl: "{ml} ml available",
+  stashAddBag: "Add bag",
+  stashAmountPlaceholder: "Amount (ml)",
+  stashLabelPlaceholder: "Label (optional)",
+  stashAmountRequired: "Enter a bag amount in ml",
+  stashSaveFailed: "Could not save bag",
+  stashEmpty: "No bags in the stash yet",
+  stashMarkUsed: "Used",
+  stashDiscard: "Discard",
+  stashAddFromPump: "Also add this pump to the stash",
+  stashUseBag: "Use a stash bag (optional)",
+  stashUseNone: "Don’t mark a bag",
+
+  medicationVitamins: "Medicine / vitamins",
+  vaccine: "Vaccine",
+  spitUp: "Spit-up",
+  logVaccine: "Log vaccine",
+  logSpitUp: "Log spit-up",
+  vaccineName: "Vaccine name",
+  vaccinePlaceholder: "e.g. 2-month vaccines",
+  vaccineRequired: "Enter the vaccine name",
+  spitUpHint: "Optional notes — amount, after a feed, etc.",
+
+  measurementSource: "Measured at",
+  measurementHome: "Home",
+  measurementClinic: "Clinic",
 } as const;
 
 export type TranslationKey = keyof typeof translations;

@@ -127,8 +127,14 @@ export function FeedModal({
   const { t } = useLanguage();
   const createFeed = useMutation(api.feedEntries.create);
   const updateFeed = useMutation(api.feedEntries.update);
+  const markStashUsed = useMutation(api.milkStash.markUsed);
   const tracker = useQuery(api.trackers.getBySecret, { secretLink });
+  const stashBags = useQuery(
+    api.milkStash.listAvailable,
+    tracker?._id ? { trackerId: tracker._id } : "skip"
+  );
   const isEditing = Boolean(editEntry);
+  const [stashBagId, setStashBagId] = useState<Id<"milkStashBags"> | "">("");
 
   const resolvedBirthDate = birthDate ?? tracker?.birthDate;
   const solidsAvailable =
@@ -257,6 +263,16 @@ export function FeedModal({
           caregiverName: selectedCaregiver,
           ...payload,
         });
+        if (
+          feedType === "bottle" &&
+          bottleMilk === "breastmilk" &&
+          stashBagId
+        ) {
+          await markStashUsed({
+            bagId: stashBagId,
+            caregiverName: selectedCaregiver,
+          });
+        }
       }
       clearFeedTimer(timerKey);
       void hapticSuccess();
@@ -508,6 +524,32 @@ export function FeedModal({
                 <p className="mt-1.5 text-xs text-muted">{t("selectBottleMilk")}</p>
               )}
             </div>
+
+            {!isEditing &&
+              bottleMilk === "breastmilk" &&
+              stashBags &&
+              stashBags.length > 0 && (
+                <div>
+                  <label className="label-field">{t("stashUseBag")}</label>
+                  <select
+                    value={stashBagId}
+                    onChange={(e) =>
+                      setStashBagId(
+                        e.target.value as Id<"milkStashBags"> | ""
+                      )
+                    }
+                    className="input-field"
+                  >
+                    <option value="">{t("stashUseNone")}</option>
+                    {stashBags.map((bag) => (
+                      <option key={bag._id} value={bag._id}>
+                        {bag.amountMl} ml
+                        {bag.label ? ` · ${bag.label}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
             <div>
               <label className="label-field">{t("notesOptional")}</label>

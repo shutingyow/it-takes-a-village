@@ -1,5 +1,15 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
+import {
+  assertIsoDate,
+  assertNotFarFuture,
+  assertRange,
+} from "./lib/entryValidation";
+
+const measurementSourceValidator = v.union(
+  v.literal("home"),
+  v.literal("clinic")
+);
 
 const growthEntryReturn = v.object({
   _id: v.id("growthEntries"),
@@ -10,6 +20,7 @@ const growthEntryReturn = v.object({
   weight: v.optional(v.number()),
   length: v.optional(v.number()),
   headCircumference: v.optional(v.number()),
+  measurementSource: v.optional(measurementSourceValidator),
   notes: v.optional(v.string()),
   timestamp: v.number(),
 });
@@ -22,11 +33,15 @@ export const create = mutation({
     weight: v.optional(v.number()),
     length: v.optional(v.number()),
     headCircumference: v.optional(v.number()),
+    measurementSource: v.optional(measurementSourceValidator),
     notes: v.optional(v.string()),
     timestamp: v.number(),
   },
   returns: v.id("growthEntries"),
   handler: async (ctx, args) => {
+    const date = assertIsoDate(args.date, "Measurement date");
+    assertNotFarFuture(args.timestamp);
+
     const hasWeight = args.weight != null;
     const hasLength = args.length != null;
     const hasHead = args.headCircumference != null;
@@ -34,18 +49,17 @@ export const create = mutation({
     if (!hasWeight && !hasLength && !hasHead) {
       throw new Error("Enter at least weight, height, or head circumference");
     }
-    if (hasWeight && (args.weight! < 1 || args.weight! > 30)) {
-      throw new Error("Weight must be between 1 kg and 30 kg");
-    }
-    // Infant-focused ranges (cm); slightly wider than typical for preemies / toddlers
-    if (hasLength && (args.length! < 35 || args.length! > 90)) {
-      throw new Error("Height must be between 35 cm and 90 cm");
-    }
-    if (hasHead && (args.headCircumference! < 28 || args.headCircumference! > 55)) {
-      throw new Error("Head circumference must be between 28 cm and 55 cm");
+    if (hasWeight) assertRange(args.weight!, 1, 30, "Weight (kg)");
+    if (hasLength) assertRange(args.length!, 35, 90, "Height (cm)");
+    if (hasHead) {
+      assertRange(args.headCircumference!, 28, 55, "Head circumference (cm)");
     }
 
-    return await ctx.db.insert("growthEntries", args);
+    return await ctx.db.insert("growthEntries", {
+      ...args,
+      date,
+      measurementSource: args.measurementSource,
+    });
   },
 });
 
@@ -84,6 +98,7 @@ export const update = mutation({
     weight: v.optional(v.number()),
     length: v.optional(v.number()),
     headCircumference: v.optional(v.number()),
+    measurementSource: v.optional(measurementSourceValidator),
     notes: v.optional(v.string()),
     timestamp: v.number(),
   },
@@ -94,6 +109,9 @@ export const update = mutation({
       throw new Error("Growth entry not found");
     }
 
+    const date = assertIsoDate(args.date, "Measurement date");
+    assertNotFarFuture(args.timestamp);
+
     const hasWeight = args.weight != null;
     const hasLength = args.length != null;
     const hasHead = args.headCircumference != null;
@@ -101,23 +119,21 @@ export const update = mutation({
     if (!hasWeight && !hasLength && !hasHead) {
       throw new Error("Enter at least weight, height, or head circumference");
     }
-    if (hasWeight && (args.weight! < 1 || args.weight! > 30)) {
-      throw new Error("Weight must be between 1 kg and 30 kg");
-    }
-    if (hasLength && (args.length! < 35 || args.length! > 90)) {
-      throw new Error("Height must be between 35 cm and 90 cm");
-    }
-    if (hasHead && (args.headCircumference! < 28 || args.headCircumference! > 55)) {
-      throw new Error("Head circumference must be between 28 cm and 55 cm");
+    if (hasWeight) assertRange(args.weight!, 1, 30, "Weight (kg)");
+    if (hasLength) assertRange(args.length!, 35, 90, "Height (cm)");
+    if (hasHead) {
+      assertRange(args.headCircumference!, 28, 55, "Head circumference (cm)");
     }
 
     await ctx.db.replace(args.entryId, {
       trackerId: existing.trackerId,
       caregiverName: existing.caregiverName,
-      date: args.date,
+      date,
       weight: args.weight,
       length: args.length,
       headCircumference: args.headCircumference,
+      measurementSource:
+        args.measurementSource ?? existing.measurementSource,
       notes: args.notes,
       timestamp: args.timestamp,
     });

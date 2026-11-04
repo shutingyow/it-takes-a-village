@@ -1,5 +1,9 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import {
+  assertNotFarFuture,
+  assertPositive,
+} from "./lib/entryValidation";
 
 // Create a pump entry
 export const create = mutation({
@@ -14,6 +18,11 @@ export const create = mutation({
   },
   returns: v.id("pumpEntries"),
   handler: async (ctx, args) => {
+    assertNotFarFuture(args.timestamp);
+    assertPositive(args.amount, "Pump amount");
+    if (args.amount > 500) {
+      throw new Error("Pump amount looks too high (max 500 ml)");
+    }
     return await ctx.db.insert("pumpEntries", args);
   },
 });

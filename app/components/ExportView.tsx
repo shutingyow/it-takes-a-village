@@ -16,31 +16,98 @@ interface ExportViewProps {
   onBack: () => void;
 }
 
+type ExportRow = {
+  timestampUtc: string;
+  timezone: string;
+  localIso: string;
+  category: string;
+  subcategory: string;
+  amount?: number;
+  unit?: string;
+  durationMinutes?: number;
+  milkType?: string;
+  side?: string;
+  stoolType?: string;
+  stoolColour?: string;
+  stoolTexture?: string;
+  measurementSource?: string;
+  caregiverName: string;
+  notes?: string;
+  summary: string;
+};
+
+function escapeCsv(s: string): string {
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function cell(value: string | number | undefined | null): string {
+  if (value === undefined || value === null || value === "") return '""';
+  return escapeCsv(String(value));
+}
+
 function rowsToCsv(
-  rows: Array<{
-    category: string;
-    timestamp: number;
-    summary: string;
-    caregiverName: string;
-    notes?: string;
-  }>
+  meta: {
+    babyName?: string;
+    birthDate?: string;
+    sex?: string;
+    timezone: string;
+    stashAvailableMl: number;
+    exportedAtUtc: string;
+    rangeDays: number;
+  },
+  rows: ExportRow[]
 ): string {
-  const header = "Date,Time,Category,Summary,Caregiver,Notes";
-  const lines = rows.map((r) => {
-    const date = new Date(r.timestamp);
-    const dateStr = date.toLocaleDateString();
-    const timeStr = date.toLocaleTimeString();
-    const escape = (s: string) => `"${s.replace(/"/g, '""')}"`;
-    return [
-      escape(dateStr),
-      escape(timeStr),
-      escape(r.category),
-      escape(r.summary),
-      escape(r.caregiverName),
-      escape(r.notes ?? ""),
-    ].join(",");
-  });
-  return [header, ...lines].join("\n");
+  const metaLines = [
+    ["meta", "baby_name", meta.babyName ?? ""].map(cell).join(","),
+    ["meta", "birth_date", meta.birthDate ?? ""].map(cell).join(","),
+    ["meta", "sex", meta.sex ?? ""].map(cell).join(","),
+    ["meta", "timezone", meta.timezone].map(cell).join(","),
+    ["meta", "exported_at_utc", meta.exportedAtUtc].map(cell).join(","),
+    ["meta", "range_days", meta.rangeDays].map(cell).join(","),
+    ["meta", "stash_available_ml", meta.stashAvailableMl].map(cell).join(","),
+  ];
+
+  const header = [
+    "timestamp_utc",
+    "timezone",
+    "local_iso",
+    "category",
+    "subcategory",
+    "amount",
+    "unit",
+    "duration_minutes",
+    "milk_type",
+    "side",
+    "stool_type",
+    "stool_colour",
+    "stool_texture",
+    "measurement_source",
+    "caregiver",
+    "notes",
+  ].join(",");
+
+  const lines = rows.map((r) =>
+    [
+      cell(r.timestampUtc),
+      cell(r.timezone),
+      cell(r.localIso),
+      cell(r.category),
+      cell(r.subcategory),
+      cell(r.amount),
+      cell(r.unit),
+      cell(r.durationMinutes),
+      cell(r.milkType),
+      cell(r.side),
+      cell(r.stoolType),
+      cell(r.stoolColour),
+      cell(r.stoolTexture),
+      cell(r.measurementSource),
+      cell(r.caregiverName),
+      cell(r.notes),
+    ].join(",")
+  );
+
+  return [...metaLines, header, ...lines].join("\n");
 }
 
 function downloadCsvWeb(csv: string, fileName: string) {
@@ -79,17 +146,33 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
 
   const exportData = useQuery(api.export.getData, { trackerId, days, now });
 
+  const buildCsv = () => {
+    if (!exportData) return null;
+    return rowsToCsv(
+      {
+        babyName: exportData.babyName ?? babyName,
+        birthDate: exportData.birthDate,
+        sex: exportData.sex,
+        timezone: exportData.timezone,
+        stashAvailableMl: exportData.stashAvailableMl,
+        exportedAtUtc: exportData.exportedAtUtc,
+        rangeDays: exportData.rangeDays,
+      },
+      exportData.rows
+    );
+  };
+
   const handleCopy = async () => {
-    if (!exportData) return;
-    const csv = rowsToCsv(exportData.rows);
+    const csv = buildCsv();
+    if (!csv) return;
     await navigator.clipboard.writeText(csv);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = async () => {
-    if (!exportData || exportBusy) return;
-    const csv = rowsToCsv(exportData.rows);
+    const csv = buildCsv();
+    if (!csv || exportBusy) return;
     const fileName = `care-log-${days}d.csv`;
     setExportError(false);
 
@@ -147,7 +230,10 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
         </button>
       </div>
 
-      <div ref={printRef} className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+      <div
+        ref={printRef}
+        className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4"
+      >
         <h2 className="text-lg font-bold text-foreground mb-1">
           {t("exportSummary")}
           {babyName ? ` — ${babyName}` : ""}
@@ -155,6 +241,16 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
         <p className="text-xs text-muted mb-4">
           {t("exportRange", { days: String(days) })} ·{" "}
           {t("exportGenerated")}: {formatDateTime(now)}
+          {exportData && (
+            <>
+              {" · "}
+              {exportData.timezone}
+              {" · "}
+              {t("stashAvailableMl", {
+                ml: String(exportData.stashAvailableMl),
+              })}
+            </>
+          )}
         </p>
 
         {!exportData ? (
@@ -165,11 +261,11 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
           <div className="space-y-2 max-h-64 overflow-y-auto print:max-h-none">
             {exportData.rows.map((row, i) => (
               <div
-                key={`${row.timestamp}-${row.category}-${i}`}
+                key={`${row.timestampUtc}-${row.category}-${i}`}
                 className="flex gap-2 text-sm border-b border-border/50 pb-2 last:border-0"
               >
                 <span className="text-muted shrink-0 w-28 text-xs">
-                  {formatDateTime(row.timestamp)}
+                  {row.localIso.replace("T", " ")}
                 </span>
                 <span className="font-medium capitalize shrink-0 w-14">
                   {row.category}
@@ -184,7 +280,7 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
       <div className="flex flex-col gap-2 print:hidden">
         <button
           type="button"
-          onClick={handleCopy}
+          onClick={() => void handleCopy()}
           disabled={!exportData?.rows.length}
           className="w-full py-3.5 px-6 rounded-xl font-medium text-sm bg-primary hover:bg-primary-hover text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >

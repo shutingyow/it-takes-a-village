@@ -59,8 +59,9 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         Task { @MainActor in
             await endAllActivities()
             do {
-                let activityId = try Self.requestActivity(state: state)
-                call.resolve(["activityId": activityId])
+                let activity = try Self.requestActivityReturning(state: state)
+                Self.observePushToken(activity: activity, plugin: self)
+                call.resolve(["activityId": activity.id])
             } catch {
                 call.reject("Failed to start Live Activity: \(error.localizedDescription)")
             }
@@ -91,8 +92,9 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
             if matches.isEmpty {
                 do {
-                    let newId = try Self.requestActivity(state: state)
-                    call.resolve(["activityId": newId])
+                    let activity = try Self.requestActivityReturning(state: state)
+                    Self.observePushToken(activity: activity, plugin: self)
+                    call.resolve(["activityId": activity.id])
                 } catch {
                     call.reject("Failed to start Live Activity: \(error.localizedDescription)")
                 }
@@ -105,6 +107,7 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             )
             for activity in matches {
                 await activity.update(content)
+                Self.observePushToken(activity: activity, plugin: self)
             }
             call.resolve(["activityId": matches.first?.id ?? ""])
         }
@@ -157,18 +160,37 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @available(iOS 16.2, *)
-    private static func requestActivity(state: FeedCountdownAttributes.ContentState) throws -> String {
+    private static func requestActivityReturning(
+        state: FeedCountdownAttributes.ContentState
+    ) throws -> Activity<FeedCountdownAttributes> {
         let attributes = FeedCountdownAttributes(kind: "last-feed")
         let content = ActivityContent(
             state: state,
             staleDate: state.dueAt.addingTimeInterval(24 * 60 * 60)
         )
-        let activity = try Activity.request(
+        // .token enables ActivityKit APNs updates from Convex when another
+        // caregiver logs a feed while this device is backgrounded.
+        return try Activity.request(
             attributes: attributes,
             content: content,
-            pushType: nil
+            pushType: .token
         )
-        return activity.id
+    }
+
+    @available(iOS 16.2, *)
+    private static func observePushToken(
+        activity: Activity<FeedCountdownAttributes>,
+        plugin: FeedLiveActivityPlugin
+    ) {
+        Task {
+            for await tokenData in activity.pushTokenUpdates {
+                let hex = tokenData.map { String(format: "%02x", $0) }.joined()
+                plugin.notifyListeners("liveActivityPushToken", data: [
+                    "activityId": activity.id,
+                    "pushToken": hex,
+                ])
+            }
+        }
     }
 
     private func contentState(from call: CAPPluginCall) -> FeedCountdownAttributes.ContentState? {

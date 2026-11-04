@@ -125,6 +125,7 @@ export function normalizeTrackerForClient(tracker: Doc<"trackers">) {
     ownerUserId: tracker.ownerUserId,
     babyName: tracker.babyName,
     birthDate: tracker.birthDate,
+    sex: tracker.sex,
     photoStorageId: tracker.photoStorageId,
     caregivers,
     feedIntervalHours: tracker.feedIntervalHours,
