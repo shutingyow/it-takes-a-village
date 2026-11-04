@@ -225,11 +225,6 @@ export function ReminderScheduler({
       feedBodyAtDue: (clock) => t("deviceNotifFeedBody", { time: clock }),
       feedBodyOverdue: (clock) =>
         t("deviceNotifFeedOverdue", { time: clock }),
-      feedBodyCountdown: (minutes, dueAt) =>
-        t("deviceNotifFeedCountdown", {
-          minutes: String(minutes),
-          time: formatTime(dueAt),
-        }),
       pumpTitle: t("nextPumpDue"),
       pumpBodyLead: (minutes, dueAt) =>
         t("deviceNotifPumpLead", {

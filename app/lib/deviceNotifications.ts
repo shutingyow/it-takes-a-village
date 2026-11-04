@@ -16,7 +16,10 @@ const OPT_IN_KEY = "deviceRemindersEnabled";
 /** Stable notification IDs so we can cancel/reschedule cleanly. */
 export const NOTIF_ID = {
   feed: 1001,
-  /** Countdown milestones before due (e.g. 60 / 45 / 30 / 15 min left). */
+  /**
+   * Legacy countdown milestone IDs (60/45/30/15). Kept so cancel-all still
+   * clears any already-scheduled alerts from older builds.
+   */
   feedCountdown: [1101, 1102, 1103, 1104, 1105, 1106] as const,
   pump: [2001, 2002, 2003, 2004, 2005, 2006] as const,
   nap: 3001,
@@ -28,9 +31,6 @@ const ALL_IDS = [
   ...NOTIF_ID.pump,
   NOTIF_ID.nap,
 ];
-
-/** Minutes-before-due at which to post an updating "Next feed in xx" alert. */
-const FEED_COUNTDOWN_MILESTONES = [60, 45, 30, 15] as const;
 
 export const DEFAULT_NOTIFY_BEFORE_MINUTES = 10;
 
@@ -57,8 +57,8 @@ export type DueNotificationPayload = {
   feedBodyAtDue: (clock: string) => string;
   /** Body when already past due, e.g. "Feed overdue · was due around 2:30". */
   feedBodyOverdue: (clock: string) => string;
-  /** Body for countdown milestones, e.g. "Next feed in 30 min · 3:40 PM". */
-  feedBodyCountdown: (minutes: number, dueAt: number) => string;
+  /** @deprecated Unused — kept optional so callers can omit gradually. */
+  feedBodyCountdown?: (minutes: number, dueAt: number) => string;
   pumpTitle: string;
   pumpBodyLead: (minutes: number, dueAt: number) => string;
   pumpBodyAtDue: (clock: string) => string;
@@ -315,29 +315,6 @@ export async function syncDueNotifications(
       fireAt,
       `feed-${feedDueAt}-lead${lead}`
     );
-
-    // Countdown milestones only while still before due (never after a miss).
-    // (True lock-screen ticking timer needs Live Activities — see feedLiveActivity.)
-    if (!overdue) {
-      const leadMs = lead * 60_000;
-      FEED_COUNTDOWN_MILESTONES.forEach((minsLeft, index) => {
-        const id = NOTIF_ID.feedCountdown[index];
-        if (id === undefined) return;
-        // Skip milestones at/after the configured lead alert (avoid duplicates).
-        if (minsLeft <= lead) return;
-        const milestoneAt = feedDueAt - minsLeft * 60_000;
-        if (milestoneAt <= now) return;
-        if (milestoneAt >= feedDueAt - leadMs && lead > 0) return;
-        // Body uses the milestone’s own remaining minutes (= minsLeft at fire).
-        planOnce(
-          id,
-          payload.feedTitle,
-          payload.feedBodyCountdown(minsLeft, feedDueAt),
-          milestoneAt,
-          `feed-countdown-${feedDueAt}-${minsLeft}`
-        );
-      });
-    }
   }
 
   payload.pumpDueAts.slice(0, NOTIF_ID.pump.length).forEach((dueAt, index) => {

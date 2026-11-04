@@ -142,7 +142,7 @@ The web app schedules **on-device** feed / pump reminders via `@capacitor/local-
 | Works today | Limitation |
 |-------------|------------|
 | Capacitor iOS app backgrounded (phone on, app not force-quit) | Local schedules are set from the client when the tracker is open |
-| Lead-time alert (`notifyBeforeMinutes`) + countdown milestones at 60 / 45 / 30 / 15 min before next feed | Not a continuous ticking clock on the Lock Screen |
+| Lead-time alert (`notifyBeforeMinutes` only — e.g. 10 min before due) | Not a continuous ticking clock on the Lock Screen |
 | Browser / Safari tab while page stays open | iOS Safari tabs are unreliable for background alerts |
 | Reschedule when a feed/pump is logged (while app open) | |
 
