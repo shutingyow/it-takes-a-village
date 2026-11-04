@@ -793,6 +793,9 @@ export const translations = {
   sexUnspecified: "Prefer not to say",
 
   milkStashTitle: "Milk stash",
+  stashTotalAvailable: "Total available",
+  stashBagCount: "{count} bags",
+  stashInventory: "Inventory",
   stashAvailableMl: "{ml} ml available",
   stashAddBag: "Add bag",
   stashAmountLabel: "Amount (ml)",
@@ -802,7 +805,7 @@ export const translations = {
   stashFrozenFor: "Frozen for {days} days",
   stashAmountRequired: "Enter a bag amount in ml",
   stashSaveFailed: "Could not save bag",
-  stashEmpty: "No bags in the stash yet",
+  stashEmpty: "No bags yet",
   stashMarkUsed: "Used",
   stashDiscard: "Discard",
   stashAddFromPump: "Add expressed milk to freezer stash",

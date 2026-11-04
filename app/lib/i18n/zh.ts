@@ -753,6 +753,9 @@ export const zh: Translations = {
   sexUnspecified: "不愿说明",
 
   milkStashTitle: "母乳库存",
+  stashTotalAvailable: "现有总量",
+  stashBagCount: "{count} 袋",
+  stashInventory: "库存",
   stashAvailableMl: "现有 {ml} ml",
   stashAddBag: "添加一袋",
   stashAmountLabel: "毫升",

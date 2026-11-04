@@ -64,124 +64,145 @@ export function MilkStashPanel({
     }
   };
 
-  return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-sm font-semibold text-foreground">
-          {t("milkStashTitle")}
-        </p>
-        <p className="text-sm text-foreground mt-2">
-          {t("stashAvailableMl", {
-            ml: String(totalMl ?? 0),
-          })}
-        </p>
-      </div>
+  const bagCount = available?.length ?? 0;
 
-      <div className="rounded-xl border border-border bg-background/60 p-3 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-          {t("stashAddBag")}
+  return (
+    <div className="px-4 pb-8 space-y-8">
+      <h1 className="text-xl font-semibold text-foreground pt-1">
+        {t("milkStashTitle")}
+      </h1>
+
+      <section className="text-center py-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-2">
+          {t("stashTotalAvailable")}
         </p>
-        <div>
-          <label htmlFor="stash-amount-ml" className="label-field">
-            {t("stashAmountLabel")}
-          </label>
-          <input
-            id="stash-amount-ml"
-            type="number"
-            inputMode="decimal"
-            min={1}
-            step={1}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder={t("stashAmountPlaceholder")}
-            className="input-field"
-          />
-        </div>
-        <div>
-          <label htmlFor="stash-frozen-on" className="label-field">
-            {t("stashFrozenDate")}
-          </label>
-          <input
-            id="stash-frozen-on"
-            type="date"
-            value={frozenOn}
-            max={toLocalIsoDate()}
-            onChange={(e) => setFrozenOn(e.target.value)}
-            className="input-field min-h-11"
-          />
-        </div>
-        {error && (
-          <p className="text-xs text-red-600" role="alert">
-            {error}
+        <p className="text-4xl font-semibold text-foreground tabular-nums tracking-tight">
+          {totalMl === undefined ? "—" : totalMl}
+          <span className="text-lg font-medium text-muted ml-1.5">ml</span>
+        </p>
+        {available !== undefined && (
+          <p className="text-sm text-muted mt-1.5">
+            {t("stashBagCount", { count: String(bagCount) })}
           </p>
         )}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void handleAdd()}
-          className="btn-primary text-sm py-2.5"
-        >
-          {busy ? t("saving") : t("stashAddBag")}
-        </button>
-      </div>
+      </section>
 
-      <ul className="space-y-2">
-        {available === undefined ? (
-          <li className="text-sm text-muted">{t("loading")}</li>
-        ) : available.length === 0 ? (
-          <li className="text-sm text-muted">{t("stashEmpty")}</li>
-        ) : (
-          available.map((bag) => {
-            const frozen = resolveFrozenOn(bag);
-            const days = daysFrozen(frozen);
-            return (
-              <li
-                key={bag._id}
-                className="rounded-xl border border-border bg-surface px-3 py-3 flex flex-col gap-2"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+      <hr className="border-border" />
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">
+          {t("stashAddBag")}
+        </h2>
+        <div className="space-y-3">
+          <div>
+            <label htmlFor="stash-amount-ml" className="label-field">
+              {t("stashAmountLabel")}
+            </label>
+            <input
+              id="stash-amount-ml"
+              type="number"
+              inputMode="decimal"
+              min={1}
+              step={1}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder={t("stashAmountPlaceholder")}
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label htmlFor="stash-frozen-on" className="label-field">
+              {t("stashFrozenDate")}
+            </label>
+            <input
+              id="stash-frozen-on"
+              type="date"
+              value={frozenOn}
+              max={toLocalIsoDate()}
+              onChange={(e) => setFrozenOn(e.target.value)}
+              className="input-field min-h-11"
+            />
+          </div>
+          {error && (
+            <p className="text-xs text-red-600" role="alert">
+              {error}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void handleAdd()}
+            className="btn-primary text-sm py-2.5"
+          >
+            {busy ? t("saving") : t("stashAddBag")}
+          </button>
+        </div>
+      </section>
+
+      <hr className="border-border" />
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">
+          {t("stashInventory")}
+        </h2>
+        <ul className="space-y-3">
+          {available === undefined ? (
+            <li className="text-sm text-muted py-2">{t("loading")}</li>
+          ) : available.length === 0 ? (
+            <li className="py-4 text-sm text-muted text-center">
+              {t("stashEmpty")}
+            </li>
+          ) : (
+            available.map((bag) => {
+              const frozen = resolveFrozenOn(bag);
+              const days = daysFrozen(frozen);
+              return (
+                <li
+                  key={bag._id}
+                  className="border-b border-border pb-3 last:border-b-0 last:pb-0"
+                >
+                  <div className="flex items-baseline justify-between gap-3 mb-2.5">
                     <p className="font-semibold text-foreground text-sm">
-                      {bag.amountMl} ml · {frozen}
+                      {bag.amountMl} ml
                     </p>
-                    <p className="text-xs text-muted">
-                      {t("stashFrozenFor", { days: String(days) })}
+                    <p className="text-xs text-muted text-right">
+                      {frozen}
                       {" · "}
-                      {bag.caregiverName}
+                      {t("stashFrozenFor", { days: String(days) })}
                     </p>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="flex-1 rounded-lg bg-primary text-white text-sm font-semibold py-2"
-                    onClick={() =>
-                      void markUsed({
-                        bagId: bag._id,
-                        caregiverName: selectedCaregiver,
-                      })
-                    }
-                  >
-                    {t("stashMarkUsed")}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex-1 rounded-lg border border-border text-sm font-semibold py-2 text-foreground"
-                    onClick={() =>
-                      void discard({
-                        bagId: bag._id,
-                        caregiverName: selectedCaregiver,
-                      })
-                    }
-                  >
-                    {t("stashDiscard")}
-                  </button>
-                </div>
-              </li>
-            );
-          })
-        )}
-      </ul>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="flex-1 rounded-xl bg-primary text-white text-sm font-semibold py-2.5"
+                      onClick={() =>
+                        void markUsed({
+                          bagId: bag._id,
+                          caregiverName: selectedCaregiver,
+                        })
+                      }
+                    >
+                      {t("stashMarkUsed")}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 rounded-xl border border-border text-sm font-semibold py-2.5 text-foreground"
+                      onClick={() =>
+                        void discard({
+                          bagId: bag._id,
+                          caregiverName: selectedCaregiver,
+                        })
+                      }
+                    >
+                      {t("stashDiscard")}
+                    </button>
+                  </div>
+                </li>
+              );
+            })
+          )}
+        </ul>
+      </section>
     </div>
   );
 }

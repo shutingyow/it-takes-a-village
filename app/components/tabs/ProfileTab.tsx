@@ -18,7 +18,9 @@ import {
   IconMilestone,
   IconNotes,
   IconCalendar,
+  IconPump,
 } from "../icons";
+import { MilkStashPanel } from "../MilkStashPanel";
 
 export type ProfileView =
   | "menu"
@@ -27,7 +29,8 @@ export type ProfileView =
   | "history"
   | "health"
   | "growth"
-  | "milestones";
+  | "milestones"
+  | "stash";
 
 interface ProfileTabProps {
   trackerId: Id<"trackers">;
@@ -66,6 +69,11 @@ export function ProfileTab({
       icon: <IconGrowth size={20} className="text-muted" />,
       label: t("growth"),
       description: t("growthDesc"),
+    },
+    {
+      id: "stash",
+      icon: <IconPump size={20} className="text-accent-pump" />,
+      label: t("milkStashTitle"),
     },
     {
       id: "notes",
@@ -135,6 +143,17 @@ export function ProfileTab({
         selectedCaregiver={selectedCaregiver}
         onBack={() => setView("menu")}
       />
+    );
+  }
+
+  if (view === "stash") {
+    return (
+      <SubView backLabel={t("backToProfile")} onBack={() => setView("menu")}>
+        <MilkStashPanel
+          trackerId={trackerId}
+          selectedCaregiver={selectedCaregiver}
+        />
+      </SubView>
     );
   }
 

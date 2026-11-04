@@ -15,7 +15,6 @@ import type { TranslationKey } from "@/app/lib/i18n/en";
 import {
   IconChevronRight,
   IconExport,
-  IconPump,
   IconReminders,
   IconUsers,
   IconWarning,
@@ -25,7 +24,6 @@ import { Capacitor } from "@capacitor/core";
 import { signInWithOAuth } from "@/app/lib/oauthSignIn";
 import { BirthDateField } from "../BirthDateField";
 import { BabySexField } from "../BabySexField";
-import { MilkStashPanel } from "../MilkStashPanel";
 import { EmailPasswordForm } from "../EmailPasswordForm";
 
 const PRIVACY_POLICY_URL = "https://it-takes-a-village.vercel.app/privacy";
@@ -47,8 +45,7 @@ export type SettingsView =
   | "menu"
   | "export"
   | "reminders"
-  | "caregivers"
-  | "stash";
+  | "caregivers";
 
 interface SettingsTabProps {
   trackerId: Id<"trackers">;
@@ -139,24 +136,6 @@ export function SettingsTab({
         babyName={babyName}
         onBack={() => setView("menu")}
       />
-    );
-  }
-
-  if (view === "stash") {
-    return (
-      <div className="p-4">
-        <button
-          type="button"
-          onClick={() => setView("menu")}
-          className="mb-3 text-sm font-semibold text-primary"
-        >
-          {t("backToMore")}
-        </button>
-        <MilkStashPanel
-          trackerId={trackerId}
-          selectedCaregiver={selectedCaregiver}
-        />
-      </div>
     );
   }
 
@@ -305,12 +284,6 @@ export function SettingsTab({
       icon: <IconExport size={20} className="text-terracotta" />,
       label: t("exportData"),
       description: t("exportDesc"),
-    },
-    {
-      id: "stash",
-      icon: <IconPump size={20} className="text-accent-pump" />,
-      label: t("milkStashTitle"),
-      description: "",
     },
     {
       id: "supply",
