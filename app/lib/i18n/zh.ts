@@ -226,7 +226,7 @@ export const zh: Translations = {
   recentActivity: "最近活动",
   viewAllHistory: "查看全部",
   health: "健康",
-  healthDesc: "体温与药物",
+  healthDesc: "记录体温、药物、疫苗",
   healthGrowthHint: "体重、身高和头围请在「档案 → 生长」中记录。",
   supplyAlerts: "用品提醒",
   supplyAlertsDesc: "追踪用品不足",
@@ -753,6 +753,7 @@ export const zh: Translations = {
   sexUnspecified: "不愿说明",
 
   milkStashTitle: "母乳库存",
+  milkStashDesc: "管理母乳库存",
   stashTotalAvailable: "现有总量",
   stashBagCount: "{count} 袋",
   stashInventory: "库存",

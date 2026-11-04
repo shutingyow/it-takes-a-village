@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
+import { cn } from "@/app/lib/utils";
 
 type Sex = "female" | "male" | "unspecified";
 
@@ -75,11 +76,13 @@ export function BabySexField({
             key={id}
             type="button"
             onClick={() => setValue(id)}
-            className={`rounded-xl border text-sm font-semibold py-2.5 ${
+            className={cn(
+              "py-2.5 rounded-xl text-sm font-semibold transition-colors touch-manipulation min-h-[44px]",
               value === id
-                ? "border-primary bg-primary-light text-foreground"
-                : "border-border bg-background text-muted"
-            }`}
+                ? "bg-terracotta text-white"
+                : "bg-beige-light text-muted hover:text-foreground"
+            )}
+            aria-pressed={value === id}
           >
             {label}
           </button>

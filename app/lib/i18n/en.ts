@@ -241,7 +241,7 @@ export const translations = {
   recentActivity: "Recent activity",
   viewAllHistory: "View all",
   health: "Health",
-  healthDesc: "Temperature & medication",
+  healthDesc: "Log temperature, medicine, vaccines",
   healthGrowthHint: "Weight, height, and head circumference are under Growth in Profile.",
   supplyAlerts: "Supply alerts",
   supplyAlertsDesc: "Track low supplies",
@@ -793,6 +793,7 @@ export const translations = {
   sexUnspecified: "Prefer not to say",
 
   milkStashTitle: "Milk stash",
+  milkStashDesc: "Manage inventory of milk",
   stashTotalAvailable: "Total available",
   stashBagCount: "{count} bags",
   stashInventory: "Inventory",

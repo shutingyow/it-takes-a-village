@@ -74,6 +74,7 @@ export function ProfileTab({
       id: "stash",
       icon: <IconPump size={20} className="text-accent-pump" />,
       label: t("milkStashTitle"),
+      description: t("milkStashDesc"),
     },
     {
       id: "notes",
@@ -91,6 +92,7 @@ export function ProfileTab({
       id: "health",
       icon: <IconHealth size={20} className="text-accent-diaper" />,
       label: t("health"),
+      description: t("healthDesc"),
     },
     {
       id: "milestones",
