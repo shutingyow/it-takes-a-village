@@ -23,6 +23,10 @@ import {
   canLogSolids,
   solidsFirstInFeedPicker,
 } from "@/app/lib/babyAge";
+import {
+  daysFrozen,
+  resolveFrozenOn,
+} from "@/app/lib/milkStashDates";
 import { hapticSuccess } from "@/app/lib/haptics";
 
 type FeedEditEntry = Extract<ActivityEntry, { entryType: "feed" }>;
@@ -541,12 +545,15 @@ export function FeedModal({
                     className="input-field"
                   >
                     <option value="">{t("stashUseNone")}</option>
-                    {stashBags.map((bag) => (
-                      <option key={bag._id} value={bag._id}>
-                        {bag.amountMl} ml
-                        {bag.label ? ` · ${bag.label}` : ""}
-                      </option>
-                    ))}
+                    {stashBags.map((bag) => {
+                      const frozen = resolveFrozenOn(bag);
+                      const days = daysFrozen(frozen);
+                      return (
+                        <option key={bag._id} value={bag._id}>
+                          {bag.amountMl} ml · {frozen} · {days}d
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               )}

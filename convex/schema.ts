@@ -277,6 +277,9 @@ export default defineSchema({
     createdAt: v.number(),
     pumpedAt: v.optional(v.number()),
     pumpEntryId: v.optional(v.id("pumpEntries")),
+    /** YYYY-MM-DD date the bag was frozen / put in stash. */
+    frozenOn: v.optional(v.string()),
+    /** @deprecated Prefer frozenOn — kept for older bags. */
     label: v.optional(v.string()),
     usedAt: v.optional(v.number()),
     usedByCaregiverName: v.optional(v.string()),

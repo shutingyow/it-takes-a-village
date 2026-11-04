@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
+  assertIsoDate,
   assertNotFarFuture,
   assertPositive,
 } from "./lib/entryValidation";
@@ -21,11 +22,24 @@ const bagReturn = v.object({
   createdAt: v.number(),
   pumpedAt: v.optional(v.number()),
   pumpEntryId: v.optional(v.id("pumpEntries")),
+  frozenOn: v.optional(v.string()),
   label: v.optional(v.string()),
   usedAt: v.optional(v.number()),
   usedByCaregiverName: v.optional(v.string()),
   notes: v.optional(v.string()),
 });
+
+function isoFromTimestamp(ms: number): string {
+  const d = new Date(ms);
+  // Asia/Singapore day for consistency with tracker defaults
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Singapore",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return fmt.format(d);
+}
 
 export const listAvailable = query({
   args: { trackerId: v.id("trackers") },
@@ -37,7 +51,11 @@ export const listAvailable = query({
         q.eq("trackerId", args.trackerId).eq("status", "available")
       )
       .collect();
-    return bags.sort((a, b) => a.createdAt - b.createdAt);
+    return bags.sort((a, b) => {
+      const aKey = a.frozenOn ?? a.label ?? String(a.createdAt);
+      const bKey = b.frozenOn ?? b.label ?? String(b.createdAt);
+      return aKey.localeCompare(bKey);
+    });
   },
 });
 
@@ -80,7 +98,8 @@ export const addBag = mutation({
     amountMl: v.number(),
     pumpedAt: v.optional(v.number()),
     pumpEntryId: v.optional(v.id("pumpEntries")),
-    label: v.optional(v.string()),
+    /** YYYY-MM-DD freeze date. Defaults from pumpedAt / today. */
+    frozenOn: v.optional(v.string()),
     notes: v.optional(v.string()),
     createdAt: v.optional(v.number()),
   },
@@ -94,6 +113,12 @@ export const addBag = mutation({
     assertNotFarFuture(createdAt);
     if (args.pumpedAt !== undefined) assertNotFarFuture(args.pumpedAt);
 
+    const frozenOn = assertIsoDate(
+      args.frozenOn ??
+        isoFromTimestamp(args.pumpedAt ?? createdAt),
+      "Freeze date"
+    );
+
     return await ctx.db.insert("milkStashBags", {
       trackerId: args.trackerId,
       caregiverName: args.caregiverName.trim(),
@@ -102,7 +127,7 @@ export const addBag = mutation({
       createdAt,
       pumpedAt: args.pumpedAt,
       pumpEntryId: args.pumpEntryId,
-      label: args.label?.trim() || undefined,
+      frozenOn,
       notes: args.notes?.trim() || undefined,
     });
   },
@@ -160,7 +185,7 @@ export const update = mutation({
   args: {
     bagId: v.id("milkStashBags"),
     amountMl: v.optional(v.number()),
-    label: v.optional(v.string()),
+    frozenOn: v.optional(v.string()),
     notes: v.optional(v.string()),
   },
   returns: v.null(),
@@ -172,7 +197,7 @@ export const update = mutation({
     }
     const patch: {
       amountMl?: number;
-      label?: string;
+      frozenOn?: string;
       notes?: string;
     } = {};
     if (args.amountMl !== undefined) {
@@ -182,8 +207,8 @@ export const update = mutation({
       }
       patch.amountMl = args.amountMl;
     }
-    if (args.label !== undefined) {
-      patch.label = args.label.trim() || undefined;
+    if (args.frozenOn !== undefined) {
+      patch.frozenOn = assertIsoDate(args.frozenOn, "Freeze date");
     }
     if (args.notes !== undefined) {
       patch.notes = args.notes.trim() || undefined;

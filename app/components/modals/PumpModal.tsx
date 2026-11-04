@@ -76,12 +76,15 @@ export function PumpModal({
           ...payload,
         });
         if (addToStash && amount > 0) {
+          const d = new Date(timestamp);
+          const frozenOn = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
           await addBag({
             trackerId,
             caregiverName: selectedCaregiver,
             amountMl: amount,
             pumpedAt: timestamp,
             pumpEntryId: pumpId,
+            frozenOn,
           });
         }
       }

@@ -5,7 +5,11 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
-import { formatDateTime } from "@/app/lib/utils";
+import {
+  daysFrozen,
+  resolveFrozenOn,
+  toLocalIsoDate,
+} from "@/app/lib/milkStashDates";
 
 interface MilkStashPanelProps {
   trackerId: Id<"trackers">;
@@ -24,7 +28,7 @@ export function MilkStashPanel({
   const discard = useMutation(api.milkStash.discard);
 
   const [amount, setAmount] = useState("");
-  const [label, setLabel] = useState("");
+  const [frozenOn, setFrozenOn] = useState(() => toLocalIsoDate());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +42,10 @@ export function MilkStashPanel({
       setError(t("stashAmountRequired"));
       return;
     }
+    if (!frozenOn) {
+      setError(t("stashFrozenDateRequired"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -45,10 +53,10 @@ export function MilkStashPanel({
         trackerId,
         caregiverName: selectedCaregiver,
         amountMl: ml,
-        label: label.trim() || undefined,
+        frozenOn,
       });
       setAmount("");
-      setLabel("");
+      setFrozenOn(toLocalIsoDate());
     } catch (err) {
       setError(err instanceof Error ? err.message : t("stashSaveFailed"));
     } finally {
@@ -84,13 +92,16 @@ export function MilkStashPanel({
           placeholder={t("stashAmountPlaceholder")}
           className="input-field"
         />
-        <input
-          type="text"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder={t("stashLabelPlaceholder")}
-          className="input-field"
-        />
+        <div>
+          <label className="label-field">{t("stashFrozenDate")}</label>
+          <input
+            type="date"
+            value={frozenOn}
+            max={toLocalIsoDate()}
+            onChange={(e) => setFrozenOn(e.target.value)}
+            className="input-field"
+          />
+        </div>
         {error && (
           <p className="text-xs text-red-600" role="alert">
             {error}
@@ -112,51 +123,55 @@ export function MilkStashPanel({
         ) : available.length === 0 ? (
           <li className="text-sm text-muted">{t("stashEmpty")}</li>
         ) : (
-          available.map((bag) => (
-            <li
-              key={bag._id}
-              className="rounded-xl border border-border bg-surface px-3 py-3 flex flex-col gap-2"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-foreground text-sm">
-                    {bag.amountMl} ml
-                    {bag.label ? ` · ${bag.label}` : ""}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {formatDateTime(bag.pumpedAt ?? bag.createdAt)} ·{" "}
-                    {bag.caregiverName}
-                  </p>
+          available.map((bag) => {
+            const frozen = resolveFrozenOn(bag);
+            const days = daysFrozen(frozen);
+            return (
+              <li
+                key={bag._id}
+                className="rounded-xl border border-border bg-surface px-3 py-3 flex flex-col gap-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground text-sm">
+                      {bag.amountMl} ml · {frozen}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {t("stashFrozenFor", { days: String(days) })}
+                      {" · "}
+                      {bag.caregiverName}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="flex-1 rounded-lg bg-primary text-white text-sm font-semibold py-2"
-                  onClick={() =>
-                    void markUsed({
-                      bagId: bag._id,
-                      caregiverName: selectedCaregiver,
-                    })
-                  }
-                >
-                  {t("stashMarkUsed")}
-                </button>
-                <button
-                  type="button"
-                  className="flex-1 rounded-lg border border-border text-sm font-semibold py-2 text-foreground"
-                  onClick={() =>
-                    void discard({
-                      bagId: bag._id,
-                      caregiverName: selectedCaregiver,
-                    })
-                  }
-                >
-                  {t("stashDiscard")}
-                </button>
-              </div>
-            </li>
-          ))
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="flex-1 rounded-lg bg-primary text-white text-sm font-semibold py-2"
+                    onClick={() =>
+                      void markUsed({
+                        bagId: bag._id,
+                        caregiverName: selectedCaregiver,
+                      })
+                    }
+                  >
+                    {t("stashMarkUsed")}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 rounded-lg border border-border text-sm font-semibold py-2 text-foreground"
+                    onClick={() =>
+                      void discard({
+                        bagId: bag._id,
+                        caregiverName: selectedCaregiver,
+                      })
+                    }
+                  >
+                    {t("stashDiscard")}
+                  </button>
+                </div>
+              </li>
+            );
+          })
         )}
       </ul>
     </div>

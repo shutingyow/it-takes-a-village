@@ -397,8 +397,12 @@ export const getData = query({
           e.status === "available"
             ? e.caregiverName
             : (e.usedByCaregiverName ?? e.caregiverName),
-        notes: [e.label, e.notes].filter(Boolean).join(" · ") || undefined,
-        summary: `${e.status} bag ${e.amountMl}ml`,
+        notes:
+          [e.frozenOn ?? e.label, e.notes].filter(Boolean).join(" · ") ||
+          undefined,
+        summary: `${e.status} bag ${e.amountMl}ml${
+          e.frozenOn ? ` frozen ${e.frozenOn}` : ""
+        }`,
       });
     }
 
