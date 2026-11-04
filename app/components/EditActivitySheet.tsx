@@ -1,7 +1,6 @@
 "use client";
 
 import type { ActivityEntry } from "./ActivityEntryCard";
-import { Id } from "@/convex/_generated/dataModel";
 import { FeedModal } from "./modals/FeedModal";
 import { DiaperModal } from "./modals/DiaperModal";
 import { PumpModal } from "./modals/PumpModal";
@@ -14,7 +13,6 @@ import { NapModal } from "./modals/NapModal";
 
 interface EditActivitySheetProps {
   entry: ActivityEntry;
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   onClose: () => void;
@@ -23,7 +21,6 @@ interface EditActivitySheetProps {
 
 export function EditActivitySheet({
   entry,
-  trackerId,
   secretLink,
   selectedCaregiver,
   onClose,
@@ -32,7 +29,6 @@ export function EditActivitySheet({
   if (entry.entryType === "feed") {
     return (
       <FeedModal
-        trackerId={trackerId}
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         editEntry={entry}
@@ -45,7 +41,6 @@ export function EditActivitySheet({
   if (entry.entryType === "diaper") {
     return (
       <DiaperModal
-        trackerId={trackerId}
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         editEntry={entry}
@@ -57,7 +52,6 @@ export function EditActivitySheet({
   if (entry.entryType === "pump") {
     return (
       <PumpModal
-        trackerId={trackerId}
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         editEntry={entry}
@@ -69,7 +63,7 @@ export function EditActivitySheet({
   if (entry.entryType === "health") {
     return (
       <HealthModal
-        trackerId={trackerId}
+        secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         healthType={
           entry.type === "weight" ? "weight" : entry.type === "medication" ? "medication" : "temperature"
@@ -83,7 +77,7 @@ export function EditActivitySheet({
   if (entry.entryType === "growth") {
     return (
       <GrowthModal
-        trackerId={trackerId}
+        secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         editEntry={entry}
         onClose={onClose}
@@ -94,7 +88,6 @@ export function EditActivitySheet({
   if (entry.entryType === "sleep") {
     return (
       <SleepModal
-        trackerId={trackerId}
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         editEntry={entry}

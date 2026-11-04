@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { verifyCaregiver } from "./lib/caregivers";
 import {
   DEFAULT_TRACKER_TIMEZONE,
   getDayBoundsForDateKey,
@@ -108,7 +109,8 @@ async function napWakeWindowBeforeMinutes(
 // Get all recent activity for history view
 export const getActivity = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     limit: v.optional(v.number()),
     type: v.optional(v.union(
       v.literal("all"),
@@ -124,6 +126,12 @@ export const getActivity = query({
     )),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
+    const trackerId = tracker._id;
     const limit = args.limit ?? 100;
     const filterType = args.type ?? "all";
     const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
@@ -132,7 +140,7 @@ export const getActivity = query({
     const feedEntries = filterType === "all" || filterType === "feed"
       ? await ctx.db
           .query("feedEntries")
-          .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+          .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", trackerId))
           .filter((q) => q.gte(q.field("timestamp"), sevenDaysAgo))
           .order("desc")
           .take(limit)
@@ -141,7 +149,7 @@ export const getActivity = query({
     const sleepEntries = filterType === "all" || filterType === "sleep" || filterType === "nap"
       ? await ctx.db
           .query("sleepEntries")
-          .withIndex("by_tracker_and_start", (q) => q.eq("trackerId", args.trackerId))
+          .withIndex("by_tracker_and_start", (q) => q.eq("trackerId", trackerId))
           .filter((q) => q.gte(q.field("startTime"), sevenDaysAgo))
           .order("desc")
           .take(limit)
@@ -150,7 +158,7 @@ export const getActivity = query({
     const diaperEntries = filterType === "all" || filterType === "diaper"
       ? await ctx.db
           .query("diaperEntries")
-          .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+          .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", trackerId))
           .filter((q) => q.gte(q.field("timestamp"), sevenDaysAgo))
           .order("desc")
           .take(limit)
@@ -159,7 +167,7 @@ export const getActivity = query({
     const pumpEntries = filterType === "all" || filterType === "pump"
       ? await ctx.db
           .query("pumpEntries")
-          .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+          .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", trackerId))
           .filter((q) => q.gte(q.field("timestamp"), sevenDaysAgo))
           .order("desc")
           .take(limit)
@@ -168,7 +176,7 @@ export const getActivity = query({
     const healthEntries = filterType === "all" || filterType === "health"
       ? await ctx.db
           .query("healthEntries")
-          .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+          .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", trackerId))
           .filter((q) => q.gte(q.field("timestamp"), sevenDaysAgo))
           .order("desc")
           .take(limit)
@@ -178,7 +186,7 @@ export const getActivity = query({
       filterType === "all" || filterType === "growth"
         ? await ctx.db
             .query("growthEntries")
-            .withIndex("by_tracker", (q) => q.eq("trackerId", args.trackerId))
+            .withIndex("by_tracker", (q) => q.eq("trackerId", trackerId))
             .filter((q) => q.gte(q.field("timestamp"), sevenDaysAgo))
             .order("desc")
             .take(limit)
@@ -189,7 +197,7 @@ export const getActivity = query({
         ? await ctx.db
             .query("activityEntries")
             .withIndex("by_tracker_and_time", (q) =>
-              q.eq("trackerId", args.trackerId).gte("timestamp", sevenDaysAgo)
+              q.eq("trackerId", trackerId).gte("timestamp", sevenDaysAgo)
             )
             .order("desc")
             .take(limit)
@@ -200,7 +208,7 @@ export const getActivity = query({
         ? await ctx.db
             .query("momentEntries")
             .withIndex("by_tracker_and_time", (q) =>
-              q.eq("trackerId", args.trackerId).gte("timestamp", sevenDaysAgo)
+              q.eq("trackerId", trackerId).gte("timestamp", sevenDaysAgo)
             )
             .order("desc")
             .take(limit)
@@ -208,7 +216,7 @@ export const getActivity = query({
 
     const feedIntervals = await feedIntervalMinutesById(
       ctx,
-      args.trackerId,
+      trackerId,
       feedEntries,
       true
     );
@@ -255,10 +263,17 @@ export const getActivity = query({
 /** Chronological activity for one Asia/Singapore calendar day (Insights Daily). */
 export const getActivityForDay = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     dateKey: v.string(),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
+    const trackerId = tracker._id;
     const { dayStart, dayEnd } = getDayBoundsForDateKey(
       args.dateKey,
       DEFAULT_TRACKER_TIMEZONE
@@ -267,7 +282,7 @@ export const getActivityForDay = query({
     const feedEntries = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", dayStart)
+        q.eq("trackerId", trackerId).gte("timestamp", dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), dayEnd))
       .collect();
@@ -275,7 +290,7 @@ export const getActivityForDay = query({
     const sleepEntries = await ctx.db
       .query("sleepEntries")
       .withIndex("by_tracker_and_start", (q) =>
-        q.eq("trackerId", args.trackerId).gte("startTime", dayStart)
+        q.eq("trackerId", trackerId).gte("startTime", dayStart)
       )
       .filter((q) => q.lt(q.field("startTime"), dayEnd))
       .collect();
@@ -283,7 +298,7 @@ export const getActivityForDay = query({
     const diaperEntries = await ctx.db
       .query("diaperEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", dayStart)
+        q.eq("trackerId", trackerId).gte("timestamp", dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), dayEnd))
       .collect();
@@ -291,7 +306,7 @@ export const getActivityForDay = query({
     const pumpEntries = await ctx.db
       .query("pumpEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", dayStart)
+        q.eq("trackerId", trackerId).gte("timestamp", dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), dayEnd))
       .collect();
@@ -299,7 +314,7 @@ export const getActivityForDay = query({
     const healthEntries = await ctx.db
       .query("healthEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", dayStart)
+        q.eq("trackerId", trackerId).gte("timestamp", dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), dayEnd))
       .collect();
@@ -307,14 +322,14 @@ export const getActivityForDay = query({
     const growthEntries = await ctx.db
       .query("growthEntries")
       .withIndex("by_tracker_and_date", (q) =>
-        q.eq("trackerId", args.trackerId).eq("date", args.dateKey)
+        q.eq("trackerId", trackerId).eq("date", args.dateKey)
       )
       .collect();
 
     const activityEntries = await ctx.db
       .query("activityEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", dayStart)
+        q.eq("trackerId", trackerId).gte("timestamp", dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), dayEnd))
       .collect();
@@ -322,20 +337,20 @@ export const getActivityForDay = query({
     const momentEntries = await ctx.db
       .query("momentEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", dayStart)
+        q.eq("trackerId", trackerId).gte("timestamp", dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), dayEnd))
       .collect();
 
     const feedIntervals = await feedIntervalMinutesById(
       ctx,
-      args.trackerId,
+      trackerId,
       feedEntries,
       false
     );
     const napWakeWindows = await napWakeWindowBeforeMinutes(
       ctx,
-      args.trackerId,
+      trackerId,
       sleepEntries
     );
 

@@ -1,12 +1,13 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
 import { assertNotFarFuture } from "./lib/entryValidation";
 
 // Create a diaper entry
 export const create = mutation({
   args: {
-    trackerId: v.id("trackers"),
-    caregiverName: v.string(),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     type: v.union(v.literal("wet"), v.literal("dirty"), v.literal("both")),
     colour: v.optional(
       v.union(
@@ -35,23 +36,39 @@ export const create = mutation({
   },
   returns: v.id("diaperEntries"),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     assertNotFarFuture(args.timestamp);
-    return await ctx.db.insert("diaperEntries", args);
+    const { secretLink: _s, actingCaregiverName: _a, ...fields } = args;
+    return await ctx.db.insert("diaperEntries", {
+      ...fields,
+      trackerId: tracker._id,
+      caregiverName: args.actingCaregiverName.trim(),
+    });
   },
 });
 
 // Get recent diaper entries
 export const getRecent = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const limit = args.limit ?? 50;
 
     return await ctx.db
       .query("diaperEntries")
-      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .take(limit);
   },
@@ -60,12 +77,18 @@ export const getRecent = query({
 // Get last diaper entry
 export const getLast = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     return await ctx.db
       .query("diaperEntries")
-      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .first();
   },
@@ -74,6 +97,8 @@ export const getLast = query({
 // Update a diaper entry (full replace of editable fields)
 export const update = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     entryId: v.id("diaperEntries"),
     type: v.union(v.literal("wet"), v.literal("dirty"), v.literal("both")),
     colour: v.optional(
@@ -103,10 +128,13 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.entryId);
-    if (!existing) {
-      throw new Error("Diaper entry not found");
-    }
+    const { entry: existing } = await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.entryId,
+      "Diaper entry not found"
+    );
 
     const hasStool = args.type === "dirty" || args.type === "both";
     await ctx.db.replace(args.entryId, {
@@ -126,10 +154,19 @@ export const update = mutation({
 // Delete a diaper entry
 export const remove = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     entryId: v.id("diaperEntries"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.entryId,
+      "Diaper entry not found"
+    );
     await ctx.db.delete(args.entryId);
     return null;
   },

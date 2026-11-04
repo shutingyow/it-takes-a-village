@@ -1,6 +1,5 @@
 "use client";
 
-import { Id } from "@/convex/_generated/dataModel";
 import { useEffect, useState } from "react";
 import { HistoryTab } from "./HistoryTab";
 import { HealthTab } from "./HealthTab";
@@ -45,7 +44,6 @@ type MoreView =
 export type { MoreView };
 
 interface MoreTabProps {
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   caregivers: CaregiverInfo[];
@@ -71,7 +69,6 @@ interface MoreTabProps {
 }
 
 export function MoreTab({
-  trackerId,
   secretLink,
   selectedCaregiver,
   caregivers,
@@ -95,7 +92,7 @@ export function MoreTab({
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
 
-  const activeAlerts = useQuery(api.supplyAlerts.getActive, { trackerId });
+  const activeAlerts = useQuery(api.supplyAlerts.getActive, { secretLink, actingCaregiverName: selectedCaregiver });
   const addCaregiver = useMutation(api.trackers.addCaregiver);
   const removeCaregiver = useMutation(api.trackers.removeCaregiver);
 
@@ -214,7 +211,6 @@ export function MoreTab({
           {t("backToMore")}
         </button>
         <HistoryTab
-          trackerId={trackerId}
           secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
         />
@@ -232,7 +228,7 @@ export function MoreTab({
         >
           {t("backToMore")}
         </button>
-        <HealthTab trackerId={trackerId} selectedCaregiver={selectedCaregiver} />
+        <HealthTab secretLink={secretLink} selectedCaregiver={selectedCaregiver} />
       </div>
     );
   }
@@ -240,7 +236,6 @@ export function MoreTab({
   if (view === "stats") {
     return (
       <StatsView
-        trackerId={trackerId}
         babyName={babyName}
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
@@ -252,7 +247,8 @@ export function MoreTab({
   if (view === "export") {
     return (
       <ExportView
-        trackerId={trackerId}
+        secretLink={secretLink}
+        selectedCaregiver={selectedCaregiver}
         babyName={babyName}
         onBack={() => setView("menu")}
       />
@@ -262,7 +258,7 @@ export function MoreTab({
   if (view === "growth") {
     return (
       <GrowthView
-        trackerId={trackerId}
+        secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         onBack={() => setView("menu")}
       />
@@ -271,7 +267,7 @@ export function MoreTab({
 
   if (view === "milestones") {
     return (
-      <MilestonesView trackerId={trackerId} onBack={() => setView("menu")} />
+      <MilestonesView secretLink={secretLink} selectedCaregiver={selectedCaregiver} onBack={() => setView("menu")} />
     );
   }
 
@@ -453,7 +449,7 @@ export function MoreTab({
 
       {showSupplyModal && (
         <SupplyAlertModal
-          trackerId={trackerId}
+          secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
           onClose={() => setShowSupplyModal(false)}
         />

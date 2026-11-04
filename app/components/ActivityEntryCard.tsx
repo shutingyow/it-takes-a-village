@@ -43,6 +43,8 @@ const iconBg: Record<string, string> = {
 
 interface ActivityEntryCardProps {
   entry: ActivityEntry;
+  secretLink: string;
+  selectedCaregiver: string;
   timeLabel?: string;
   isLast?: boolean;
   onEdit?: (entry: ActivityEntry) => void;
@@ -63,6 +65,8 @@ function getPhotoIds(entry: ActivityEntry): Id<"_storage">[] | undefined {
 
 export function ActivityEntryCard({
   entry,
+  secretLink,
+  selectedCaregiver,
   timeLabel,
   isLast = false,
   onEdit,
@@ -111,7 +115,13 @@ export function ActivityEntryCard({
         {photoIds && photoIds.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {photoIds.map((id) => (
-              <NotePhoto key={id} storageId={id} size="sm" />
+              <NotePhoto
+                key={id}
+                storageId={id}
+                secretLink={secretLink}
+                actingCaregiverName={selectedCaregiver}
+                size="sm"
+              />
             ))}
           </div>
         )}

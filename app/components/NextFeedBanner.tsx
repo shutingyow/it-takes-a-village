@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import {
   cn,
   formatMinutesCompact,
@@ -23,11 +22,12 @@ import {
 } from "@/app/lib/feedScheduleAck";
 
 interface NextFeedBannerProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
 }
 
 /** High-contrast next-feed countdown + late/overdue acknowledgment. */
-export function NextFeedBanner({ trackerId }: NextFeedBannerProps) {
+export function NextFeedBanner({ secretLink, selectedCaregiver }: NextFeedBannerProps) {
   const { t } = useLanguage();
   const [now, setNow] = useState(() => Date.now());
   const [ackTick, setAckTick] = useState(0);
@@ -37,12 +37,13 @@ export function NextFeedBanner({ trackerId }: NextFeedBannerProps) {
     return () => clearInterval(id);
   }, []);
 
-  const dueStatus = useQuery(api.reminders.getDueStatus, { trackerId, now });
+  const dueStatus = useQuery(api.reminders.getDueStatus, { secretLink, actingCaregiverName: selectedCaregiver, now });
   const recentFeeds = useQuery(api.feedEntries.getRecentMilk, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     limit: 2,
   });
-  const lastPump = useQuery(api.pumpEntries.getLast, { trackerId });
+  const lastPump = useQuery(api.pumpEntries.getLast, { secretLink, actingCaregiverName: selectedCaregiver });
   const feed = dueStatus?.items.find((item) => item.type === "feed");
   const lastFeed = recentFeeds?.[0] ?? null;
   const previousFeed = recentFeeds?.[1] ?? null;

@@ -2,7 +2,6 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useEffect, useState } from "react";
 import {
   cn,
@@ -22,7 +21,8 @@ import {
 } from "@/app/lib/feedScheduleAck";
 
 interface DueSoonCardProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
   pumpScheduleEnabled?: boolean;
 }
 
@@ -107,7 +107,8 @@ function DueRow({
 }
 
 export function DueSoonCard({
-  trackerId,
+  secretLink,
+  selectedCaregiver,
   pumpScheduleEnabled,
 }: DueSoonCardProps) {
   const { t } = useLanguage();
@@ -119,9 +120,10 @@ export function DueSoonCard({
     return () => clearInterval(interval);
   }, []);
 
-  const dueStatus = useQuery(api.reminders.getDueStatus, { trackerId, now });
+  const dueStatus = useQuery(api.reminders.getDueStatus, { secretLink, actingCaregiverName: selectedCaregiver, now });
   const recentFeeds = useQuery(api.feedEntries.getRecentMilk, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     limit: 2,
   });
 

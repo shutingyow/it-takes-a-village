@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
 const IMPORT_TAG = "import:baby_log_23aug_5sep";
@@ -77,7 +77,7 @@ function pumpSignature(e: {
  * Batch-import parsed baby log rows into an existing tracker.
  * Idempotent: skips rows whose signature already exists (same timestamp + notes + type).
  */
-export const importBatch = mutation({
+export const importBatch = internalMutation({
   args: {
     trackerId: v.id("trackers"),
     feeds: v.optional(v.array(feedEntryValidator)),
@@ -276,7 +276,7 @@ export const importBatch = mutation({
 });
 
 /** Verify import counts for a tracker (tagged rows only). */
-export const verifyImport = query({
+export const verifyImport = internalQuery({
   args: {
     trackerId: v.id("trackers"),
     importTag: v.optional(v.string()),
@@ -359,7 +359,7 @@ export const verifyImport = query({
 });
 
 /** Look up tracker by id for scripts. */
-export const getTrackerMeta = query({
+export const getTrackerMeta = internalQuery({
   args: { trackerId: v.id("trackers") },
   returns: v.union(
     v.object({
@@ -391,7 +391,7 @@ const diaperTypeValidator = v.union(
  * Matches trackerId + timestamp (+ optional import notes tag).
  * Used to correct a prior wet-only import (Diaper+Poop → both, etc.).
  */
-export const fixDiaperTypes = mutation({
+export const fixDiaperTypes = internalMutation({
   args: {
     trackerId: v.id("trackers"),
     importTag: v.optional(v.string()),
@@ -489,7 +489,7 @@ export const fixDiaperTypes = mutation({
 });
 
 /** Count imported diaper entries by type for a tracker (via secretLink). */
-export const countDiaperTypesBySecret = query({
+export const countDiaperTypesBySecret = internalQuery({
   args: {
     secretLink: v.string(),
     importTag: v.optional(v.string()),

@@ -72,15 +72,21 @@ export default function TrackerPage({
   );
   const lastFeed = useQuery(
     api.feedEntries.getLast,
-    tracker ? { trackerId: tracker._id } : "skip"
+    tracker && lockedCaregiver
+      ? { secretLink, actingCaregiverName: lockedCaregiver }
+      : "skip"
   );
   const lastDiaper = useQuery(
     api.diaperEntries.getLast,
-    tracker ? { trackerId: tracker._id } : "skip"
+    tracker && lockedCaregiver
+      ? { secretLink, actingCaregiverName: lockedCaregiver }
+      : "skip"
   );
   const activeAlerts = useQuery(
     api.supplyAlerts.getActive,
-    tracker ? { trackerId: tracker._id } : "skip"
+    tracker && lockedCaregiver
+      ? { secretLink, actingCaregiverName: lockedCaregiver }
+      : "skip"
   );
 
   useEffect(() => {
@@ -344,7 +350,7 @@ export default function TrackerPage({
 
       {activeAlerts && activeAlerts.length > 0 && (
         <SupplyAlertsBanner
-          trackerId={tracker._id}
+          secretLink={secretLink}
           selectedCaregiver={lockedCaregiver}
           alerts={activeAlerts}
         />
@@ -353,7 +359,6 @@ export default function TrackerPage({
       <main className="flex-1 min-h-0 min-w-0 overflow-x-clip overflow-y-auto overscroll-y-contain pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))]">
         {activeTab === "today" && (
           <HomeTab
-            trackerId={tracker._id}
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
             babyName={tracker.babyName}
@@ -369,7 +374,7 @@ export default function TrackerPage({
           />
         )}
         <ReminderScheduler
-          trackerId={tracker._id}
+          selectedCaregiver={lockedCaregiver}
           secretLink={secretLink}
           feedIntervalHours={tracker.feedIntervalHours}
           notifyBeforeMinutes={tracker.notifyBeforeMinutes}
@@ -380,7 +385,6 @@ export default function TrackerPage({
         />
         {activeTab === "insights" && (
           <InsightsTab
-            trackerId={tracker._id}
             babyName={tracker.babyName}
             birthDate={tracker.birthDate}
             secretLink={secretLink}
@@ -390,7 +394,6 @@ export default function TrackerPage({
         )}
         {activeTab === "profile" && (
           <ProfileTab
-            trackerId={tracker._id}
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
             openView={profileOpenView}
@@ -398,7 +401,6 @@ export default function TrackerPage({
         )}
         {activeTab === "settings" && (
           <SettingsTab
-            trackerId={tracker._id}
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
             caregivers={tracker.caregivers}
@@ -441,7 +443,6 @@ export default function TrackerPage({
 
       {activeLogModal === "feed" && (
         <FeedModal
-          trackerId={tracker._id}
           secretLink={secretLink}
           selectedCaregiver={lockedCaregiver}
           birthDate={tracker.birthDate}
@@ -450,7 +451,6 @@ export default function TrackerPage({
       )}
       {activeLogModal === "diaper" && (
         <DiaperModal
-          trackerId={tracker._id}
           secretLink={secretLink}
           selectedCaregiver={lockedCaregiver}
           onClose={() => setActiveLogModal(null)}
@@ -458,7 +458,6 @@ export default function TrackerPage({
       )}
       {activeLogModal === "pump" && (
         <PumpModal
-          trackerId={tracker._id}
           secretLink={secretLink}
           selectedCaregiver={lockedCaregiver}
           onClose={() => setActiveLogModal(null)}
@@ -473,7 +472,6 @@ export default function TrackerPage({
       )}
       {activeLogModal === "nap" && (
         <SleepModal
-          trackerId={tracker._id}
           secretLink={secretLink}
           selectedCaregiver={lockedCaregiver}
           onClose={() => setActiveLogModal(null)}

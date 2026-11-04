@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import {
   cn,
@@ -106,17 +105,14 @@ function clampBlock(
 }
 
 interface TodayTimetableProps {
-  trackerId: Id<"trackers">;
   /** Day to show (YYYY-MM-DD). Defaults to today. */
   dateKey?: string;
   className?: string;
-  /** When set with selectedCaregiver, timetable entries open the edit/detail sheet. */
-  secretLink?: string;
-  selectedCaregiver?: string;
+  secretLink: string;
+  selectedCaregiver: string;
 }
 
 export function TodayTimetable({
-  trackerId,
   dateKey: controlledDateKey,
   className,
   secretLink,
@@ -130,7 +126,7 @@ export function TodayTimetable({
   } | null>(null);
   const [editingEntry, setEditingEntry] = useState<ActivityEntry | null>(null);
 
-  const canOpenDetails = Boolean(secretLink && selectedCaregiver);
+  const canOpenDetails = Boolean(selectedCaregiver);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -141,7 +137,8 @@ export function TodayTimetable({
   const anchorKey = controlledDateKey ?? todayKey;
 
   const schedule = useQuery(api.timetable.getSchedule, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     startDateKey: anchorKey,
     dayCount: 1,
     now,
@@ -150,7 +147,11 @@ export function TodayTimetable({
   const dayEntries = useQuery(
     api.history.getActivityForDay,
     pendingOpen
-      ? { trackerId, dateKey: pendingOpen.dateKey }
+      ? {
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
+          dateKey: pendingOpen.dateKey,
+        }
       : "skip"
   );
 
@@ -211,10 +212,9 @@ export function TodayTimetable({
         />
       )}
 
-      {editingEntry && secretLink && selectedCaregiver && (
+      {editingEntry && selectedCaregiver && (
         <EditActivitySheet
           entry={editingEntry}
-          trackerId={trackerId}
           secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
           onClose={() => setEditingEntry(null)}

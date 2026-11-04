@@ -1,6 +1,5 @@
 "use client";
 
-import { Id } from "@/convex/_generated/dataModel";
 import { useEffect, useState } from "react";
 import { NotesTab } from "./NotesTab";
 import { UpcomingTab } from "./UpcomingTab";
@@ -33,14 +32,12 @@ export type ProfileView =
   | "stash";
 
 interface ProfileTabProps {
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   openView?: ProfileView | null;
 }
 
 export function ProfileTab({
-  trackerId,
   secretLink,
   selectedCaregiver,
   openView,
@@ -105,7 +102,7 @@ export function ProfileTab({
   if (view === "notes") {
     return (
       <SubView backLabel={t("backToProfile")} onBack={() => setView("menu")}>
-        <NotesTab trackerId={trackerId} selectedCaregiver={selectedCaregiver} />
+        <NotesTab secretLink={secretLink} selectedCaregiver={selectedCaregiver} />
       </SubView>
     );
   }
@@ -113,7 +110,7 @@ export function ProfileTab({
   if (view === "upcoming") {
     return (
       <SubView backLabel={t("backToProfile")} onBack={() => setView("menu")}>
-        <UpcomingTab trackerId={trackerId} selectedCaregiver={selectedCaregiver} />
+        <UpcomingTab secretLink={secretLink} selectedCaregiver={selectedCaregiver} />
       </SubView>
     );
   }
@@ -122,7 +119,6 @@ export function ProfileTab({
     return (
       <SubView backLabel={t("backToProfile")} onBack={() => setView("menu")}>
         <HistoryTab
-          trackerId={trackerId}
           secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
         />
@@ -133,7 +129,7 @@ export function ProfileTab({
   if (view === "health") {
     return (
       <SubView backLabel={t("backToProfile")} onBack={() => setView("menu")}>
-        <HealthTab trackerId={trackerId} selectedCaregiver={selectedCaregiver} />
+        <HealthTab secretLink={secretLink} selectedCaregiver={selectedCaregiver} />
       </SubView>
     );
   }
@@ -141,7 +137,7 @@ export function ProfileTab({
   if (view === "growth") {
     return (
       <GrowthView
-        trackerId={trackerId}
+        secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         onBack={() => setView("menu")}
       />
@@ -152,7 +148,7 @@ export function ProfileTab({
     return (
       <SubView backLabel={t("backToProfile")} onBack={() => setView("menu")}>
         <MilkStashPanel
-          trackerId={trackerId}
+          secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
         />
       </SubView>
@@ -161,7 +157,7 @@ export function ProfileTab({
 
   if (view === "milestones") {
     return (
-      <MilestonesView trackerId={trackerId} onBack={() => setView("menu")} />
+      <MilestonesView secretLink={secretLink} selectedCaregiver={selectedCaregiver} onBack={() => setView("menu")} />
     );
   }
 

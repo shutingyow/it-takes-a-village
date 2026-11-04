@@ -1,6 +1,5 @@
 "use client";
 
-import { Id } from "@/convex/_generated/dataModel";
 import { useEffect, useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
@@ -48,7 +47,6 @@ export type SettingsView =
   | "caregivers";
 
 interface SettingsTabProps {
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   caregivers: CaregiverInfo[];
@@ -78,7 +76,6 @@ interface SettingsTabProps {
 }
 
 export function SettingsTab({
-  trackerId,
   secretLink,
   selectedCaregiver,
   caregivers,
@@ -109,7 +106,7 @@ export function SettingsTab({
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
 
-  const activeAlerts = useQuery(api.supplyAlerts.getActive, { trackerId });
+  const activeAlerts = useQuery(api.supplyAlerts.getActive, { secretLink, actingCaregiverName: selectedCaregiver });
   const addCaregiver = useMutation(api.trackers.addCaregiver);
   const removeCaregiver = useMutation(api.trackers.removeCaregiver);
 
@@ -132,7 +129,8 @@ export function SettingsTab({
   if (view === "export") {
     return (
       <ExportView
-        trackerId={trackerId}
+        secretLink={secretLink}
+        selectedCaregiver={selectedCaregiver}
         babyName={babyName}
         onBack={() => setView("menu")}
       />
@@ -501,7 +499,7 @@ export function SettingsTab({
 
       {showSupplyModal && (
         <SupplyAlertModal
-          trackerId={trackerId}
+          secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
           onClose={() => setShowSupplyModal(false)}
         />

@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useEffect, useMemo, useState } from "react";
 import {
   formatDate,
@@ -74,7 +73,6 @@ const CATEGORY_META: Record<
 
 interface HomeCategoryDetailProps {
   category: HomeCategory;
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   onBack: () => void;
@@ -83,7 +81,6 @@ interface HomeCategoryDetailProps {
 
 export function HomeCategoryDetail({
   category,
-  trackerId,
   secretLink,
   selectedCaregiver,
   onBack,
@@ -102,12 +99,13 @@ export function HomeCategoryDetail({
   const dueStatus = useQuery(
     api.reminders.getDueStatus,
     category === "feed" || category === "pump"
-      ? { trackerId, now }
+      ? { secretLink, actingCaregiverName: selectedCaregiver, now }
       : "skip"
   );
 
   const activity = useQuery(api.history.getActivity, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     limit: 50,
     type: meta.historyType,
   });
@@ -144,11 +142,11 @@ export function HomeCategoryDetail({
     if (!confirm(t("confirmDeleteEntry"))) return;
     try {
       if (entry.entryType === "feed") {
-        await removeFeed({ entryId: entry._id });
+        await removeFeed({ secretLink, actingCaregiverName: selectedCaregiver, entryId: entry._id });
       } else if (entry.entryType === "diaper") {
-        await removeDiaper({ entryId: entry._id });
+        await removeDiaper({ secretLink, actingCaregiverName: selectedCaregiver, entryId: entry._id });
       } else if (entry.entryType === "pump") {
-        await removePump({ entryId: entry._id });
+        await removePump({ secretLink, actingCaregiverName: selectedCaregiver, entryId: entry._id });
       } else if (entry.entryType === "sleep" || entry.entryType === "nap") {
         await removeSleep({
           secretLink,
@@ -352,6 +350,8 @@ export function HomeCategoryDetail({
                     {entries.map((entry, index) => (
                       <ActivityEntryCard
                         key={entry._id}
+                        secretLink={secretLink}
+                        selectedCaregiver={selectedCaregiver}
                         entry={entry}
                         timeLabel={formatTime(entry.time)}
                         isLast={index === entries.length - 1}
@@ -370,7 +370,6 @@ export function HomeCategoryDetail({
       {editingEntry && (
         <EditActivitySheet
           entry={editingEntry}
-          trackerId={trackerId}
           secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
           onClose={() => setEditingEntry(null)}

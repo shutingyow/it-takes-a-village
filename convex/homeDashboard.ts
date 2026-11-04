@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { verifyCaregiver } from "./lib/caregivers";
 
 const diaperTypeValidator = v.union(
   v.literal("wet"),
@@ -12,7 +13,8 @@ const diaperTypeValidator = v.union(
  */
 export const getTileSummaries = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     dayStart: v.number(),
     dayEnd: v.number(),
     now: v.number(),
@@ -52,10 +54,15 @@ export const getTileSummaries = query({
     ),
   }),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const recentFeeds = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId)
+        q.eq("trackerId", tracker._id)
       )
       .order("desc")
       .take(40);
@@ -66,7 +73,7 @@ export const getTileSummaries = query({
     const lastDiaper = await ctx.db
       .query("diaperEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId)
+        q.eq("trackerId", tracker._id)
       )
       .order("desc")
       .first();
@@ -74,7 +81,7 @@ export const getTileSummaries = query({
     const pumpsToday = await ctx.db
       .query("pumpEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", args.dayStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", args.dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), args.dayEnd))
       .collect();
@@ -82,7 +89,7 @@ export const getTileSummaries = query({
     const lastPump = await ctx.db
       .query("pumpEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId)
+        q.eq("trackerId", tracker._id)
       )
       .order("desc")
       .first();
@@ -90,7 +97,7 @@ export const getTileSummaries = query({
     const recentSleep = await ctx.db
       .query("sleepEntries")
       .withIndex("by_tracker_and_start", (q) =>
-        q.eq("trackerId", args.trackerId)
+        q.eq("trackerId", tracker._id)
       )
       .order("desc")
       .take(40);

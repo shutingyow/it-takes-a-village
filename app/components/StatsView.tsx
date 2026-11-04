@@ -2,7 +2,6 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useMemo, useState } from "react";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { cn, formatTime, getDateKeyInZone, shiftDateKey } from "@/app/lib/utils";
@@ -17,11 +16,10 @@ import { BirthDateField } from "./BirthDateField";
 import { TodayTimetable } from "./TodayTimetable";
 
 interface StatsViewProps {
-  trackerId: Id<"trackers">;
   babyName?: string;
   birthDate?: string;
-  secretLink?: string;
-  selectedCaregiver?: string;
+  secretLink: string;
+  selectedCaregiver: string;
   /** Birth date edits are admin-only. */
   canEditBirthDate?: boolean;
   onBack?: () => void;
@@ -282,7 +280,6 @@ function StatLine({ label, value }: { label: string; value: string }) {
 }
 
 export function StatsView({
-  trackerId,
   babyName,
   birthDate,
   secretLink,
@@ -304,20 +301,31 @@ export function StatsView({
   const weeklySummary = useQuery(
     api.stats.getWeeklySummary,
     rangeMode === "weekly"
-      ? { trackerId, now, endDateKey: selectedWeekEndKey }
+      ? {
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
+          now,
+          endDateKey: selectedWeekEndKey,
+        }
       : "skip"
   );
   const dailyStats = useQuery(
     api.stats.getDailyStats,
     rangeMode === "daily"
-      ? { trackerId, dateKey: selectedDateKey, now }
+      ? {
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
+          dateKey: selectedDateKey,
+          now,
+        }
       : "skip"
   );
 
   if (showExport) {
     return (
       <ExportView
-        trackerId={trackerId}
+        secretLink={secretLink}
+        selectedCaregiver={selectedCaregiver}
         babyName={babyName}
         onBack={() => setShowExport(false)}
       />
@@ -595,7 +603,6 @@ export function StatsView({
 
       {rangeMode === "daily" && (
         <TodayTimetable
-          trackerId={trackerId}
           dateKey={selectedDateKey}
           className="px-0 pb-4"
           secretLink={secretLink}

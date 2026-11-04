@@ -18,7 +18,6 @@ import { hapticSuccess } from "@/app/lib/haptics";
 type DiaperEditEntry = Extract<ActivityEntry, { entryType: "diaper" }>;
 
 interface DiaperModalProps {
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   onClose: () => void;
@@ -63,7 +62,6 @@ const CONSISTENCIES: Array<{ id: DiaperConsistency; labelKey: TranslationKey }> 
   ];
 
 export function DiaperModal({
-  trackerId,
   secretLink,
   selectedCaregiver,
   onClose,
@@ -117,11 +115,11 @@ export function DiaperModal({
       };
 
       if (editEntry) {
-        await updateDiaper({ entryId: editEntry._id, ...payload });
+        await updateDiaper({ secretLink, actingCaregiverName: selectedCaregiver, entryId: editEntry._id, ...payload });
       } else {
         await createDiaper({
-          trackerId,
-          caregiverName: selectedCaregiver,
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
           ...payload,
         });
       }

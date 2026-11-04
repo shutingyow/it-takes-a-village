@@ -98,7 +98,13 @@ export function TodayHeader({
           aria-label={photoStorageId ? t("changePhoto") : t("addPhoto")}
         >
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-beige-light border-[3px] border-beige flex items-center justify-center overflow-hidden shadow-sm">
-            <BabyAvatar storageId={photoStorageId} alt={mainTitle} size="md" />
+            <BabyAvatar
+              storageId={photoStorageId}
+              secretLink={secretLink}
+              actingCaregiverName={selectedCaregiver}
+              alt={mainTitle}
+              size="md"
+            />
           </div>
           <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-terracotta text-white flex items-center justify-center border-[2px] border-background shadow-sm">
             <IconPlus size={12} strokeWidth={2.5} />

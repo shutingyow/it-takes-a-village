@@ -2,7 +2,6 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { Capacitor } from "@capacitor/core";
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
@@ -11,7 +10,8 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { formatDateTime } from "@/app/lib/utils";
 
 interface ExportViewProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
   babyName?: string;
   onBack: () => void;
 }
@@ -148,7 +148,7 @@ async function shareCsvNative(csv: string, fileName: string) {
   });
 }
 
-export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
+export function ExportView({ secretLink, selectedCaregiver, babyName, onBack }: ExportViewProps) {
   const { t } = useLanguage();
   const [days, setDays] = useState<7 | 30>(7);
   const [now] = useState(Date.now());
@@ -158,7 +158,7 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const isNative = Capacitor.isNativePlatform();
 
-  const exportData = useQuery(api.export.getData, { trackerId, days, now });
+  const exportData = useQuery(api.export.getData, { secretLink, actingCaregiverName: selectedCaregiver, days, now });
 
   const buildCsv = () => {
     if (!exportData) return null;

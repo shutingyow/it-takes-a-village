@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Capacitor } from "@capacitor/core";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { formatTime } from "@/app/lib/utils";
 import { listUpcomingPumpDueAts } from "@/convex/lib/pumpSchedule";
@@ -21,7 +20,7 @@ import {
 import { isFeedTimerRecording } from "@/app/lib/feedTimer";
 
 interface ReminderSchedulerProps {
-  trackerId: Id<"trackers">;
+  selectedCaregiver: string;
   secretLink: string;
   feedIntervalHours?: number;
   notifyBeforeMinutes?: number;
@@ -50,7 +49,7 @@ interface ReminderSchedulerProps {
  * Capacitor app returns to the foreground (clears stale OS schedules).
  */
 export function ReminderScheduler({
-  trackerId,
+  selectedCaregiver,
   secretLink,
   feedIntervalHours,
   notifyBeforeMinutes: notifyBeforeProp,
@@ -68,14 +67,15 @@ export function ReminderScheduler({
   useEffect(() => {
     setLiveActivityPushTokenHandler(({ activityId, pushToken }) => {
       void upsertLiveActivity({
-        trackerId,
+        secretLink,
+        actingCaregiverName: selectedCaregiver,
         activityId,
         pushToken,
         deviceId: getOrCreateDeviceId(),
       });
     });
     return () => setLiveActivityPushTokenHandler(null);
-  }, [trackerId, upsertLiveActivity]);
+  }, [secretLink, selectedCaregiver, upsertLiveActivity]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -117,16 +117,18 @@ export function ReminderScheduler({
   }, []);
 
   const dueStatus = useQuery(api.reminders.getDueStatus, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     now,
   });
-  const lastFeed = useQuery(api.feedEntries.getLast, { trackerId });
-  const lastPump = useQuery(api.pumpEntries.getLast, { trackerId });
+  const lastFeed = useQuery(api.feedEntries.getLast, { secretLink, actingCaregiverName: selectedCaregiver });
+  const lastPump = useQuery(api.pumpEntries.getLast, { secretLink, actingCaregiverName: selectedCaregiver });
   const recentSleep = useQuery(api.sleepEntries.getRecent, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     limit: 10,
   });
-  const activeSleep = useQuery(api.sleepEntries.getActive, { trackerId });
+  const activeSleep = useQuery(api.sleepEntries.getActive, { secretLink, actingCaregiverName: selectedCaregiver });
 
   const feedItem = dueStatus?.items.find((item) => item.type === "feed");
   const pumpItem = dueStatus?.items.find((item) => item.type === "pump");

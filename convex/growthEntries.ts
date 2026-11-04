@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
+import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
 import {
   assertIsoDate,
   assertNotFarFuture,
@@ -27,8 +28,8 @@ const growthEntryReturn = v.object({
 
 export const create = mutation({
   args: {
-    trackerId: v.id("trackers"),
-    caregiverName: v.string(),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     date: v.string(),
     weight: v.optional(v.number()),
     length: v.optional(v.number()),
@@ -39,6 +40,11 @@ export const create = mutation({
   },
   returns: v.id("growthEntries"),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const date = assertIsoDate(args.date, "Measurement date");
     assertNotFarFuture(args.timestamp);
 
@@ -56,36 +62,56 @@ export const create = mutation({
     }
 
     return await ctx.db.insert("growthEntries", {
-      ...args,
+      trackerId: tracker._id,
+      caregiverName: args.actingCaregiverName.trim(),
       date,
+      weight: args.weight,
+      length: args.length,
+      headCircumference: args.headCircumference,
       measurementSource: args.measurementSource,
+      notes: args.notes,
+      timestamp: args.timestamp,
     });
   },
 });
 
 export const list = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     limit: v.optional(v.number()),
   },
   returns: v.array(growthEntryReturn),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const limit = args.limit ?? 20;
     return await ctx.db
       .query("growthEntries")
-      .withIndex("by_tracker_and_date", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_date", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .take(limit);
   },
 });
 
 export const getLatest = query({
-  args: { trackerId: v.id("trackers") },
+  args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
+  },
   returns: v.union(growthEntryReturn, v.null()),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     return await ctx.db
       .query("growthEntries")
-      .withIndex("by_tracker_and_date", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_date", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .first();
   },
@@ -93,6 +119,8 @@ export const getLatest = query({
 
 export const update = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     entryId: v.id("growthEntries"),
     date: v.string(),
     weight: v.optional(v.number()),
@@ -104,10 +132,13 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.entryId);
-    if (!existing) {
-      throw new Error("Growth entry not found");
-    }
+    const { entry: existing } = await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.entryId,
+      "Growth entry not found"
+    );
 
     const date = assertIsoDate(args.date, "Measurement date");
     assertNotFarFuture(args.timestamp);
@@ -142,9 +173,20 @@ export const update = mutation({
 });
 
 export const remove = mutation({
-  args: { entryId: v.id("growthEntries") },
+  args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
+    entryId: v.id("growthEntries"),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.entryId,
+      "Growth entry not found"
+    );
     await ctx.db.delete(args.entryId);
     return null;
   },

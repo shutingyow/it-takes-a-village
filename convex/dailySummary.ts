@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { verifyCaregiver } from "./lib/caregivers";
 
 const diaperTypeValidator = v.union(
   v.literal("wet"),
@@ -43,17 +44,23 @@ function sleepMinutesInRange(
 
 export const getForDay = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     dayStart: v.number(),
     dayEnd: v.number(),
     now: v.number(),
   },
   returns: dailySummaryValidator,
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const feeds = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", args.dayStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", args.dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), args.dayEnd))
       .collect();
@@ -61,7 +68,7 @@ export const getForDay = query({
     const diapers = await ctx.db
       .query("diaperEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", args.dayStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", args.dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), args.dayEnd))
       .collect();
@@ -69,7 +76,7 @@ export const getForDay = query({
     const pumps = await ctx.db
       .query("pumpEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", args.dayStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", args.dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), args.dayEnd))
       .collect();
@@ -77,7 +84,7 @@ export const getForDay = query({
     const healthEntries = await ctx.db
       .query("healthEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", args.dayStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", args.dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), args.dayEnd))
       .collect();
@@ -86,7 +93,7 @@ export const getForDay = query({
       .query("sleepEntries")
       .withIndex("by_tracker_and_start", (q) =>
         q
-          .eq("trackerId", args.trackerId)
+          .eq("trackerId", tracker._id)
           .gte("startTime", args.dayStart - 24 * 60 * 60 * 1000)
       )
       .collect();

@@ -9,7 +9,8 @@ import type { TranslationKey } from "@/app/lib/i18n/en";
 import { formatDate } from "@/app/lib/utils";
 
 interface MilestonesViewProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
   onBack: () => void;
 }
 
@@ -20,20 +21,20 @@ const CATEGORY_LABELS: Record<string, TranslationKey> = {
   sleep: "milestoneCategorySleep",
 };
 
-export function MilestonesView({ trackerId, onBack }: MilestonesViewProps) {
+export function MilestonesView({ secretLink, selectedCaregiver, onBack }: MilestonesViewProps) {
   const { t } = useLanguage();
   const ensureSeeded = useMutation(api.milestones.ensureSeeded);
   const markAchieved = useMutation(api.milestones.markAchieved);
   const clearAchieved = useMutation(api.milestones.clearAchieved);
   const addCustom = useMutation(api.milestones.addCustom);
 
-  const milestones = useQuery(api.milestones.list, { trackerId });
+  const milestones = useQuery(api.milestones.list, { secretLink, actingCaregiverName: selectedCaregiver });
   const [newTitle, setNewTitle] = useState("");
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    void ensureSeeded({ trackerId });
-  }, [trackerId, ensureSeeded]);
+    void ensureSeeded({ secretLink, actingCaregiverName: selectedCaregiver });
+  }, [secretLink, selectedCaregiver, ensureSeeded]);
 
   const getTitle = (m: {
     title: string;
@@ -52,9 +53,9 @@ export function MilestonesView({ trackerId, onBack }: MilestonesViewProps) {
     achievedAt?: number
   ) => {
     if (achievedAt) {
-      await clearAchieved({ milestoneId: id });
+      await clearAchieved({ secretLink, actingCaregiverName: selectedCaregiver, milestoneId: id });
     } else {
-      await markAchieved({ milestoneId: id, achievedAt: Date.now() });
+      await markAchieved({ secretLink, actingCaregiverName: selectedCaregiver, milestoneId: id, achievedAt: Date.now() });
     }
   };
 
@@ -63,7 +64,7 @@ export function MilestonesView({ trackerId, onBack }: MilestonesViewProps) {
     if (!title) return;
     setAdding(true);
     try {
-      await addCustom({ trackerId, title });
+      await addCustom({ secretLink, actingCaregiverName: selectedCaregiver, title });
       setNewTitle("");
     } finally {
       setAdding(false);

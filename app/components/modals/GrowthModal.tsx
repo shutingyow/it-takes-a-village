@@ -2,7 +2,6 @@
 
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 import { BottomSheet } from "../ui/BottomSheet";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
@@ -13,7 +12,7 @@ import { LoggedByHint } from "../LoggedByHint";
 type GrowthEditEntry = Extract<ActivityEntry, { entryType: "growth" }>;
 
 interface GrowthModalProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
   onClose: () => void;
   editEntry?: GrowthEditEntry;
@@ -36,7 +35,7 @@ function parseOptionalPositive(raw: string): number | undefined {
 }
 
 export function GrowthModal({
-  trackerId,
+  secretLink,
   selectedCaregiver,
   onClose,
   editEntry,
@@ -90,11 +89,11 @@ export function GrowthModal({
       };
 
       if (editEntry) {
-        await update({ entryId: editEntry._id, ...payload });
+        await update({ secretLink, actingCaregiverName: selectedCaregiver, entryId: editEntry._id, ...payload });
       } else {
         await create({
-          trackerId,
-          caregiverName: selectedCaregiver,
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
           ...payload,
         });
       }

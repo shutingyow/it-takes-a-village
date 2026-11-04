@@ -1,16 +1,23 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
+import { verifyCaregiver } from "./lib/caregivers";
 
 /** Register / refresh an ActivityKit push token for Live Activity updates. */
 export const upsertLiveActivity = mutation({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     activityId: v.string(),
     pushToken: v.string(),
     deviceId: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const token = args.pushToken.trim().toLowerCase();
     const activityId = args.activityId.trim();
     const deviceId = args.deviceId.trim();
@@ -26,7 +33,7 @@ export const upsertLiveActivity = mutation({
     const now = Date.now();
     if (byActivity) {
       await ctx.db.patch(byActivity._id, {
-        trackerId: args.trackerId,
+        trackerId: tracker._id,
         pushToken: token,
         deviceId,
         updatedAt: now,
@@ -39,13 +46,13 @@ export const upsertLiveActivity = mutation({
       .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
       .collect();
     for (const row of byDevice) {
-      if (row.trackerId === args.trackerId) {
+      if (row.trackerId === tracker._id) {
         await ctx.db.delete(row._id);
       }
     }
 
     await ctx.db.insert("liveActivityRegistrations", {
-      trackerId: args.trackerId,
+      trackerId: tracker._id,
       activityId,
       pushToken: token,
       deviceId,
@@ -57,24 +64,33 @@ export const upsertLiveActivity = mutation({
 
 export const removeLiveActivity = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     activityId: v.optional(v.string()),
     deviceId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     if (args.activityId) {
       const row = await ctx.db
         .query("liveActivityRegistrations")
         .withIndex("by_activity", (q) => q.eq("activityId", args.activityId!))
         .unique();
-      if (row) await ctx.db.delete(row._id);
+      if (row && row.trackerId === tracker._id) await ctx.db.delete(row._id);
     }
     if (args.deviceId) {
       const rows = await ctx.db
         .query("liveActivityRegistrations")
         .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId!))
         .collect();
-      for (const row of rows) await ctx.db.delete(row._id);
+      for (const row of rows) {
+        if (row.trackerId === tracker._id) await ctx.db.delete(row._id);
+      }
     }
     return null;
   },
@@ -83,12 +99,18 @@ export const removeLiveActivity = mutation({
 /** Register APNs device token for silent wakes. */
 export const upsertDevicePushToken = mutation({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     token: v.string(),
     deviceId: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const token = args.token.trim();
     const deviceId = args.deviceId.trim();
     if (!token || !deviceId) throw new Error("Missing device push fields");
@@ -99,7 +121,7 @@ export const upsertDevicePushToken = mutation({
       .collect();
 
     const now = Date.now();
-    const sameTracker = existing.find((r) => r.trackerId === args.trackerId);
+    const sameTracker = existing.find((r) => r.trackerId === tracker._id);
     if (sameTracker) {
       await ctx.db.patch(sameTracker._id, { token, updatedAt: now });
       return null;
@@ -108,7 +130,7 @@ export const upsertDevicePushToken = mutation({
       await ctx.db.delete(row._id);
     }
     await ctx.db.insert("devicePushTokens", {
-      trackerId: args.trackerId,
+      trackerId: tracker._id,
       token,
       deviceId,
       updatedAt: now,

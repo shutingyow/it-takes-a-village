@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
 import {
   assertNotFarFuture,
   assertRange,
@@ -50,8 +51,8 @@ function validateHealthFields(args: {
 
 export const create = mutation({
   args: {
-    trackerId: v.id("trackers"),
-    caregiverName: v.string(),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     type: healthTypeValidator,
     temperature: v.optional(v.number()),
     medicationName: v.optional(v.string()),
@@ -63,10 +64,15 @@ export const create = mutation({
   },
   returns: v.id("healthEntries"),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     validateHealthFields(args);
     return await ctx.db.insert("healthEntries", {
-      trackerId: args.trackerId,
-      caregiverName: args.caregiverName,
+      trackerId: tracker._id,
+      caregiverName: args.actingCaregiverName.trim(),
       type: args.type,
       temperature:
         args.type === "temperature" ? args.temperature : undefined,
@@ -86,14 +92,20 @@ export const create = mutation({
 
 export const getRecent = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const limit = args.limit ?? 50;
     return await ctx.db
       .query("healthEntries")
-      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .take(limit);
   },
@@ -101,16 +113,22 @@ export const getRecent = query({
 
 export const getByType = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     type: healthTypeValidator,
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const limit = args.limit ?? 50;
     return await ctx.db
       .query("healthEntries")
       .withIndex("by_tracker_and_type", (q) =>
-        q.eq("trackerId", args.trackerId).eq("type", args.type)
+        q.eq("trackerId", tracker._id).eq("type", args.type)
       )
       .order("desc")
       .take(limit);
@@ -119,6 +137,8 @@ export const getByType = query({
 
 export const update = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     entryId: v.id("healthEntries"),
     type: healthTypeValidator,
     temperature: v.optional(v.number()),
@@ -131,10 +151,13 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.entryId);
-    if (!existing) {
-      throw new Error("Health entry not found");
-    }
+    const { entry: existing } = await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.entryId,
+      "Health entry not found"
+    );
     validateHealthFields(args);
 
     await ctx.db.replace(args.entryId, {
@@ -160,10 +183,19 @@ export const update = mutation({
 
 export const remove = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     entryId: v.id("healthEntries"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.entryId,
+      "Health entry not found"
+    );
     await ctx.db.delete(args.entryId);
     return null;
   },

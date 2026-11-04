@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { cn } from "@/app/lib/utils";
 import type { TranslationKey } from "@/app/lib/i18n/en";
@@ -19,20 +18,22 @@ const MOODS: Array<{ id: Mood; labelKey: TranslationKey }> = [
 ];
 
 interface DailyDiarySectionProps {
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   dateKey: string;
 }
 
 export function DailyDiarySection({
-  trackerId,
   secretLink,
   selectedCaregiver,
   dateKey,
 }: DailyDiarySectionProps) {
   const { t } = useLanguage();
-  const diary = useQuery(api.diaryEntries.getForDay, { trackerId, dateKey });
+  const diary = useQuery(api.diaryEntries.getForDay, {
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
+    dateKey,
+  });
   const upsert = useMutation(api.diaryEntries.upsert);
 
   const [content, setContent] = useState("");

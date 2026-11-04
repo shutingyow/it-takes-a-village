@@ -2,10 +2,8 @@
 
 import { StatsView } from "../StatsView";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
-import { Id } from "@/convex/_generated/dataModel";
 
 interface InsightsTabProps {
-  trackerId: Id<"trackers">;
   babyName?: string;
   birthDate?: string;
   secretLink: string;
@@ -14,7 +12,6 @@ interface InsightsTabProps {
 }
 
 export function InsightsTab({
-  trackerId,
   babyName,
   birthDate,
   secretLink,
@@ -25,7 +22,6 @@ export function InsightsTab({
 
   return (
     <StatsView
-      trackerId={trackerId}
       babyName={babyName}
       birthDate={birthDate}
       secretLink={secretLink}

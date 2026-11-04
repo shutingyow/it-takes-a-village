@@ -8,6 +8,8 @@ import { ActivityEntryCard, type ActivityEntry } from "./ActivityEntryCard";
 type DayEntry = Extract<ActivityEntry, { time: number }>;
 
 interface DayActivityTimelineProps {
+  secretLink: string;
+  selectedCaregiver: string;
   entries: DayEntry[];
   isToday: boolean;
   onEdit?: (entry: ActivityEntry) => void;
@@ -42,6 +44,8 @@ function WakeWindowBar({
 }
 
 export function DayActivityTimeline({
+  secretLink,
+  selectedCaregiver,
   entries,
   isToday,
   onEdit,
@@ -77,6 +81,8 @@ export function DayActivityTimeline({
             {wakeBefore != null && <WakeWindowBar minutes={wakeBefore} />}
             <ActivityEntryCard
               entry={entry}
+              secretLink={secretLink}
+              selectedCaregiver={selectedCaregiver}
               timeLabel={formatTime(entry.time)}
               isLast={index === entries.length - 1}
               onEdit={onEdit}

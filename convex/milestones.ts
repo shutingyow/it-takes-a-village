@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
 
 export const PREDEFINED_MILESTONES = [
   { key: "first_smile", title: "First smile", category: "social", sortOrder: 1 },
@@ -29,30 +30,46 @@ const milestoneValidator = v.object({
 });
 
 export const list = query({
-  args: { trackerId: v.id("trackers") },
+  args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
+  },
   returns: v.array(milestoneValidator),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     return await ctx.db
       .query("milestones")
-      .withIndex("by_tracker", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker", (q) => q.eq("trackerId", tracker._id))
       .collect();
   },
 });
 
 export const ensureSeeded = mutation({
-  args: { trackerId: v.id("trackers") },
+  args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const existing = await ctx.db
       .query("milestones")
-      .withIndex("by_tracker", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker", (q) => q.eq("trackerId", tracker._id))
       .first();
 
     if (existing) return null;
 
     for (const m of PREDEFINED_MILESTONES) {
       await ctx.db.insert("milestones", {
-        trackerId: args.trackerId,
+        trackerId: tracker._id,
         title: m.title,
         category: m.category,
         predefinedKey: m.key,
@@ -67,20 +84,40 @@ export const ensureSeeded = mutation({
 
 export const markAchieved = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     milestoneId: v.id("milestones"),
     achievedAt: v.number(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.milestoneId,
+      "Milestone not found"
+    );
     await ctx.db.patch(args.milestoneId, { achievedAt: args.achievedAt });
     return null;
   },
 });
 
 export const clearAchieved = mutation({
-  args: { milestoneId: v.id("milestones") },
+  args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
+    milestoneId: v.id("milestones"),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.milestoneId,
+      "Milestone not found"
+    );
     await ctx.db.patch(args.milestoneId, { achievedAt: undefined });
     return null;
   },
@@ -88,23 +125,29 @@ export const clearAchieved = mutation({
 
 export const addCustom = mutation({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     title: v.string(),
   },
   returns: v.id("milestones"),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const title = args.title.trim();
     if (!title) throw new Error("Milestone title is required");
 
     const existing = await ctx.db
       .query("milestones")
-      .withIndex("by_tracker", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker", (q) => q.eq("trackerId", tracker._id))
       .collect();
 
     const maxOrder = existing.reduce((max, m) => Math.max(max, m.sortOrder), 0);
 
     return await ctx.db.insert("milestones", {
-      trackerId: args.trackerId,
+      trackerId: tracker._id,
       title,
       isCustom: true,
       sortOrder: maxOrder + 1,

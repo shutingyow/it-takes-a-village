@@ -82,6 +82,8 @@ export function EntryPhotoField({
             <NotePhoto
               key={id}
               storageId={id}
+              secretLink={secretLink}
+              actingCaregiverName={selectedCaregiver}
               onRemove={() => onChange(photoIds.filter((p) => p !== id))}
               removeLabel={t("removePhoto")}
             />

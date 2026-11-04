@@ -16,7 +16,6 @@ import { hapticSuccess } from "@/app/lib/haptics";
 type PumpEditEntry = Extract<ActivityEntry, { entryType: "pump" }>;
 
 interface PumpModalProps {
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   onClose: () => void;
@@ -24,7 +23,6 @@ interface PumpModalProps {
 }
 
 export function PumpModal({
-  trackerId,
   secretLink,
   selectedCaregiver,
   onClose,
@@ -63,19 +61,19 @@ export function PumpModal({
       };
 
       if (editEntry) {
-        await updatePump({ entryId: editEntry._id, ...payload });
+        await updatePump({ secretLink, actingCaregiverName: selectedCaregiver, entryId: editEntry._id, ...payload });
       } else {
         const pumpId = await createPump({
-          trackerId,
-          caregiverName: selectedCaregiver,
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
           ...payload,
         });
         if (addToStash && amount > 0) {
           const d = new Date(timestamp);
           const frozenOn = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
           await addBag({
-            trackerId,
-            caregiverName: selectedCaregiver,
+            secretLink,
+            actingCaregiverName: selectedCaregiver,
             amountMl: amount,
             pumpedAt: timestamp,
             pumpEntryId: pumpId,

@@ -15,7 +15,6 @@ import { LoggedByHint } from "../LoggedByHint";
 type SleepEditEntry = Extract<ActivityEntry, { entryType: "sleep" }>;
 
 interface SleepModalProps {
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   onClose: () => void;
@@ -41,7 +40,6 @@ function getDefaultPastTimes(lastSleepEnd?: number) {
 }
 
 export function SleepModal({
-  trackerId,
   secretLink,
   selectedCaregiver,
   onClose,
@@ -54,11 +52,11 @@ export function SleepModal({
   const updateSleep = useMutation(api.sleepEntries.update);
   const activeSleep = useQuery(
     api.sleepEntries.getActive,
-    editEntry ? "skip" : { trackerId }
+    editEntry ? "skip" : { secretLink, actingCaregiverName: selectedCaregiver }
   );
   const lastSleep = useQuery(
     api.sleepEntries.getLast,
-    editEntry ? "skip" : { trackerId }
+    editEntry ? "skip" : { secretLink, actingCaregiverName: selectedCaregiver }
   );
   const isEditing = Boolean(editEntry);
 
@@ -114,8 +112,8 @@ export function SleepModal({
     setIsSubmitting(true);
     try {
       await startSleep({
-        trackerId,
-        caregiverName: selectedCaregiver,
+        secretLink,
+        actingCaregiverName: selectedCaregiver,
         type: sleepType,
         startTime: Date.now(),
         photoIds: photoIds.length > 0 ? photoIds : undefined,
@@ -136,6 +134,8 @@ export function SleepModal({
     setIsSubmitting(true);
     try {
       await endSleep({
+        secretLink,
+        actingCaregiverName: selectedCaregiver,
         entryId: activeSleep._id,
         endTime: Date.now(),
         photoIds: photoIds.length > 0 ? photoIds : undefined,
@@ -168,8 +168,8 @@ export function SleepModal({
     setIsSubmitting(true);
     try {
       await createSleep({
-        trackerId,
-        caregiverName: selectedCaregiver,
+        secretLink,
+        actingCaregiverName: selectedCaregiver,
         type: sleepType,
         startTime: pastStartTime,
         endTime: pastEndTime,
@@ -197,6 +197,8 @@ export function SleepModal({
     setIsSubmitting(true);
     try {
       await updateSleep({
+        secretLink,
+        actingCaregiverName: selectedCaregiver,
         entryId: editEntry._id,
         type: sleepType,
         startTime: pastStartTime,

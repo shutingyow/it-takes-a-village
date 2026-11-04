@@ -33,7 +33,6 @@ type FeedEditEntry = Extract<ActivityEntry, { entryType: "feed" }>;
 type FeedType = "breast" | "bottle" | "solids";
 
 interface FeedModalProps {
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   onClose: () => void;
@@ -121,7 +120,6 @@ function inferBottleMilk(entry: FeedEditEntry): BottleMilk | undefined {
 }
 
 export function FeedModal({
-  trackerId,
   secretLink,
   selectedCaregiver,
   onClose,
@@ -135,7 +133,9 @@ export function FeedModal({
   const tracker = useQuery(api.trackers.getBySecret, { secretLink });
   const stashBags = useQuery(
     api.milkStash.listAvailable,
-    tracker?._id ? { trackerId: tracker._id } : "skip"
+    selectedCaregiver
+      ? { secretLink, actingCaregiverName: selectedCaregiver }
+      : "skip"
   );
   const isEditing = Boolean(editEntry);
   const [stashBagId, setStashBagId] = useState<Id<"milkStashBags"> | "">("");
@@ -260,11 +260,11 @@ export function FeedModal({
       };
 
       if (editEntry) {
-        await updateFeed({ entryId: editEntry._id, ...payload });
+        await updateFeed({ secretLink, actingCaregiverName: selectedCaregiver, entryId: editEntry._id, ...payload });
       } else {
         await createFeed({
-          trackerId,
-          caregiverName: selectedCaregiver,
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
           ...payload,
         });
         if (
@@ -273,8 +273,9 @@ export function FeedModal({
           stashBagId
         ) {
           await markStashUsed({
+            secretLink,
             bagId: stashBagId,
-            caregiverName: selectedCaregiver,
+            actingCaregiverName: selectedCaregiver,
           });
         }
       }

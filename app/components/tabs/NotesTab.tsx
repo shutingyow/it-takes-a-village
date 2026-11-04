@@ -10,13 +10,13 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconCamera, IconNotes } from "../icons";
 
 interface NotesTabProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
 }
 
-export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
+export function NotesTab({ secretLink, selectedCaregiver }: NotesTabProps) {
   const { t } = useLanguage();
-  const notes = useQuery(api.notes.getRecent, { trackerId, limit: 20 });
+  const notes = useQuery(api.notes.getRecent, { secretLink, actingCaregiverName: selectedCaregiver, limit: 20 });
   const createNote = useMutation(api.notes.create);
   const generateUploadUrl = useMutation(api.notes.generateUploadUrl);
   const removeNote = useMutation(api.notes.remove);
@@ -31,7 +31,10 @@ export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
   const uploadPhoto = async (file: File) => {
     setIsUploading(true);
     try {
-      const postUrl = await generateUploadUrl();
+      const postUrl = await generateUploadUrl({
+        secretLink,
+        actingCaregiverName: selectedCaregiver,
+      });
       const result = await fetch(postUrl, {
         method: "POST",
         headers: { "Content-Type": file.type },
@@ -61,8 +64,8 @@ export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
     setIsSubmitting(true);
     try {
       await createNote({
-        trackerId,
-        caregiverName: selectedCaregiver,
+        secretLink,
+        actingCaregiverName: selectedCaregiver,
         content: content.trim(),
         photoIds,
         timestamp: Date.now(),
@@ -94,7 +97,12 @@ export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
         {photoIds.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {photoIds.map((id) => (
-              <NotePhoto key={id} storageId={id} />
+              <NotePhoto
+                key={id}
+                storageId={id}
+                secretLink={secretLink}
+                actingCaregiverName={selectedCaregiver}
+              />
             ))}
           </div>
         )}
@@ -181,7 +189,7 @@ export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => removeNote({ noteId: note._id })}
+                    onClick={() => removeNote({ secretLink, actingCaregiverName: selectedCaregiver, noteId: note._id })}
                     className="text-xs text-[#c45c5c] hover:underline shrink-0"
                   >
                     {t("delete")}
@@ -190,7 +198,12 @@ export function NotesTab({ trackerId, selectedCaregiver }: NotesTabProps) {
                 {note.photoIds.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {note.photoIds.map((id) => (
-                      <NotePhoto key={id} storageId={id} />
+                      <NotePhoto
+                key={id}
+                storageId={id}
+                secretLink={secretLink}
+                actingCaregiverName={selectedCaregiver}
+              />
                     ))}
                   </div>
                 )}

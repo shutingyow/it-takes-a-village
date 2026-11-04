@@ -1,6 +1,5 @@
 "use client";
 
-import { Id } from "@/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useState } from "react";
@@ -14,13 +13,13 @@ import {
 } from "../icons";
 
 interface HealthTabProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
 }
 
 type HealthType = "temperature" | "medication" | "vaccine" | "spitup";
 
-export function HealthTab({ trackerId, selectedCaregiver }: HealthTabProps) {
+export function HealthTab({ secretLink, selectedCaregiver }: HealthTabProps) {
   const { t } = useLanguage();
   const [activeModal, setActiveModal] = useState<HealthType | null>(null);
 
@@ -52,22 +51,26 @@ export function HealthTab({ trackerId, selectedCaregiver }: HealthTabProps) {
   ];
 
   const lastTemp = useQuery(api.healthEntries.getByType, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     type: "temperature",
     limit: 1,
   });
   const lastMed = useQuery(api.healthEntries.getByType, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     type: "medication",
     limit: 1,
   });
   const lastVaccine = useQuery(api.healthEntries.getByType, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     type: "vaccine",
     limit: 1,
   });
   const lastSpit = useQuery(api.healthEntries.getByType, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     type: "spitup",
     limit: 1,
   });
@@ -116,7 +119,7 @@ export function HealthTab({ trackerId, selectedCaregiver }: HealthTabProps) {
 
       {activeModal && (
         <HealthModal
-          trackerId={trackerId}
+          secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
           healthType={activeModal}
           onClose={() => setActiveModal(null)}

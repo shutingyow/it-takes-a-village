@@ -1,13 +1,13 @@
 "use client";
 
 import { Doc } from "@/convex/_generated/dataModel";
-import { Id } from "@/convex/_generated/dataModel";
 import { formatTimeAgo } from "@/app/lib/utils";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { cn } from "@/app/lib/utils";
 
 interface QuickStatsPillsProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
   lastFeed?: Doc<"feedEntries"> | null;
   lastDiaper?: Doc<"diaperEntries"> | null;
 }

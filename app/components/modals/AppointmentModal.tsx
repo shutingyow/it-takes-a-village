@@ -2,14 +2,13 @@
 
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 import { BottomSheet } from "../ui/BottomSheet";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconCalendar } from "../icons";
 
 interface AppointmentModalProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
   onClose: () => void;
 }
@@ -22,7 +21,7 @@ function toDatetimeLocalValue(timestamp: number): string {
 }
 
 export function AppointmentModal({
-  trackerId,
+  secretLink,
   selectedCaregiver,
   onClose,
 }: AppointmentModalProps) {
@@ -50,8 +49,8 @@ export function AppointmentModal({
     setIsSubmitting(true);
     try {
       await createAppointment({
-        trackerId,
-        caregiverName: selectedCaregiver,
+        secretLink,
+        actingCaregiverName: selectedCaregiver,
         title: title.trim(),
         date: new Date(dateTime).getTime(),
         location: location || undefined,

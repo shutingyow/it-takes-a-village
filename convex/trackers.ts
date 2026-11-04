@@ -223,13 +223,19 @@ export const getBySecret = query({
 // Update baby name
 export const updateBabyName = mutation({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     babyName: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyAdmin(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const trimmed = args.babyName.trim();
-    await ctx.db.patch(args.trackerId, {
+    await ctx.db.patch(tracker._id, {
       babyName: trimmed || undefined,
     });
     return null;
@@ -595,13 +601,19 @@ export const updatePhoto = mutation({
 // Regenerate secret link
 export const regenerateSecret = mutation({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
   },
   returns: v.string(),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyAdmin(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const newSecret = nanoid(16);
 
-    await ctx.db.patch(args.trackerId, {
+    await ctx.db.patch(tracker._id, {
       secretLink: newSecret,
     });
 

@@ -2,17 +2,17 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { getTodayBoundsInZone } from "@/app/lib/utils";
 import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ActivityIcon } from "./icons";
 
 interface DailySummaryProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
 }
 
-export function DailySummary({ trackerId }: DailySummaryProps) {
+export function DailySummary({ secretLink, selectedCaregiver }: DailySummaryProps) {
   const { t } = useLanguage();
   const [now, setNow] = useState(() => Date.now());
   const { dayStart, dayEnd } = useMemo(() => getTodayBoundsInZone(now), [now]);
@@ -29,7 +29,8 @@ export function DailySummary({ trackerId }: DailySummaryProps) {
   }, []);
 
   const summary = useQuery(api.dailySummary.getForDay, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     dayStart,
     dayEnd,
     now,

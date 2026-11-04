@@ -8,6 +8,8 @@ import { useState } from "react";
 
 interface NotePhotoProps {
   storageId: Id<"_storage">;
+  secretLink: string;
+  actingCaregiverName: string;
   size?: "sm" | "md";
   className?: string;
   onRemove?: () => void;
@@ -16,12 +18,18 @@ interface NotePhotoProps {
 
 export function NotePhoto({
   storageId,
+  secretLink,
+  actingCaregiverName,
   size = "md",
   className,
   onRemove,
   removeLabel = "Remove",
 }: NotePhotoProps) {
-  const url = useQuery(api.notes.getPhotoUrl, { storageId });
+  const url = useQuery(api.notes.getPhotoUrl, {
+    secretLink,
+    actingCaregiverName,
+    storageId,
+  });
   const [enlarged, setEnlarged] = useState(false);
 
   const sizeClass = size === "sm" ? "w-12 h-12" : "w-20 h-20";

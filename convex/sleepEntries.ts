@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import { verifyCaregiver } from "./lib/caregivers";
+import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
 
 const MAX_DURATION_MINUTES = 24 * 60;
 
@@ -72,8 +72,8 @@ async function getActiveSleepForTracker(
 // Start a sleep session
 export const start = mutation({
   args: {
-    trackerId: v.id("trackers"),
-    caregiverName: v.string(),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     type: v.union(v.literal("nap"), v.literal("night")),
     startTime: v.number(),
     notes: v.optional(v.string()),
@@ -81,14 +81,19 @@ export const start = mutation({
   },
   returns: v.id("sleepEntries"),
   handler: async (ctx, args) => {
-    const activeSleep = await getActiveSleepForTracker(ctx, args.trackerId);
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
+    const activeSleep = await getActiveSleepForTracker(ctx, tracker._id);
     if (activeSleep) {
       throw new Error("A sleep session is already active");
     }
 
     return await ctx.db.insert("sleepEntries", {
-      trackerId: args.trackerId,
-      caregiverName: args.caregiverName,
+      trackerId: tracker._id,
+      caregiverName: args.actingCaregiverName.trim(),
       type: args.type,
       startTime: args.startTime,
       endTime: undefined, // Active sleep
@@ -101,19 +106,27 @@ export const start = mutation({
 // End a sleep session
 export const end = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     entryId: v.id("sleepEntries"),
     endTime: v.number(),
     photoIds: v.optional(v.array(v.id("_storage"))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const { entry: existing } = await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.entryId,
+      "Sleep entry not found"
+    );
     const patch: { endTime: number; photoIds?: Id<"_storage">[] } = {
       endTime: args.endTime,
     };
     if (args.photoIds !== undefined) {
-      const existing = await ctx.db.get(args.entryId);
       const merged = [
-        ...(existing?.photoIds ?? []),
+        ...(existing.photoIds ?? []),
         ...args.photoIds,
       ];
       patch.photoIds = merged;
@@ -126,8 +139,8 @@ export const end = mutation({
 // Create a completed sleep entry (retrospective logging)
 export const create = mutation({
   args: {
-    trackerId: v.id("trackers"),
-    caregiverName: v.string(),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     type: v.union(v.literal("nap"), v.literal("night")),
     startTime: v.number(),
     endTime: v.number(),
@@ -136,6 +149,11 @@ export const create = mutation({
   },
   returns: v.id("sleepEntries"),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     if (args.endTime <= args.startTime) {
       throw new Error("End time must be after start time");
     }
@@ -145,7 +163,7 @@ export const create = mutation({
       throw new Error("End time cannot be in the future");
     }
 
-    const activeSleep = await getActiveSleepForTracker(ctx, args.trackerId);
+    const activeSleep = await getActiveSleepForTracker(ctx, tracker._id);
     if (
       activeSleep &&
       args.startTime < now &&
@@ -155,8 +173,8 @@ export const create = mutation({
     }
 
     return await ctx.db.insert("sleepEntries", {
-      trackerId: args.trackerId,
-      caregiverName: args.caregiverName,
+      trackerId: tracker._id,
+      caregiverName: args.actingCaregiverName.trim(),
       type: args.type,
       startTime: args.startTime,
       endTime: args.endTime,
@@ -169,25 +187,37 @@ export const create = mutation({
 // Get active sleep session
 export const getActive = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
   },
   handler: async (ctx, args) => {
-    return await getActiveSleepForTracker(ctx, args.trackerId);
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
+    return await getActiveSleepForTracker(ctx, tracker._id);
   },
 });
 
 // Get recent sleep entries
 export const getRecent = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const limit = args.limit ?? 50;
 
     return await ctx.db
       .query("sleepEntries")
-      .withIndex("by_tracker_and_start", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_start", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .take(limit);
   },
@@ -196,12 +226,18 @@ export const getRecent = query({
 // Get last completed sleep entry
 export const getLast = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const entries = await ctx.db
       .query("sleepEntries")
-      .withIndex("by_tracker_and_start", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_start", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .take(10);
 
@@ -213,6 +249,8 @@ export const getLast = query({
 // Update a sleep entry (full replace of editable fields)
 export const update = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     entryId: v.id("sleepEntries"),
     type: v.union(v.literal("nap"), v.literal("night")),
     startTime: v.number(),
@@ -222,10 +260,13 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.entryId);
-    if (!existing) {
-      throw new Error("Sleep entry not found");
-    }
+    const { entry: existing } = await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.entryId,
+      "Sleep entry not found"
+    );
 
     if (args.endTime !== undefined && args.endTime <= args.startTime) {
       throw new Error("End time must be after start time");
@@ -336,7 +377,8 @@ export const updateNap = mutation({
 
 export const getTodayNapStatus = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     now: v.number(),
   },
   returns: v.union(
@@ -352,10 +394,15 @@ export const getTodayNapStatus = query({
     })
   ),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const recent = await ctx.db
       .query("sleepEntries")
       .withIndex("by_tracker_and_start", (q) =>
-        q.eq("trackerId", args.trackerId)
+        q.eq("trackerId", tracker._id)
       )
       .order("desc")
       .take(80);

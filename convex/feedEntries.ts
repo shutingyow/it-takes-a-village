@@ -1,7 +1,11 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { getTrackerBySecret } from "./lib/caregivers";
+import {
+  getTrackerBySecret,
+  requireOwnedEntry,
+  verifyCaregiver,
+} from "./lib/caregivers";
 import { isMilkFeed } from "./lib/feeds";
 import {
   assertNonNegative,
@@ -84,8 +88,8 @@ function storedAmountGrams(amountGrams: number | undefined): number | undefined 
 // Create a feed entry
 export const create = mutation({
   args: {
-    trackerId: v.id("trackers"),
-    caregiverName: v.string(),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     type: feedTypeValidator,
     side: v.optional(v.union(v.literal("left"), v.literal("right"))),
     duration: v.optional(v.number()),
@@ -101,6 +105,11 @@ export const create = mutation({
   },
   returns: v.id("feedEntries"),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     assertNotFarFuture(args.timestamp);
     assertNonNegative(args.durationMinutes ?? args.duration, "Duration");
     if (args.type === "bottle") {
@@ -118,8 +127,8 @@ export const create = mutation({
         ? undefined
         : storedDurationMinutes(args.durationMinutes, args.duration);
     const id = await ctx.db.insert("feedEntries", {
-      trackerId: args.trackerId,
-      caregiverName: args.caregiverName,
+      trackerId: tracker._id,
+      caregiverName: args.actingCaregiverName.trim(),
       type: args.type,
       side: args.type === "breast" ? args.side : undefined,
       duration: minutes,
@@ -136,7 +145,7 @@ export const create = mutation({
       photoIds: args.photoIds,
     });
     if (isMilkFeed(args.type)) {
-      await scheduleFeedPush(ctx, args.trackerId);
+      await scheduleFeedPush(ctx, tracker._id);
     }
     return id;
   },
@@ -145,15 +154,21 @@ export const create = mutation({
 // Get recent feed entries for a tracker
 export const getRecent = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const limit = args.limit ?? 50;
 
     return await ctx.db
       .query("feedEntries")
-      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .take(limit);
   },
@@ -162,14 +177,20 @@ export const getRecent = query({
 /** Recent milk feeds only (nursing / bottle). Solids never move the milk clock. */
 export const getRecentMilk = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const limit = args.limit ?? 50;
     const recent = await ctx.db
       .query("feedEntries")
-      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .take(Math.max(limit * 4, 40));
     return recent.filter((feed) => isMilkFeed(feed.type)).slice(0, limit);
@@ -179,12 +200,18 @@ export const getRecentMilk = query({
 /** Last milk feed (nursing / bottle). Skips solids. */
 export const getLast = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
   },
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const recent = await ctx.db
       .query("feedEntries")
-      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .take(40);
     return recent.find((feed) => isMilkFeed(feed.type)) ?? null;
@@ -194,6 +221,8 @@ export const getLast = query({
 // Update a feed entry (full replace of editable fields)
 export const update = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     entryId: v.id("feedEntries"),
     type: feedTypeValidator,
     side: v.optional(v.union(v.literal("left"), v.literal("right"))),
@@ -210,10 +239,13 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.entryId);
-    if (!existing) {
-      throw new Error("Feed entry not found");
-    }
+    const { entry: existing } = await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.entryId,
+      "Feed entry not found"
+    );
 
     assertNotFarFuture(args.timestamp);
     assertNonNegative(args.durationMinutes ?? args.duration, "Duration");
@@ -257,12 +289,19 @@ export const update = mutation({
 // Delete a feed entry
 export const remove = mutation({
   args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     entryId: v.id("feedEntries"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.entryId);
-    if (!existing) return null;
+    const { entry: existing } = await requireOwnedEntry(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName,
+      args.entryId,
+      "Feed entry not found"
+    );
     await ctx.db.delete(args.entryId);
     if (isMilkFeed(existing.type)) {
       await scheduleFeedPush(ctx, existing.trackerId);
@@ -275,7 +314,7 @@ export const remove = mutation({
  * One-off: set bottleMilk from notes for bottle feeds missing the field.
  * Pass secretLink to limit to one tracker; omit to backfill all trackers.
  */
-export const backfillBottleMilk = mutation({
+export const backfillBottleMilk = internalMutation({
   args: {
     secretLink: v.optional(v.string()),
   },
@@ -340,6 +379,7 @@ export const backfillBottleMilk = mutation({
 export const bottleMilkStats = query({
   args: {
     secretLink: v.string(),
+    actingCaregiverName: v.string(),
   },
   returns: v.object({
     bottleTotal: v.number(),
@@ -348,10 +388,11 @@ export const bottleMilkStats = query({
     missing: v.number(),
   }),
   handler: async (ctx, args) => {
-    const tracker = await getTrackerBySecret(ctx, args.secretLink);
-    if (!tracker) {
-      throw new Error("Tracker not found");
-    }
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const feeds = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker", (q) => q.eq("trackerId", tracker._id))

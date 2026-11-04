@@ -23,15 +23,21 @@ const diaryEntryValidator = v.object({
 
 export const getForDay = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     dateKey: v.string(),
   },
   returns: v.union(diaryEntryValidator, v.null()),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     return await ctx.db
       .query("diaryEntries")
       .withIndex("by_tracker_and_date", (q) =>
-        q.eq("trackerId", args.trackerId).eq("dateKey", args.dateKey)
+        q.eq("trackerId", tracker._id).eq("dateKey", args.dateKey)
       )
       .unique();
   },

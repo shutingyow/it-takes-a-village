@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import type { TranslationKey } from "@/app/lib/i18n/en";
 import {
@@ -59,13 +58,15 @@ const TILES: Array<{
 ];
 
 interface HomeCategoryGridProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
   onSelect: (category: HomeTileCategory) => void;
   onQuickLog?: (category: HomeTileCategory) => void;
 }
 
 export function HomeCategoryGrid({
-  trackerId,
+  secretLink,
+  selectedCaregiver,
   onSelect,
   onQuickLog,
 }: HomeCategoryGridProps) {
@@ -79,12 +80,13 @@ export function HomeCategoryGrid({
   }, []);
 
   const summaries = useQuery(api.homeDashboard.getTileSummaries, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     dayStart,
     dayEnd,
     now,
   });
-  const dueStatus = useQuery(api.reminders.getDueStatus, { trackerId, now });
+  const dueStatus = useQuery(api.reminders.getDueStatus, { secretLink, actingCaregiverName: selectedCaregiver, now });
   const feedDue = dueStatus?.items.find((item) => item.type === "feed");
 
   /** Single compact line under the title (reference: "10 mins ago, 80ml"). */

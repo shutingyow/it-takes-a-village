@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 import { AppointmentModal } from "../modals/AppointmentModal";
 import { formatDateTime } from "@/app/lib/utils";
@@ -10,15 +9,15 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconCalendar, IconLocation } from "../icons";
 
 interface UpcomingTabProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
 }
 
-export function UpcomingTab({ trackerId, selectedCaregiver }: UpcomingTabProps) {
+export function UpcomingTab({ secretLink, selectedCaregiver }: UpcomingTabProps) {
   const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
   const [now] = useState(() => Date.now());
-  const upcoming = useQuery(api.appointments.getUpcoming, { trackerId, now });
+  const upcoming = useQuery(api.appointments.getUpcoming, { secretLink, actingCaregiverName: selectedCaregiver, now });
   const removeAppointment = useMutation(api.appointments.remove);
 
   return (
@@ -84,7 +83,7 @@ export function UpcomingTab({ trackerId, selectedCaregiver }: UpcomingTabProps) 
                 <button
                   type="button"
                   onClick={() =>
-                    removeAppointment({ appointmentId: appointment._id })
+                    removeAppointment({ secretLink, actingCaregiverName: selectedCaregiver, appointmentId: appointment._id })
                   }
                   className="text-xs text-[#c45c5c] hover:underline shrink-0"
                 >
@@ -98,7 +97,7 @@ export function UpcomingTab({ trackerId, selectedCaregiver }: UpcomingTabProps) 
 
       {showModal && (
         <AppointmentModal
-          trackerId={trackerId}
+          secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
           onClose={() => setShowModal(false)}
         />

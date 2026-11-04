@@ -2,7 +2,6 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useEffect, useMemo, useState } from "react";
 import {
   formatTime,
@@ -25,7 +24,8 @@ const GOALS = {
 };
 
 interface SummaryGridProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
 }
 
 function ProgressBar({
@@ -45,7 +45,7 @@ function ProgressBar({
   );
 }
 
-export function SummaryGrid({ trackerId }: SummaryGridProps) {
+export function SummaryGrid({ secretLink, selectedCaregiver }: SummaryGridProps) {
   const { t } = useLanguage();
   const [now, setNow] = useState(() => Date.now());
   const { dayStart, dayEnd } = useMemo(() => getTodayBoundsInZone(now), [now]);
@@ -56,7 +56,8 @@ export function SummaryGrid({ trackerId }: SummaryGridProps) {
   }, []);
 
   const summary = useQuery(api.dailySummary.getForDay, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     dayStart,
     dayEnd,
     now,
@@ -167,21 +168,24 @@ export function SummaryGrid({ trackerId }: SummaryGridProps) {
           </div>
         ))}
       </div>
-      <NapAwakeLine trackerId={trackerId} now={now} />
+      <NapAwakeLine secretLink={secretLink} selectedCaregiver={selectedCaregiver} now={now} />
     </div>
   );
 }
 
 function NapAwakeLine({
-  trackerId,
+  secretLink,
+  selectedCaregiver,
   now,
 }: {
-  trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
   now: number;
 }) {
   const { t } = useLanguage();
   const status = useQuery(api.sleepEntries.getTodayNapStatus, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     now,
   });
 

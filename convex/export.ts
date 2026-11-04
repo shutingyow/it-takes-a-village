@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { verifyCaregiver } from "./lib/caregivers";
 import { DEFAULT_TRACKER_TIMEZONE } from "./lib/dayBounds";
 
 const exportRowValidator = v.object({
@@ -87,7 +88,8 @@ function stamps(occurredAt: number, loggedAt: number, timeZone: string) {
 
 export const getData = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     days: v.union(v.literal(7), v.literal(30)),
     now: v.number(),
   },
@@ -103,7 +105,11 @@ export const getData = query({
     rangeDays: v.number(),
   }),
   handler: async (ctx, args) => {
-    const tracker = await ctx.db.get("trackers", args.trackerId);
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const timeZone =
       tracker?.pumpSchedule?.timezone ?? DEFAULT_TRACKER_TIMEZONE;
     const rangeStart = args.now - args.days * 24 * 60 * 60 * 1000;
@@ -112,7 +118,7 @@ export const getData = query({
     const feeds = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", rangeStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", rangeStart)
       )
       .order("desc")
       .take(500);
@@ -163,7 +169,7 @@ export const getData = query({
     const pumps = await ctx.db
       .query("pumpEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", rangeStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", rangeStart)
       )
       .order("desc")
       .take(500);
@@ -184,7 +190,7 @@ export const getData = query({
     const sleepEntries = await ctx.db
       .query("sleepEntries")
       .withIndex("by_tracker_and_start", (q) =>
-        q.eq("trackerId", args.trackerId).gte("startTime", rangeStart)
+        q.eq("trackerId", tracker._id).gte("startTime", rangeStart)
       )
       .order("desc")
       .take(500);
@@ -211,7 +217,7 @@ export const getData = query({
     const diapers = await ctx.db
       .query("diaperEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", rangeStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", rangeStart)
       )
       .order("desc")
       .take(500);
@@ -233,7 +239,7 @@ export const getData = query({
     const healthEntries = await ctx.db
       .query("healthEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", rangeStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", rangeStart)
       )
       .order("desc")
       .take(500);
@@ -274,7 +280,7 @@ export const getData = query({
     const momentEntries = await ctx.db
       .query("momentEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", rangeStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", rangeStart)
       )
       .order("desc")
       .take(500);
@@ -293,7 +299,7 @@ export const getData = query({
     const activityEntries = await ctx.db
       .query("activityEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", rangeStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", rangeStart)
       )
       .order("desc")
       .take(500);
@@ -314,7 +320,7 @@ export const getData = query({
 
     const growthEntries = await ctx.db
       .query("growthEntries")
-      .withIndex("by_tracker", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker", (q) => q.eq("trackerId", tracker._id))
       .filter((q) => q.gte(q.field("timestamp"), rangeStart))
       .order("desc")
       .take(500);
@@ -381,7 +387,7 @@ export const getData = query({
     const stashBags = await ctx.db
       .query("milkStashBags")
       .withIndex("by_tracker_and_created", (q) =>
-        q.eq("trackerId", args.trackerId)
+        q.eq("trackerId", tracker._id)
       )
       .order("desc")
       .take(500);

@@ -14,7 +14,6 @@ import { Doc, Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 
 interface HomeTabProps {
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   babyName?: string;
@@ -30,7 +29,6 @@ interface HomeTabProps {
 }
 
 export function HomeTab({
-  trackerId,
   secretLink,
   selectedCaregiver,
   babyName,
@@ -51,7 +49,6 @@ export function HomeTab({
     return (
       <HomeCategoryDetail
         category={category}
-        trackerId={trackerId}
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         onBack={() => setCategory(null)}
@@ -72,7 +69,8 @@ export function HomeTab({
       />
 
       <HomeCategoryGrid
-        trackerId={trackerId}
+        secretLink={secretLink}
+        selectedCaregiver={selectedCaregiver}
         onSelect={(cat: HomeTileCategory) => setCategory(cat)}
         onQuickLog={
           onQuickLog
@@ -82,7 +80,8 @@ export function HomeTab({
       />
 
       <DueSoonCard
-        trackerId={trackerId}
+        secretLink={secretLink}
+        selectedCaregiver={selectedCaregiver}
         pumpScheduleEnabled={pumpScheduleEnabled}
       />
 

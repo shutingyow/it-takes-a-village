@@ -2,7 +2,6 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 import { GrowthModal } from "./modals/GrowthModal";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
@@ -10,20 +9,20 @@ import { formatGrowthLine } from "@/app/lib/utils";
 import { IconGrowth } from "./icons";
 
 interface GrowthViewProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
   onBack: () => void;
 }
 
 export function GrowthView({
-  trackerId,
+  secretLink,
   selectedCaregiver,
   onBack,
 }: GrowthViewProps) {
   const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
 
-  const entries = useQuery(api.growthEntries.list, { trackerId, limit: 12 });
+  const entries = useQuery(api.growthEntries.list, { secretLink, actingCaregiverName: selectedCaregiver, limit: 12 });
 
   const weights = entries
     ? [...entries]
@@ -148,7 +147,7 @@ export function GrowthView({
 
       {showModal && (
         <GrowthModal
-          trackerId={trackerId}
+          secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
           onClose={() => setShowModal(false)}
         />

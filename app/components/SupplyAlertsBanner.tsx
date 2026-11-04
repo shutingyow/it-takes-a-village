@@ -9,13 +9,13 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconCheck, IconWarning } from "./icons";
 
 interface SupplyAlertsBannerProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
   alerts: Doc<"supplyAlerts">[];
 }
 
 export function SupplyAlertsBanner({
-  trackerId,
+  secretLink,
   selectedCaregiver,
   alerts,
 }: SupplyAlertsBannerProps) {
@@ -51,7 +51,7 @@ export function SupplyAlertsBanner({
                 <span>{t("runningLow", { item: alert.item })}</span>
                 <button
                   type="button"
-                  onClick={() => markRestocked({ alertId: alert._id })}
+                  onClick={() => markRestocked({ secretLink, actingCaregiverName: selectedCaregiver, alertId: alert._id })}
                   className="text-xs font-medium text-secondary hover:underline shrink-0 flex items-center gap-1"
                 >
                   <IconCheck size={12} />
@@ -65,7 +65,7 @@ export function SupplyAlertsBanner({
 
       {showModal && (
         <SupplyAlertModal
-          trackerId={trackerId}
+          secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
           onClose={() => setShowModal(false)}
         />

@@ -2,26 +2,28 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { buildFeedingInsight } from "@/app/lib/feedingInsightCopy";
 
 interface FeedingInsightProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
+  selectedCaregiver: string;
   mode: "daily" | "weekly";
   dateKey: string;
   isToday: boolean;
 }
 
 export function FeedingInsight({
-  trackerId,
+  secretLink,
+  selectedCaregiver,
   mode,
   dateKey,
   isToday,
 }: FeedingInsightProps) {
   const { t, language } = useLanguage();
   const data = useQuery(api.stats.getFeedingTrend, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     mode,
     dateKey,
   });

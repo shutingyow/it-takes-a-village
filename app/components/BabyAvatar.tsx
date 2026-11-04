@@ -7,14 +7,22 @@ import { IconUser } from "./icons";
 
 interface BabyAvatarProps {
   storageId?: Id<"_storage">;
+  secretLink: string;
+  actingCaregiverName: string;
   alt: string;
   size?: "sm" | "md" | "lg";
 }
 
-export function BabyAvatar({ storageId, alt, size = "md" }: BabyAvatarProps) {
+export function BabyAvatar({
+  storageId,
+  secretLink,
+  actingCaregiverName,
+  alt,
+  size = "md",
+}: BabyAvatarProps) {
   const url = useQuery(
     api.notes.getPhotoUrl,
-    storageId ? { storageId } : "skip"
+    storageId ? { secretLink, actingCaregiverName, storageId } : "skip"
   );
 
   const sizeClass =

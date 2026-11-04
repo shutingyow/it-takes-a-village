@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { verifyCaregiver } from "./lib/caregivers";
 import {
   clampFeedAtForSkew,
   computeFeedDueAt,
@@ -53,7 +54,8 @@ function computeDueStatus(dueAt: number, now: number) {
 
 export const getDueStatus = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     now: v.number(),
   },
   returns: v.object({
@@ -69,7 +71,11 @@ export const getDueStatus = query({
     items: v.array(dueItemValidator),
   }),
   handler: async (ctx, args) => {
-    const tracker = await ctx.db.get("trackers", args.trackerId);
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const night = resolveNightFeedSettings(tracker ?? undefined);
     if (!tracker) {
       return {
@@ -102,7 +108,7 @@ export const getDueStatus = query({
 
     const recentFeeds = await ctx.db
       .query("feedEntries")
-      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", args.trackerId))
+      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", tracker._id))
       .order("desc")
       .take(40);
     const lastFeed = recentFeeds.find(
@@ -138,7 +144,7 @@ export const getDueStatus = query({
         const medEntries = await ctx.db
           .query("healthEntries")
           .withIndex("by_tracker_and_type", (q) =>
-            q.eq("trackerId", args.trackerId).eq("type", "medication")
+            q.eq("trackerId", tracker._id).eq("type", "medication")
           )
           .order("desc")
           .take(50);
@@ -167,7 +173,7 @@ export const getDueStatus = query({
       const lastPump = await ctx.db
         .query("pumpEntries")
         .withIndex("by_tracker_and_time", (q) =>
-          q.eq("trackerId", args.trackerId)
+          q.eq("trackerId", tracker._id)
         )
         .order("desc")
         .first();

@@ -2,7 +2,6 @@
 
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 import { BottomSheet } from "../ui/BottomSheet";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
@@ -24,7 +23,7 @@ type HealthType =
 type HealthEditEntry = Extract<ActivityEntry, { entryType: "health" }>;
 
 interface HealthModalProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
   healthType: HealthType;
   onClose: () => void;
@@ -32,7 +31,7 @@ interface HealthModalProps {
 }
 
 export function HealthModal({
-  trackerId,
+  secretLink,
   selectedCaregiver,
   healthType,
   onClose,
@@ -118,11 +117,11 @@ export function HealthModal({
       };
 
       if (editEntry) {
-        await updateHealth({ entryId: editEntry._id, ...payload });
+        await updateHealth({ secretLink, actingCaregiverName: selectedCaregiver, entryId: editEntry._id, ...payload });
       } else {
         await createHealth({
-          trackerId,
-          caregiverName: selectedCaregiver,
+          secretLink,
+          actingCaregiverName: selectedCaregiver,
           ...payload,
         });
       }

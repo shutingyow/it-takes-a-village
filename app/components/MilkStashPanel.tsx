@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import {
@@ -12,17 +11,17 @@ import {
 } from "@/app/lib/milkStashDates";
 
 interface MilkStashPanelProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
 }
 
 export function MilkStashPanel({
-  trackerId,
+  secretLink,
   selectedCaregiver,
 }: MilkStashPanelProps) {
   const { t } = useLanguage();
-  const available = useQuery(api.milkStash.listAvailable, { trackerId });
-  const totalMl = useQuery(api.milkStash.availableTotalMl, { trackerId });
+  const available = useQuery(api.milkStash.listAvailable, { secretLink, actingCaregiverName: selectedCaregiver });
+  const totalMl = useQuery(api.milkStash.availableTotalMl, { secretLink, actingCaregiverName: selectedCaregiver });
   const addBag = useMutation(api.milkStash.addBag);
   const markUsed = useMutation(api.milkStash.markUsed);
   const discard = useMutation(api.milkStash.discard);
@@ -50,8 +49,8 @@ export function MilkStashPanel({
     setError(null);
     try {
       await addBag({
-        trackerId,
-        caregiverName: selectedCaregiver,
+        secretLink,
+        actingCaregiverName: selectedCaregiver,
         amountMl: ml,
         frozenOn,
       });
@@ -177,8 +176,9 @@ export function MilkStashPanel({
                       className="flex-1 rounded-xl bg-primary text-white text-sm font-semibold py-2.5"
                       onClick={() =>
                         void markUsed({
+                          secretLink,
                           bagId: bag._id,
-                          caregiverName: selectedCaregiver,
+                          actingCaregiverName: selectedCaregiver,
                         })
                       }
                     >
@@ -189,8 +189,9 @@ export function MilkStashPanel({
                       className="flex-1 rounded-xl border border-border text-sm font-semibold py-2.5 text-foreground"
                       onClick={() =>
                         void discard({
+                          secretLink,
                           bagId: bag._id,
-                          caregiverName: selectedCaregiver,
+                          actingCaregiverName: selectedCaregiver,
                         })
                       }
                     >

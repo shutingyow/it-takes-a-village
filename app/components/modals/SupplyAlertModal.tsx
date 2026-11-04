@@ -2,7 +2,6 @@
 
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 import { BottomSheet } from "../ui/BottomSheet";
 import { cn } from "@/app/lib/utils";
@@ -10,7 +9,7 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconWarning } from "../icons";
 
 interface SupplyAlertModalProps {
-  trackerId: Id<"trackers">;
+  secretLink: string;
   selectedCaregiver: string;
   onClose: () => void;
 }
@@ -24,7 +23,7 @@ const commonItems = [
 ];
 
 export function SupplyAlertModal({
-  trackerId,
+  secretLink,
   selectedCaregiver,
   onClose,
 }: SupplyAlertModalProps) {
@@ -47,8 +46,8 @@ export function SupplyAlertModal({
     setIsSubmitting(true);
     try {
       await createAlert({
-        trackerId,
-        caregiverName: selectedCaregiver,
+        secretLink,
+        actingCaregiverName: selectedCaregiver,
         item: item.trim(),
         timestamp: Date.now(),
       });

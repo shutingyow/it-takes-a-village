@@ -1,7 +1,9 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id, TableNames } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+
+type DbCtx = QueryCtx | MutationCtx;
 
 export const caregiverRoleValidator = v.union(
   v.literal("admin"),
@@ -59,7 +61,7 @@ export function countAdmins(caregivers: Caregiver[]): number {
 }
 
 export async function getTrackerBySecret(
-  ctx: QueryCtx | MutationCtx,
+  ctx: DbCtx,
   secretLink: string
 ): Promise<Doc<"trackers"> | null> {
   return await ctx.db
@@ -69,7 +71,7 @@ export async function getTrackerBySecret(
 }
 
 export async function verifyCaregiver(
-  ctx: QueryCtx | MutationCtx,
+  ctx: DbCtx,
   secretLink: string,
   actingCaregiverName: string
 ): Promise<{ tracker: Doc<"trackers">; caregivers: Caregiver[] }> {
@@ -79,12 +81,59 @@ export async function verifyCaregiver(
   }
 
   const caregivers = getCaregivers(tracker);
-  const actor = caregivers.find((c) => c.name === actingCaregiverName);
+  const actor = caregivers.find((c) => c.name === actingCaregiverName.trim());
   if (!actor) {
     throw new Error("Caregiver not found on this tracker");
   }
 
   return { tracker, caregivers };
+}
+
+/**
+ * Resolve the village from the secret link and ensure the actor is listed.
+ * If trackerId is also passed, it must match (stops IDOR with a stolen id).
+ */
+export async function requireTrackerAccess(
+  ctx: DbCtx,
+  secretLink: string,
+  actingCaregiverName: string,
+  trackerId?: Id<"trackers">
+): Promise<{ tracker: Doc<"trackers">; caregivers: Caregiver[] }> {
+  const result = await verifyCaregiver(ctx, secretLink, actingCaregiverName);
+  if (trackerId !== undefined && result.tracker._id !== trackerId) {
+    throw new Error("Tracker not found");
+  }
+  return result;
+}
+
+/**
+ * Load an entry and prove it belongs to the village identified by secretLink.
+ */
+export async function requireOwnedEntry<TableName extends TableNames>(
+  ctx: DbCtx,
+  secretLink: string,
+  actingCaregiverName: string,
+  entryId: Id<TableName>,
+  notFoundMessage = "Entry not found"
+): Promise<{
+  tracker: Doc<"trackers">;
+  caregivers: Caregiver[];
+  entry: Doc<TableName>;
+}> {
+  const { tracker, caregivers } = await verifyCaregiver(
+    ctx,
+    secretLink,
+    actingCaregiverName
+  );
+  const entry = await ctx.db.get(entryId);
+  if (
+    !entry ||
+    !("trackerId" in entry) ||
+    entry.trackerId !== tracker._id
+  ) {
+    throw new Error(notFoundMessage);
+  }
+  return { tracker, caregivers, entry };
 }
 
 /**

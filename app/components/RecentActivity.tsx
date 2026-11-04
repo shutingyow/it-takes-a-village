@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { formatTime } from "@/app/lib/utils";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ActivityEntryCard, type ActivityEntry } from "./ActivityEntryCard";
@@ -18,14 +17,12 @@ import { useState } from "react";
 const RECENT_LIMIT = 8;
 
 interface RecentActivityProps {
-  trackerId: Id<"trackers">;
   secretLink: string;
   selectedCaregiver: string;
   onViewAll?: () => void;
 }
 
 export function RecentActivity({
-  trackerId,
   secretLink,
   selectedCaregiver,
   onViewAll,
@@ -44,13 +41,15 @@ export function RecentActivity({
   const removeMoment = useMutation(api.momentEntries.remove);
 
   const anyActivity = useQuery(api.history.getActivity, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     limit: 1,
     type: "all",
   });
 
   const activity = useQuery(api.history.getActivity, {
-    trackerId,
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
     limit: filter === "all" ? 40 : RECENT_LIMIT,
     type: filter,
   });
@@ -59,13 +58,13 @@ export function RecentActivity({
     if (!confirm(t("confirmDeleteEntry"))) return;
     try {
       if (entry.entryType === "feed") {
-        await removeFeed({ entryId: entry._id });
+        await removeFeed({ secretLink, actingCaregiverName: selectedCaregiver, entryId: entry._id });
       } else if (entry.entryType === "diaper") {
-        await removeDiaper({ entryId: entry._id });
+        await removeDiaper({ secretLink, actingCaregiverName: selectedCaregiver, entryId: entry._id });
       } else if (entry.entryType === "pump") {
-        await removePump({ entryId: entry._id });
+        await removePump({ secretLink, actingCaregiverName: selectedCaregiver, entryId: entry._id });
       } else if (entry.entryType === "health") {
-        await removeHealth({ entryId: entry._id });
+        await removeHealth({ secretLink, actingCaregiverName: selectedCaregiver, entryId: entry._id });
       } else if (entry.entryType === "sleep" || entry.entryType === "nap") {
         await removeSleep({
           secretLink,
@@ -73,7 +72,7 @@ export function RecentActivity({
           entryId: entry._id,
         });
       } else if (entry.entryType === "growth") {
-        await removeGrowth({ entryId: entry._id });
+        await removeGrowth({ secretLink, actingCaregiverName: selectedCaregiver, entryId: entry._id });
       } else if (entry.entryType === "activity") {
         await removeActivity({
           secretLink,
@@ -159,6 +158,8 @@ export function RecentActivity({
           {visibleActivity.map((entry, index) => (
             <ActivityEntryCard
               key={entry._id}
+              secretLink={secretLink}
+              selectedCaregiver={selectedCaregiver}
               entry={entry}
               timeLabel={formatTime(entry.time)}
               isLast={index === visibleActivity.length - 1}
@@ -172,7 +173,6 @@ export function RecentActivity({
       {editingEntry && (
         <EditActivitySheet
           entry={editingEntry}
-          trackerId={trackerId}
           secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
           onClose={() => setEditingEntry(null)}

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { verifyCaregiver } from "./lib/caregivers";
 import {
   DEFAULT_TRACKER_TIMEZONE,
   formatWeekdayShortInZone,
@@ -212,7 +213,8 @@ function buildDayStat(
  */
 export const getWeeklySummary = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     now: v.number(),
     /** Last day of the 7-day window (YYYY-MM-DD). Defaults to today. */
     endDateKey: v.optional(v.string()),
@@ -225,6 +227,11 @@ export const getWeeklySummary = query({
     timezone: v.string(),
   }),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const timeZone = DEFAULT_TRACKER_TIMEZONE;
     const { dateKey: todayKey } = getTodayBoundsInZone(args.now, timeZone);
     const endDateKey =
@@ -243,7 +250,7 @@ export const getWeeklySummary = query({
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) =>
         q
-          .eq("trackerId", args.trackerId)
+          .eq("trackerId", tracker._id)
           .gte("timestamp", rangeStart)
           .lt("timestamp", rangeEnd)
       )
@@ -253,7 +260,7 @@ export const getWeeklySummary = query({
       .query("diaperEntries")
       .withIndex("by_tracker_and_time", (q) =>
         q
-          .eq("trackerId", args.trackerId)
+          .eq("trackerId", tracker._id)
           .gte("timestamp", rangeStart)
           .lt("timestamp", rangeEnd)
       )
@@ -263,7 +270,7 @@ export const getWeeklySummary = query({
       .query("pumpEntries")
       .withIndex("by_tracker_and_time", (q) =>
         q
-          .eq("trackerId", args.trackerId)
+          .eq("trackerId", tracker._id)
           .gte("timestamp", rangeStart)
           .lt("timestamp", rangeEnd)
       )
@@ -273,7 +280,7 @@ export const getWeeklySummary = query({
       .query("sleepEntries")
       .withIndex("by_tracker_and_start", (q) =>
         q
-          .eq("trackerId", args.trackerId)
+          .eq("trackerId", tracker._id)
           .gte("startTime", rangeStart - 24 * 60 * 60 * 1000)
           .lt("startTime", rangeEnd)
       )
@@ -323,7 +330,8 @@ export const getWeeklySummary = query({
 
 export const getDailyStats = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     dateKey: v.string(), // YYYY-MM-DD in Asia/Singapore
     now: v.number(),
   },
@@ -332,13 +340,18 @@ export const getDailyStats = query({
     timezone: v.string(),
   }),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const timeZone = DEFAULT_TRACKER_TIMEZONE;
     const { dayStart, dayEnd } = getDayBoundsForDateKey(args.dateKey, timeZone);
 
     const feeds = await ctx.db
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", dayStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), dayEnd))
       .collect();
@@ -346,7 +359,7 @@ export const getDailyStats = query({
     const diapers = await ctx.db
       .query("diaperEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", dayStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), dayEnd))
       .collect();
@@ -354,7 +367,7 @@ export const getDailyStats = query({
     const pumps = await ctx.db
       .query("pumpEntries")
       .withIndex("by_tracker_and_time", (q) =>
-        q.eq("trackerId", args.trackerId).gte("timestamp", dayStart)
+        q.eq("trackerId", tracker._id).gte("timestamp", dayStart)
       )
       .filter((q) => q.lt(q.field("timestamp"), dayEnd))
       .collect();
@@ -363,7 +376,7 @@ export const getDailyStats = query({
       .query("sleepEntries")
       .withIndex("by_tracker_and_start", (q) =>
         q
-          .eq("trackerId", args.trackerId)
+          .eq("trackerId", tracker._id)
           .gte("startTime", dayStart - 24 * 60 * 60 * 1000)
       )
       .collect();
@@ -513,7 +526,8 @@ function compareNumber(
  */
 export const getFeedingTrend = query({
   args: {
-    trackerId: v.id("trackers"),
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
     mode: v.union(v.literal("daily"), v.literal("weekly")),
     dateKey: v.string(),
   },
@@ -527,6 +541,11 @@ export const getFeedingTrend = query({
     intervalDirection: feedDirectionValidator,
   }),
   handler: async (ctx, args) => {
+    const { tracker } = await verifyCaregiver(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
     const timeZone = DEFAULT_TRACKER_TIMEZONE;
     const currentEndKey = args.dateKey;
     const currentStartKey =
@@ -561,7 +580,7 @@ export const getFeedingTrend = query({
       .query("feedEntries")
       .withIndex("by_tracker_and_time", (q) =>
         q
-          .eq("trackerId", args.trackerId)
+          .eq("trackerId", tracker._id)
           .gte("timestamp", fetchStart)
           .lt("timestamp", fetchEnd)
       )
