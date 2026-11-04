@@ -5,7 +5,6 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 import { BottomSheet } from "../ui/BottomSheet";
-import { cn } from "@/app/lib/utils";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconPump } from "../icons";
 import { EntryPhotoField } from "../EntryPhotoField";
@@ -37,9 +36,6 @@ export function PumpModal({
   const isEditing = Boolean(editEntry);
 
   const [amount, setAmount] = useState(editEntry?.amount ?? 150);
-  const [side, setSide] = useState<"left" | "right" | "both">(
-    editEntry?.side ?? "both"
-  );
   const [notes, setNotes] = useState(editEntry?.notes ?? "");
   const [photoIds, setPhotoIds] = useState<Id<"_storage">[]>(
     editEntry?.photoIds ?? []
@@ -61,7 +57,6 @@ export function PumpModal({
     try {
       const payload = {
         amount,
-        side,
         timestamp,
         notes: notes || undefined,
         photoIds: photoIds.length > 0 ? photoIds : undefined,
@@ -131,31 +126,6 @@ export function PumpModal({
             >
               +
             </button>
-          </div>
-        </div>
-
-        <div>
-          <label className="label-field">{t("pumpSide")}</label>
-          <div className="flex gap-2">
-            {(
-              [
-                { id: "left" as const, label: t("left") },
-                { id: "right" as const, label: t("right") },
-                { id: "both" as const, label: t("both") },
-              ] as const
-            ).map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setSide(s.id)}
-                className={cn(
-                  "btn-option flex-1 py-2.5",
-                  side === s.id ? "btn-option-selected" : "btn-option-default"
-                )}
-              >
-                {s.label}
-              </button>
-            ))}
           </div>
         </div>
 

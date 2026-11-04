@@ -17,9 +17,11 @@ interface ExportViewProps {
 }
 
 type ExportRow = {
-  timestampUtc: string;
+  occurredAtUtc: string;
+  occurredLocalIso: string;
+  loggedAtUtc: string;
+  loggedLocalIso: string;
   timezone: string;
-  localIso: string;
   category: string;
   subcategory: string;
   amount?: number;
@@ -31,6 +33,7 @@ type ExportRow = {
   stoolColour?: string;
   stoolTexture?: string;
   measurementSource?: string;
+  expressedDate?: string;
   caregiverName: string;
   notes?: string;
   summary: string;
@@ -43,6 +46,11 @@ function escapeCsv(s: string): string {
 function cell(value: string | number | undefined | null): string {
   if (value === undefined || value === null || value === "") return '""';
   return escapeCsv(String(value));
+}
+
+/** Comment lines (# …) keep metadata out of the header row for CSV parsers. */
+function metaComment(key: string, value: string | number | undefined): string {
+  return `# ${key}=${value === undefined || value === "" ? "" : String(value)}`;
 }
 
 function rowsToCsv(
@@ -58,19 +66,21 @@ function rowsToCsv(
   rows: ExportRow[]
 ): string {
   const metaLines = [
-    ["meta", "baby_name", meta.babyName ?? ""].map(cell).join(","),
-    ["meta", "birth_date", meta.birthDate ?? ""].map(cell).join(","),
-    ["meta", "sex", meta.sex ?? ""].map(cell).join(","),
-    ["meta", "timezone", meta.timezone].map(cell).join(","),
-    ["meta", "exported_at_utc", meta.exportedAtUtc].map(cell).join(","),
-    ["meta", "range_days", meta.rangeDays].map(cell).join(","),
-    ["meta", "stash_available_ml", meta.stashAvailableMl].map(cell).join(","),
+    metaComment("baby_name", meta.babyName),
+    metaComment("birth_date", meta.birthDate),
+    metaComment("sex", meta.sex),
+    metaComment("timezone", meta.timezone),
+    metaComment("exported_at_utc", meta.exportedAtUtc),
+    metaComment("range_days", meta.rangeDays),
+    metaComment("stash_available_ml", meta.stashAvailableMl),
   ];
 
   const header = [
-    "timestamp_utc",
+    "occurred_at_utc",
+    "occurred_local_iso",
+    "logged_at_utc",
+    "logged_local_iso",
     "timezone",
-    "local_iso",
     "category",
     "subcategory",
     "amount",
@@ -82,15 +92,18 @@ function rowsToCsv(
     "stool_colour",
     "stool_texture",
     "measurement_source",
+    "expressed_date",
     "caregiver",
     "notes",
   ].join(",");
 
   const lines = rows.map((r) =>
     [
-      cell(r.timestampUtc),
+      cell(r.occurredAtUtc),
+      cell(r.occurredLocalIso),
+      cell(r.loggedAtUtc),
+      cell(r.loggedLocalIso),
       cell(r.timezone),
-      cell(r.localIso),
       cell(r.category),
       cell(r.subcategory),
       cell(r.amount),
@@ -102,6 +115,7 @@ function rowsToCsv(
       cell(r.stoolColour),
       cell(r.stoolTexture),
       cell(r.measurementSource),
+      cell(r.expressedDate),
       cell(r.caregiverName),
       cell(r.notes),
     ].join(",")
@@ -261,11 +275,11 @@ export function ExportView({ trackerId, babyName, onBack }: ExportViewProps) {
           <div className="space-y-2 max-h-64 overflow-y-auto print:max-h-none">
             {exportData.rows.map((row, i) => (
               <div
-                key={`${row.timestampUtc}-${row.category}-${i}`}
+                key={`${row.occurredAtUtc}-${row.category}-${i}`}
                 className="flex gap-2 text-sm border-b border-border/50 pb-2 last:border-0"
               >
                 <span className="text-muted shrink-0 w-28 text-xs">
-                  {row.localIso.replace("T", " ")}
+                  {row.occurredLocalIso.replace("T", " ")}
                 </span>
                 <span className="font-medium capitalize shrink-0 w-14">
                   {row.category}

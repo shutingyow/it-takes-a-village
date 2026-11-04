@@ -167,33 +167,21 @@ export function DayFeedPumpTables({ entries }: DayFeedPumpTablesProps) {
               <tr>
                 <th className={`${headCell} sticky left-0 z-10`}>{t("colTime")}</th>
                 <th className={headCell}>{t("colAmount")}</th>
-                <th className={headCell}>{t("colSide")}</th>
                 <th className={headCell}>{t("colNotes")}</th>
               </tr>
             </thead>
             <tbody>
-              {pumps.map((entry) => {
-                const sideLabel =
-                  entry.side === "left"
-                    ? t("left")
-                    : entry.side === "right"
-                      ? t("right")
-                      : entry.side === "both"
-                        ? t("both")
-                        : DASH;
-                return (
-                  <tr key={entry._id}>
-                    <td className={`${bodyCell} sticky left-0 z-10 bg-surface font-medium`}>
-                      {formatTime(entry.time)}
-                    </td>
-                    <td className={bodyCell}>{entry.amount} ml</td>
-                    <td className={bodyCell}>{sideLabel}</td>
-                    <td className={notesCell} title={entry.notes ?? undefined}>
-                      {entry.notes?.trim() ? entry.notes : DASH}
-                    </td>
-                  </tr>
-                );
-              })}
+              {pumps.map((entry) => (
+                <tr key={entry._id}>
+                  <td className={`${bodyCell} sticky left-0 z-10 bg-surface font-medium`}>
+                    {formatTime(entry.time)}
+                  </td>
+                  <td className={bodyCell}>{entry.amount} ml</td>
+                  <td className={notesCell} title={entry.notes ?? undefined}>
+                    {entry.notes?.trim() ? entry.notes : DASH}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </ScrollTable>
         )}

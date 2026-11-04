@@ -3,7 +3,7 @@
  * Import fixed pump schedule into Russell's tracker (production).
  *
  * Every day 23 Aug 2026 – 5 Sep 2026, Asia/Singapore:
- *   00:00, 04:00, 08:00, 12:00, 16:00, 20:00 — 90 ml, side both
+ *   00:00, 04:00, 08:00, 12:00, 16:00, 20:00 — 90 ml
  *
  * Usage:
  *   node scripts/import-pump-schedule.mjs --dry-run
@@ -78,7 +78,6 @@ function buildPumps() {
     for (const hour of HOURS) {
       pumps.push({
         amount: AMOUNT_ML,
-        side: "both",
         timestamp: toEpochMs(year, month, day, hour, 0),
         notes: IMPORT_TAG,
         caregiverName: CAREGIVER,

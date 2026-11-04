@@ -352,9 +352,7 @@ function getSubtitle(entry: ActivityEntry, t: TFunction): string | null {
     return appendLoggedBy(parts, entry.caregiverName, t);
   }
   if (entry.entryType === "pump") {
-    const parts: string[] = [];
-    if (entry.side) parts.push(`${entry.side} side`);
-    return appendLoggedBy(parts, entry.caregiverName, t);
+    return appendLoggedBy([], entry.caregiverName, t);
   }
   if (entry.entryType === "health" && entry.type === "medication" && entry.dosage) {
     return appendLoggedBy([entry.dosage], entry.caregiverName, t);

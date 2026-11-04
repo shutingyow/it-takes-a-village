@@ -3,9 +3,11 @@ import { query } from "./_generated/server";
 import { DEFAULT_TRACKER_TIMEZONE } from "./lib/dayBounds";
 
 const exportRowValidator = v.object({
-  timestampUtc: v.string(),
+  occurredAtUtc: v.string(),
+  occurredLocalIso: v.string(),
+  loggedAtUtc: v.string(),
+  loggedLocalIso: v.string(),
   timezone: v.string(),
-  localIso: v.string(),
   category: v.string(),
   subcategory: v.string(),
   amount: v.optional(v.number()),
@@ -17,6 +19,8 @@ const exportRowValidator = v.object({
   stoolColour: v.optional(v.string()),
   stoolTexture: v.optional(v.string()),
   measurementSource: v.optional(v.string()),
+  /** YYYY-MM-DD freeze / expression date for stash bags. */
+  expressedDate: v.optional(v.string()),
   caregiverName: v.string(),
   notes: v.optional(v.string()),
   /** Short preview line for the in-app list only. */
@@ -24,9 +28,11 @@ const exportRowValidator = v.object({
 });
 
 type ExportRow = {
-  timestampUtc: string;
+  occurredAtUtc: string;
+  occurredLocalIso: string;
+  loggedAtUtc: string;
+  loggedLocalIso: string;
   timezone: string;
-  localIso: string;
   category: string;
   subcategory: string;
   amount?: number;
@@ -38,6 +44,7 @@ type ExportRow = {
   stoolColour?: string;
   stoolTexture?: string;
   measurementSource?: string;
+  expressedDate?: string;
   caregiverName: string;
   notes?: string;
   summary: string;
@@ -61,12 +68,20 @@ function formatLocalIso(ms: number, timeZone: string): string {
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
-function stamp(ms: number, timeZone: string) {
+/** Midday UTC for a YYYY-MM-DD calendar date (stable sort key). */
+function msFromIsoDate(isoDate: string): number {
+  const ms = Date.parse(`${isoDate}T12:00:00.000Z`);
+  return Number.isFinite(ms) ? ms : Date.now();
+}
+
+function stamps(occurredAt: number, loggedAt: number, timeZone: string) {
   return {
-    timestampUtc: new Date(ms).toISOString(),
+    occurredAtUtc: new Date(occurredAt).toISOString(),
+    occurredLocalIso: formatLocalIso(occurredAt, timeZone),
+    loggedAtUtc: new Date(loggedAt).toISOString(),
+    loggedLocalIso: formatLocalIso(loggedAt, timeZone),
     timezone: timeZone,
-    localIso: formatLocalIso(ms, timeZone),
-    sortAt: ms,
+    sortAt: occurredAt,
   };
 }
 
@@ -112,7 +127,7 @@ export const getData = query({
               ? "breastmilk"
               : undefined
           : undefined;
-      let summary =
+      const summary =
         e.type === "breast"
           ? `Nursing${e.side ? ` (${e.side})` : ""}${
               durationMinutes != null ? ` ${durationMinutes}min` : ""
@@ -125,7 +140,7 @@ export const getData = query({
                 e.amount != null ? ` ${e.amount}ml` : ""
               }${durationMinutes != null ? ` ${durationMinutes}min` : ""}`;
       rows.push({
-        ...stamp(e.timestamp, timeZone),
+        ...stamps(e.timestamp, e._creationTime, timeZone),
         category: "feed",
         subcategory: e.type,
         amount:
@@ -155,15 +170,14 @@ export const getData = query({
 
     for (const e of pumps) {
       rows.push({
-        ...stamp(e.timestamp, timeZone),
+        ...stamps(e.timestamp, e._creationTime, timeZone),
         category: "pump",
-        subcategory: e.side ?? "pump",
+        subcategory: "pump",
         amount: e.amount,
         unit: "ml",
-        side: e.side,
         caregiverName: e.caregiverName,
         notes: e.notes,
-        summary: `Pump ${e.amount}ml${e.side ? ` (${e.side})` : ""}`,
+        summary: `Pump ${e.amount}ml`,
       });
     }
 
@@ -182,7 +196,7 @@ export const getData = query({
           ? Math.floor((e.endTime - e.startTime) / 60000)
           : undefined);
       rows.push({
-        ...stamp(e.startTime, timeZone),
+        ...stamps(e.startTime, e._creationTime, timeZone),
         category: "sleep",
         subcategory: e.type === "nap" ? "nap" : "night",
         durationMinutes: durationMin,
@@ -204,7 +218,7 @@ export const getData = query({
 
     for (const e of diapers) {
       rows.push({
-        ...stamp(e.timestamp, timeZone),
+        ...stamps(e.timestamp, e._creationTime, timeZone),
         category: "diaper",
         subcategory: e.type,
         stoolType: e.type,
@@ -246,7 +260,7 @@ export const getData = query({
         summary = "Spit-up";
       }
       rows.push({
-        ...stamp(e.timestamp, timeZone),
+        ...stamps(e.timestamp, e._creationTime, timeZone),
         category: "health",
         subcategory: e.type,
         amount,
@@ -267,7 +281,7 @@ export const getData = query({
 
     for (const e of momentEntries) {
       rows.push({
-        ...stamp(e.timestamp, timeZone),
+        ...stamps(e.timestamp, e._creationTime, timeZone),
         category: "moment",
         subcategory: e.preset ?? "moment",
         caregiverName: e.caregiverName,
@@ -286,7 +300,7 @@ export const getData = query({
 
     for (const e of activityEntries) {
       rows.push({
-        ...stamp(e.timestamp, timeZone),
+        ...stamps(e.timestamp, e._creationTime, timeZone),
         category: "activity",
         subcategory: e.kind,
         durationMinutes: e.durationMinutes,
@@ -312,10 +326,9 @@ export const getData = query({
       if (e.headCircumference != null) {
         parts.push(`HC ${e.headCircumference} cm`);
       }
-      // One row per measurement type present so amount/unit stay structured.
       if (e.weight != null) {
         rows.push({
-          ...stamp(e.timestamp, timeZone),
+          ...stamps(e.timestamp, e._creationTime, timeZone),
           category: "growth",
           subcategory: "weight",
           amount: e.weight,
@@ -328,7 +341,7 @@ export const getData = query({
       }
       if (e.length != null) {
         rows.push({
-          ...stamp(e.timestamp, timeZone),
+          ...stamps(e.timestamp, e._creationTime, timeZone),
           category: "growth",
           subcategory: "length",
           amount: e.length,
@@ -341,7 +354,7 @@ export const getData = query({
       }
       if (e.headCircumference != null) {
         rows.push({
-          ...stamp(e.timestamp, timeZone),
+          ...stamps(e.timestamp, e._creationTime, timeZone),
           category: "growth",
           subcategory: "head",
           amount: e.headCircumference,
@@ -354,7 +367,7 @@ export const getData = query({
       }
       if (e.weight == null && e.length == null && e.headCircumference == null) {
         rows.push({
-          ...stamp(e.timestamp, timeZone),
+          ...stamps(e.timestamp, e._creationTime, timeZone),
           category: "growth",
           subcategory: "growth",
           measurementSource: e.measurementSource,
@@ -380,10 +393,18 @@ export const getData = query({
         e.createdAt >= rangeStart ||
         (e.usedAt !== undefined && e.usedAt >= rangeStart);
       if (!inRange) continue;
-      const eventAt =
+
+      const expressedDate = e.frozenOn ?? e.label;
+      const occurredAt =
+        e.status === "available"
+          ? (e.pumpedAt ??
+            (expressedDate ? msFromIsoDate(expressedDate) : e.createdAt))
+          : (e.usedAt ?? e.createdAt);
+      const loggedAt =
         e.status === "available" ? e.createdAt : (e.usedAt ?? e.createdAt);
+
       rows.push({
-        ...stamp(eventAt, timeZone),
+        ...stamps(occurredAt, loggedAt, timeZone),
         category: "stash",
         subcategory:
           e.status === "available"
@@ -393,15 +414,14 @@ export const getData = query({
               : "bag_discarded",
         amount: e.amountMl,
         unit: "ml",
+        expressedDate,
         caregiverName:
           e.status === "available"
             ? e.caregiverName
             : (e.usedByCaregiverName ?? e.caregiverName),
-        notes:
-          [e.frozenOn ?? e.label, e.notes].filter(Boolean).join(" · ") ||
-          undefined,
+        notes: e.notes,
         summary: `${e.status} bag ${e.amountMl}ml${
-          e.frozenOn ? ` frozen ${e.frozenOn}` : ""
+          expressedDate ? ` expressed ${expressedDate}` : ""
         }`,
       });
     }
