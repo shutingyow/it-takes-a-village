@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as accountDeletion from "../accountDeletion.js";
 import type * as activityEntries from "../activityEntries.js";
 import type * as apns from "../apns.js";
 import type * as apnsHelpers from "../apnsHelpers.js";
@@ -50,6 +51,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accountDeletion: typeof accountDeletion;
   activityEntries: typeof activityEntries;
   apns: typeof apns;
   apnsHelpers: typeof apnsHelpers;

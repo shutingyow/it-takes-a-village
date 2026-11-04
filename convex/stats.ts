@@ -2,10 +2,10 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { verifyCaregiver } from "./lib/caregivers";
 import {
-  DEFAULT_TRACKER_TIMEZONE,
   formatWeekdayShortInZone,
   getDayBoundsForDateKey,
   getTodayBoundsInZone,
+  resolveTrackerTimezone,
   shiftDateKey,
 } from "./lib/dayBounds";
 
@@ -94,6 +94,7 @@ function buildDayStat(
   dayStart: number,
   dayEnd: number,
   now: number,
+  timeZone: string,
   feeds: Array<{
     timestamp: number;
     type: string;
@@ -187,7 +188,7 @@ function buildDayStat(
 
   return {
     date: dateKey,
-    label: formatWeekdayShortInZone(dayStart, DEFAULT_TRACKER_TIMEZONE),
+    label: formatWeekdayShortInZone(dayStart, timeZone),
     feedCount: breastCount + bottleCount,
     breastCount,
     bottleCount,
@@ -232,7 +233,7 @@ export const getWeeklySummary = query({
       args.secretLink,
       args.actingCaregiverName
     );
-    const timeZone = DEFAULT_TRACKER_TIMEZONE;
+    const timeZone = resolveTrackerTimezone(tracker);
     const { dateKey: todayKey } = getTodayBoundsInZone(args.now, timeZone);
     const endDateKey =
       args.endDateKey && args.endDateKey <= todayKey
@@ -297,6 +298,7 @@ export const getWeeklySummary = query({
           dayStart,
           dayEnd,
           args.now,
+          timeZone,
           feeds,
           diapers,
           pumps,
@@ -345,7 +347,7 @@ export const getDailyStats = query({
       args.secretLink,
       args.actingCaregiverName
     );
-    const timeZone = DEFAULT_TRACKER_TIMEZONE;
+    const timeZone = resolveTrackerTimezone(tracker);
     const { dayStart, dayEnd } = getDayBoundsForDateKey(args.dateKey, timeZone);
 
     const feeds = await ctx.db
@@ -386,6 +388,7 @@ export const getDailyStats = query({
       dayStart,
       dayEnd,
       args.now,
+      timeZone,
       feeds,
       diapers,
       pumps,
@@ -546,7 +549,7 @@ export const getFeedingTrend = query({
       args.secretLink,
       args.actingCaregiverName
     );
-    const timeZone = DEFAULT_TRACKER_TIMEZONE;
+    const timeZone = resolveTrackerTimezone(tracker);
     const currentEndKey = args.dateKey;
     const currentStartKey =
       args.mode === "daily"

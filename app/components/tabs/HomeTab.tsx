@@ -19,6 +19,7 @@ interface HomeTabProps {
   babyName?: string;
   birthDate?: string;
   photoStorageId?: Id<"_storage">;
+  timezone?: string;
   lastFeed?: Doc<"feedEntries"> | null;
   lastDiaper?: Doc<"diaperEntries"> | null;
   pumpScheduleEnabled?: boolean;
@@ -34,6 +35,7 @@ export function HomeTab({
   babyName,
   birthDate,
   photoStorageId,
+  timezone,
   pumpScheduleEnabled,
   onOpenMilestones,
   onOpenSettings,
@@ -71,6 +73,7 @@ export function HomeTab({
       <HomeCategoryGrid
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
+        timezone={timezone}
         onSelect={(cat: HomeTileCategory) => setCategory(cat)}
         onQuickLog={
           onQuickLog

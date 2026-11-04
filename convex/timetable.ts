@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { verifyCaregiver } from "./lib/caregivers";
 import {
-  DEFAULT_TRACKER_TIMEZONE,
+  resolveTrackerTimezone,
   getDayBoundsForDateKey,
   shiftDateKey,
 } from "./lib/dayBounds";
@@ -55,7 +55,7 @@ export const getSchedule = query({
       args.actingCaregiverName
     );
     const dayCount = Math.min(7, Math.max(1, Math.floor(args.dayCount)));
-    const tz = DEFAULT_TRACKER_TIMEZONE;
+    const tz = resolveTrackerTimezone(tracker);
     const days: Array<{
       dateKey: string;
       dayStart: number;

@@ -20,6 +20,7 @@ interface StatsViewProps {
   birthDate?: string;
   secretLink: string;
   selectedCaregiver: string;
+  timezone?: string;
   /** Birth date edits are admin-only. */
   canEditBirthDate?: boolean;
   onBack?: () => void;
@@ -285,6 +286,7 @@ export function StatsView({
   secretLink,
   selectedCaregiver,
   canEditBirthDate = false,
+  timezone,
   onBack,
   title,
 }: StatsViewProps) {
@@ -293,7 +295,10 @@ export function StatsView({
   const [showExport, setShowExport] = useState(false);
   const [metric, setMetric] = useState<ChartMetric>("feeds");
   const [rangeMode, setRangeMode] = useState<RangeMode>("daily");
-  const todayKey = useMemo(() => getDateKeyInZone(now), [now]);
+  const todayKey = useMemo(
+    () => getDateKeyInZone(now, timezone),
+    [now, timezone]
+  );
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
   /** Last day of the rolling 7-day weekly window; defaults to today. */
   const [selectedWeekEndKey, setSelectedWeekEndKey] = useState(todayKey);
@@ -607,6 +612,7 @@ export function StatsView({
           className="px-0 pb-4"
           secretLink={secretLink}
           selectedCaregiver={selectedCaregiver}
+          timezone={timezone}
         />
       )}
 

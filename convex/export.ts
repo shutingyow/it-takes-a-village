@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { verifyCaregiver } from "./lib/caregivers";
-import { DEFAULT_TRACKER_TIMEZONE } from "./lib/dayBounds";
+import { resolveTrackerTimezone } from "./lib/dayBounds";
 
 const exportRowValidator = v.object({
   occurredAtUtc: v.string(),
@@ -110,8 +110,7 @@ export const getData = query({
       args.secretLink,
       args.actingCaregiverName
     );
-    const timeZone =
-      tracker?.pumpSchedule?.timezone ?? DEFAULT_TRACKER_TIMEZONE;
+    const timeZone = resolveTrackerTimezone(tracker);
     const rangeStart = args.now - args.days * 24 * 60 * 60 * 1000;
     const rows: ExportRow[] = [];
 

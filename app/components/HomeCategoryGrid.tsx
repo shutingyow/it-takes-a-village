@@ -60,6 +60,8 @@ const TILES: Array<{
 interface HomeCategoryGridProps {
   secretLink: string;
   selectedCaregiver: string;
+  /** Village IANA timezone for “today” bounds. */
+  timezone?: string;
   onSelect: (category: HomeTileCategory) => void;
   onQuickLog?: (category: HomeTileCategory) => void;
 }
@@ -67,12 +69,16 @@ interface HomeCategoryGridProps {
 export function HomeCategoryGrid({
   secretLink,
   selectedCaregiver,
+  timezone,
   onSelect,
   onQuickLog,
 }: HomeCategoryGridProps) {
   const { t } = useLanguage();
   const [now, setNow] = useState(() => Date.now());
-  const { dayStart, dayEnd } = useMemo(() => getTodayBoundsInZone(now), [now]);
+  const { dayStart, dayEnd } = useMemo(
+    () => getTodayBoundsInZone(now, timezone),
+    [now, timezone]
+  );
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);

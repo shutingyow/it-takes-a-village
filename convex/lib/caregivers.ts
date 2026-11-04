@@ -20,21 +20,17 @@ export type Caregiver = {
   role: "admin" | "caregiver";
 };
 
-const ADMIN_NAME = "Mommy (Shuting)";
-
-export function isAdminName(name: string): boolean {
-  return name.trim().toLowerCase() === ADMIN_NAME.toLowerCase();
-}
-
+/**
+ * Legacy name lists → caregivers. First name is admin; real admin power for
+ * settings is SSO ownership (`verifyAdmin` / ownerUserId), not this label.
+ */
 export function assignRoles(names: string[]): Caregiver[] {
   const trimmed = names.map((n) => n.trim()).filter(Boolean);
   if (trimmed.length === 0) return [];
 
-  const hasNamedAdmin = trimmed.some(isAdminName);
   return trimmed.map((name, index) => ({
     name,
-    role:
-      isAdminName(name) || (!hasNamedAdmin && index === 0) ? "admin" : "caregiver",
+    role: index === 0 ? "admin" : "caregiver",
   }));
 }
 
@@ -176,6 +172,7 @@ export function normalizeTrackerForClient(tracker: Doc<"trackers">) {
     birthDate: tracker.birthDate,
     sex: tracker.sex,
     photoStorageId: tracker.photoStorageId,
+    timezone: tracker.timezone,
     caregivers,
     feedIntervalHours: tracker.feedIntervalHours,
     nightFeedIntervalEnabled: tracker.nightFeedIntervalEnabled,

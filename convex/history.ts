@@ -3,7 +3,7 @@ import { query, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { verifyCaregiver } from "./lib/caregivers";
 import {
-  DEFAULT_TRACKER_TIMEZONE,
+  resolveTrackerTimezone,
   getDayBoundsForDateKey,
 } from "./lib/dayBounds";
 import { isMilkFeed } from "./lib/feeds";
@@ -276,7 +276,7 @@ export const getActivityForDay = query({
     const trackerId = tracker._id;
     const { dayStart, dayEnd } = getDayBoundsForDateKey(
       args.dateKey,
-      DEFAULT_TRACKER_TIMEZONE
+      resolveTrackerTimezone(tracker)
     );
 
     const feedEntries = await ctx.db

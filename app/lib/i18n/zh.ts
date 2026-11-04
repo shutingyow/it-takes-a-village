@@ -71,6 +71,13 @@ export const zh: Translations = {
   signInInvalidClient:
     "登录尚未配置（invalid client）。请在 Convex 部署中设置 AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET 与 AUTH_APPLE_ID / AUTH_APPLE_SECRET — 详见 IOS.md。",
   signOut: "退出登录",
+  deleteAccount: "删除账户",
+  deletingAccount: "正在删除…",
+  deleteAccountConfirm: "确定删除账户及你创建的所有村庄？此操作无法撤销。",
+  deleteAccountHint: "会删除你的登录信息及你创建的村庄。其他看护人的账户不受影响。",
+  deleteAccountFailed: "无法删除账户，请重试。",
+  villageTimezone: "村庄时区",
+  villageTimezoneDesc: "用于“今天”、夜间喂养窗口和排程，全村共用。",
   accountSection: "账户",
   accountSignedIn: "你已登录。管理设置使用此账户。",
   accountSignedOut:

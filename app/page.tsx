@@ -22,9 +22,9 @@ import { IconReminders } from "@/app/components/icons";
 import { LanguageToggle } from "@/app/components/LanguageToggle";
 import { signInWithOAuth } from "@/app/lib/oauthSignIn";
 import { EmailPasswordForm } from "@/app/components/EmailPasswordForm";
+import { detectDeviceTimezone } from "@/app/lib/utils";
 
 const CREATE_TIMEOUT_MS = 15_000;
-const DEFAULT_ADMIN = "Mommy (Shuting)";
 
 type CaregiverDraft = {
   name: string;
@@ -40,6 +40,7 @@ export default function Home() {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { signIn, signOut } = useAuthActions();
   const createTracker = useMutation(api.trackers.create);
+  const deleteAccount = useMutation(api.accountDeletion.deleteAccount);
   const myVillages = useQuery(
     api.trackers.listMine,
     isAuthenticated ? {} : "skip"
@@ -50,7 +51,7 @@ export default function Home() {
   const [showConnectingBanner, setShowConnectingBanner] = useState(false);
   const [babyName, setBabyName] = useState("");
   const [caregivers, setCaregivers] = useState<CaregiverDraft[]>([
-    { name: DEFAULT_ADMIN, role: "admin" },
+    { name: "", role: "admin" },
   ]);
   const [isCreating, setIsCreating] = useState(false);
   const [signingInProvider, setSigningInProvider] = useState<
@@ -163,24 +164,9 @@ export default function Home() {
       const updated = [...prev];
       const current = updated[index];
       if (!current) return prev;
-      const isDefaultAdmin =
-        index === 0 &&
-        current.role === "admin" &&
-        current.name === DEFAULT_ADMIN;
-      updated[index] = {
-        name,
-        role:
-          name.trim().toLowerCase() === DEFAULT_ADMIN.toLowerCase() ||
-          isDefaultAdmin
-            ? "admin"
-            : current.role,
-      };
-      const hasAdmin = updated.some(
-        (c) =>
-          c.role === "admin" ||
-          c.name.trim().toLowerCase() === DEFAULT_ADMIN.toLowerCase()
-      );
-      if (!hasAdmin && updated[0]) {
+      updated[index] = { ...current, name };
+      // Keep first row as the labeled admin caregiver for the lock screen.
+      if (!updated.some((c) => c.role === "admin") && updated[0]) {
         updated[0] = { ...updated[0], role: "admin" };
       }
       return updated;
@@ -223,16 +209,16 @@ export default function Home() {
       return;
     }
 
-    const hasNamedAdmin = drafts.some(
-      (c) => c.name.toLowerCase() === DEFAULT_ADMIN.toLowerCase()
-    );
     const normalized = drafts.map((c, i) => ({
       name: c.name,
-      role:
-        c.name.toLowerCase() === DEFAULT_ADMIN.toLowerCase() ||
-        (!hasNamedAdmin && i === 0)
-          ? ("admin" as const)
-          : ("caregiver" as const),
+      role: (i === 0 || c.role === "admin" ? "admin" : "caregiver") as
+        | "admin"
+        | "caregiver",
+    }));
+    // Exactly one labeled admin: the creator’s first name.
+    const withSingleAdmin = normalized.map((c, i) => ({
+      ...c,
+      role: (i === 0 ? "admin" : "caregiver") as "admin" | "caregiver",
     }));
 
     setError(null);
@@ -242,8 +228,9 @@ export default function Home() {
       const trimmedBabyName = babyName.trim();
       const result = await Promise.race([
         createTracker({
-          caregivers: normalized,
+          caregivers: withSingleAdmin,
           babyName: trimmedBabyName || undefined,
+          timezone: detectDeviceTimezone(),
         }),
         new Promise<never>((_, reject) => {
           setTimeout(() => {
@@ -646,13 +633,34 @@ export default function Home() {
       {/* Below status bar / battery — not absolute under the Dynamic Island */}
       <div className="mx-auto max-w-md w-full flex items-center justify-end gap-2 pt-3 pb-3">
         {isAuthenticated && (
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            className="text-sm font-semibold text-muted hover:text-foreground px-2 py-2 min-h-11"
-          >
-            {t("signOut")}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="text-sm font-semibold text-muted hover:text-foreground px-2 py-2 min-h-11"
+            >
+              {t("signOut")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirm(t("deleteAccountConfirm"))) return;
+                void (async () => {
+                  try {
+                    await deleteAccount({ confirm: "DELETE" });
+                    await signOut();
+                    router.replace("/");
+                  } catch (err) {
+                    console.error(err);
+                    setError(t("deleteAccountFailed"));
+                  }
+                })();
+              }}
+              className="text-sm font-semibold text-red-600 hover:text-red-700 px-2 py-2 min-h-11"
+            >
+              {t("deleteAccount")}
+            </button>
+          </>
         )}
         <LanguageToggle />
       </div>

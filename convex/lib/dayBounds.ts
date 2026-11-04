@@ -1,17 +1,29 @@
 /**
  * Day boundary for summaries and Insights/Stats.
  *
- * One day = one calendar day in Asia/Singapore (SGT, UTC+8):
- *   start inclusive: 00:00:00.000 SGT
- *   end exclusive:   next day 00:00:00.000 SGT
+ * One day = one calendar day in the village timezone:
+ *   start inclusive: 00:00:00.000 local
+ *   end exclusive:   next day 00:00:00.000 local
  *
  * Not a rolling 24h window. Not browser-local and not UTC midnight
  * (Convex runtimes are UTC; using Date#getHours locally would be wrong).
- * Matches pump-schedule / import defaults (DEFAULT_PUMP_TIMEZONE).
+ * Prefer `trackers.timezone`; fall back to DEFAULT_TRACKER_TIMEZONE.
  */
 import { zonedTimeToUtc } from "./pumpSchedule";
 
+/** Fallback when a village has no timezone set (legacy trackers). */
 export const DEFAULT_TRACKER_TIMEZONE = "Asia/Singapore";
+
+export function resolveTrackerTimezone(tracker: {
+  timezone?: string;
+  pumpSchedule?: { timezone?: string };
+} | null | undefined): string {
+  const fromTracker = tracker?.timezone?.trim();
+  if (fromTracker) return fromTracker;
+  const fromPump = tracker?.pumpSchedule?.timezone?.trim();
+  if (fromPump) return fromPump;
+  return DEFAULT_TRACKER_TIMEZONE;
+}
 
 function zonedYmd(
   ms: number,

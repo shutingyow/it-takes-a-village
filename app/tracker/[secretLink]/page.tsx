@@ -364,6 +364,7 @@ export default function TrackerPage({
             babyName={tracker.babyName}
             birthDate={tracker.birthDate}
             photoStorageId={tracker.photoStorageId}
+            timezone={tracker.timezone}
             lastFeed={lastFeed}
             lastDiaper={lastDiaper}
             pumpScheduleEnabled={tracker.pumpSchedule?.enabled}
@@ -389,6 +390,7 @@ export default function TrackerPage({
             birthDate={tracker.birthDate}
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
+            timezone={tracker.timezone}
             canEditBirthDate={tracker.viewerIsOwner}
           />
         )}
@@ -407,6 +409,7 @@ export default function TrackerPage({
             babyName={tracker.babyName}
             birthDate={tracker.birthDate}
             sex={tracker.sex}
+            timezone={tracker.timezone}
             feedIntervalHours={tracker.feedIntervalHours}
             nightFeedIntervalEnabled={tracker.nightFeedIntervalEnabled}
             nightFeedIntervalHours={tracker.nightFeedIntervalHours}

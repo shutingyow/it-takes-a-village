@@ -57,6 +57,11 @@ export default defineSchema({
       )
     ),
     photoStorageId: v.optional(v.id("_storage")),
+    /**
+     * IANA timezone for village “today”, night feed window, diary dateKey,
+     * and schedules (e.g. "Asia/Singapore"). Defaults applied when unset.
+     */
+    timezone: v.optional(v.string()),
     caregivers: v.optional(
       v.array(
         v.object({
@@ -69,7 +74,7 @@ export default defineSchema({
     feedIntervalHours: v.optional(v.number()),
     /**
      * Longer overnight feed gap. When enabled, feeds logged inside the night
-     * window (local Asia/Singapore by default) use nightFeedIntervalHours.
+     * window (tracker timezone) use nightFeedIntervalHours.
      * Defaults applied in feedSchedule when unset.
      */
     nightFeedIntervalEnabled: v.optional(v.boolean()),

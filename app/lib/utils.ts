@@ -80,8 +80,40 @@ export {
   getDateKeyInZone,
   getDayBoundsForDateKey,
   getTodayBoundsInZone,
+  resolveTrackerTimezone,
   shiftDateKey,
 } from "../../convex/lib/dayBounds";
+
+/** Common IANA zones for the village timezone picker. */
+export const VILLAGE_TIMEZONE_OPTIONS = [
+  "Asia/Singapore",
+  "Asia/Hong_Kong",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Asia/Seoul",
+  "Asia/Kolkata",
+  "Asia/Dubai",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Toronto",
+  "America/Sao_Paulo",
+  "Australia/Sydney",
+  "Australia/Melbourne",
+  "Pacific/Auckland",
+] as const;
+
+export function detectDeviceTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Singapore";
+  } catch {
+    return "Asia/Singapore";
+  }
+}
 
 export function getTodayBounds(): { dayStart: number; dayEnd: number } {
   const { dayStart, dayEnd } = getTodayBoundsInZone();

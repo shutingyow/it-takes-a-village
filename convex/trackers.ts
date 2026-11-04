@@ -23,6 +23,7 @@ import {
   DEFAULT_PUMP_TIMEZONE,
   normalizePumpTimes,
 } from "./lib/pumpSchedule";
+import { DEFAULT_TRACKER_TIMEZONE } from "./lib/dayBounds";
 
 const medicationReminderValidator = v.object({
   name: v.string(),
@@ -56,6 +57,7 @@ const trackerReturnValidator = v.object({
     )
   ),
   photoStorageId: v.optional(v.id("_storage")),
+  timezone: v.optional(v.string()),
   caregivers: v.array(caregiverValidator),
   feedIntervalHours: v.optional(v.number()),
   nightFeedIntervalEnabled: v.optional(v.boolean()),
@@ -78,10 +80,24 @@ const trackerClientValidator = v.object({
 });
 
 // Create a new tracker with a unique secret link (signed-in admin only)
+function normalizeIanaTimezone(raw: string | undefined): string {
+  const trimmed = raw?.trim();
+  if (!trimmed) return DEFAULT_TRACKER_TIMEZONE;
+  try {
+    // Throws RangeError for unknown zones in modern runtimes.
+    Intl.DateTimeFormat(undefined, { timeZone: trimmed }).format(new Date());
+    return trimmed;
+  } catch {
+    return DEFAULT_TRACKER_TIMEZONE;
+  }
+}
+
 export const create = mutation({
   args: {
     caregivers: v.array(caregiverValidator),
     babyName: v.optional(v.string()),
+    /** IANA zone from the creator’s device; defaults to Asia/Singapore. */
+    timezone: v.optional(v.string()),
   },
   returns: v.object({
     trackerId: v.id("trackers"),
@@ -100,17 +116,21 @@ export const create = mutation({
     if (caregivers.length === 0) {
       throw new Error("Add at least one caregiver");
     }
-    if (countAdmins(caregivers) === 0) {
-      throw new Error("At least one admin caregiver is required");
+    // Creator is always the SSO owner. Ensure the first listed caregiver is
+    // labeled admin for lock-screen display; real admin power is ownerUserId.
+    if (countAdmins(caregivers) === 0 && caregivers[0]) {
+      caregivers[0] = { ...caregivers[0], role: "admin" };
     }
 
     const secretLink = nanoid(16);
     const babyName = args.babyName?.trim() || undefined;
+    const timezone = normalizeIanaTimezone(args.timezone);
 
     const trackerId = await ctx.db.insert("trackers", {
       secretLink,
       ownerUserId: userId,
       babyName,
+      timezone,
       caregivers,
       feedIntervalHours: 2.5,
       createdAt: Date.now(),
@@ -237,6 +257,32 @@ export const updateBabyName = mutation({
     const trimmed = args.babyName.trim();
     await ctx.db.patch(tracker._id, {
       babyName: trimmed || undefined,
+    });
+    return null;
+  },
+});
+
+/** Village timezone for shared “today” / night windows / schedules. */
+export const updateTimezone = mutation({
+  args: {
+    secretLink: v.string(),
+    actingCaregiverName: v.string(),
+    timezone: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { tracker } = await verifyAdmin(
+      ctx,
+      args.secretLink,
+      args.actingCaregiverName
+    );
+    const timezone = normalizeIanaTimezone(args.timezone);
+    const pump = tracker.pumpSchedule;
+    await ctx.db.patch(tracker._id, {
+      timezone,
+      ...(pump
+        ? { pumpSchedule: { ...pump, timezone } }
+        : {}),
     });
     return null;
   },

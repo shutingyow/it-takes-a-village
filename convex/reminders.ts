@@ -12,6 +12,7 @@ import {
   computeNextPumpDueAt,
   DEFAULT_PUMP_INTERVAL_HOURS,
 } from "./lib/pumpSchedule";
+import { resolveTrackerTimezone } from "./lib/dayBounds";
 
 const dueItemValidator = v.object({
   type: v.union(
@@ -122,7 +123,7 @@ export const getDueStatus = query({
         lastFeed.timestamp,
         feedIntervalHours,
         night,
-        { now: args.now }
+        { now: args.now, timeZone: resolveTrackerTimezone(tracker) }
       );
       effectiveFeedIntervalHours = (dueAt - feedAt) / (60 * 60 * 1000);
       usingNightInterval =

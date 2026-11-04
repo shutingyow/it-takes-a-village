@@ -110,6 +110,7 @@ interface TodayTimetableProps {
   className?: string;
   secretLink: string;
   selectedCaregiver: string;
+  timezone?: string;
 }
 
 export function TodayTimetable({
@@ -117,6 +118,7 @@ export function TodayTimetable({
   className,
   secretLink,
   selectedCaregiver,
+  timezone,
 }: TodayTimetableProps) {
   const { t } = useLanguage();
   const [now, setNow] = useState(() => Date.now());
@@ -133,7 +135,10 @@ export function TodayTimetable({
     return () => clearInterval(id);
   }, []);
 
-  const todayKey = useMemo(() => getDateKeyInZone(now), [now]);
+  const todayKey = useMemo(
+    () => getDateKeyInZone(now, timezone),
+    [now, timezone]
+  );
   const anchorKey = controlledDateKey ?? todayKey;
 
   const schedule = useQuery(api.timetable.getSchedule, {
@@ -171,8 +176,8 @@ export function TodayTimetable({
 
   const gridHeight = HOURS.length * HOUR_PX;
   const { dayStart: todayBoundsStart } = useMemo(
-    () => getTodayBoundsInZone(now),
-    [now]
+    () => getTodayBoundsInZone(now, timezone),
+    [now, timezone]
   );
   const showingToday = anchorKey === todayKey;
   const nowTop = showingToday

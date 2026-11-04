@@ -76,6 +76,16 @@ export const translations = {
   signInInvalidClient:
     "Sign-in isn’t configured yet (invalid client). Add AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET and AUTH_APPLE_ID / AUTH_APPLE_SECRET on your Convex deployment — see IOS.md.",
   signOut: "Sign out",
+  deleteAccount: "Delete account",
+  deletingAccount: "Deleting…",
+  deleteAccountConfirm:
+    "Delete your account and every village you own? This cannot be undone.",
+  deleteAccountHint:
+    "Deletes your sign-in and villages you created. Shared caregivers keep their own accounts.",
+  deleteAccountFailed: "Could not delete account. Try again.",
+  villageTimezone: "Village timezone",
+  villageTimezoneDesc:
+    "Used for “today”, night feed windows, and schedules for everyone in this village.",
   accountSection: "Account",
   accountSignedIn: "You’re signed in. Admin settings use this account.",
   accountSignedOut:

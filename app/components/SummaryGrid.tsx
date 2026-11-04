@@ -26,6 +26,7 @@ const GOALS = {
 interface SummaryGridProps {
   secretLink: string;
   selectedCaregiver: string;
+  timezone?: string;
 }
 
 function ProgressBar({
@@ -45,10 +46,17 @@ function ProgressBar({
   );
 }
 
-export function SummaryGrid({ secretLink, selectedCaregiver }: SummaryGridProps) {
+export function SummaryGrid({
+  secretLink,
+  selectedCaregiver,
+  timezone,
+}: SummaryGridProps) {
   const { t } = useLanguage();
   const [now, setNow] = useState(() => Date.now());
-  const { dayStart, dayEnd } = useMemo(() => getTodayBoundsInZone(now), [now]);
+  const { dayStart, dayEnd } = useMemo(
+    () => getTodayBoundsInZone(now, timezone),
+    [now, timezone]
+  );
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);

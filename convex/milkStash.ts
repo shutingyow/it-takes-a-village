@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
+import { resolveTrackerTimezone } from "./lib/dayBounds";
 import {
   assertIsoDate,
   assertNotFarFuture,
@@ -30,16 +31,14 @@ const bagReturn = v.object({
   notes: v.optional(v.string()),
 });
 
-function isoFromTimestamp(ms: number): string {
-  const d = new Date(ms);
-  // Asia/Singapore day for consistency with tracker defaults
+function isoFromTimestamp(ms: number, timeZone: string): string {
   const fmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Singapore",
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
-  return fmt.format(d);
+  return fmt.format(new Date(ms));
 }
 
 export const listAvailable = query({
@@ -143,7 +142,10 @@ export const addBag = mutation({
 
     const frozenOn = assertIsoDate(
       args.frozenOn ??
-        isoFromTimestamp(args.pumpedAt ?? createdAt),
+        isoFromTimestamp(
+          args.pumpedAt ?? createdAt,
+          resolveTrackerTimezone(tracker)
+        ),
       "Freeze date"
     );
 

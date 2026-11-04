@@ -24,6 +24,12 @@ import { signInWithOAuth } from "@/app/lib/oauthSignIn";
 import { BirthDateField } from "../BirthDateField";
 import { BabySexField } from "../BabySexField";
 import { EmailPasswordForm } from "../EmailPasswordForm";
+import {
+  DEFAULT_TRACKER_TIMEZONE,
+  VILLAGE_TIMEZONE_OPTIONS,
+  detectDeviceTimezone,
+} from "@/app/lib/utils";
+import { useRouter } from "next/navigation";
 
 const PRIVACY_POLICY_URL = "https://it-takes-a-village.vercel.app/privacy";
 
@@ -53,6 +59,7 @@ interface SettingsTabProps {
   babyName?: string;
   sex?: "female" | "male" | "unspecified";
   birthDate?: string;
+  timezone?: string;
   feedIntervalHours?: number;
   nightFeedIntervalEnabled?: boolean;
   nightFeedIntervalHours?: number;
@@ -82,6 +89,7 @@ export function SettingsTab({
   babyName,
   birthDate,
   sex,
+  timezone,
   feedIntervalHours,
   nightFeedIntervalEnabled,
   nightFeedIntervalHours,
@@ -97,6 +105,7 @@ export function SettingsTab({
 }: SettingsTabProps) {
   const { t, language, setLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
   const { isAuthenticated } = useConvexAuth();
   const { signIn, signOut } = useAuthActions();
   const [view, setView] = useState<SettingsView>("menu");
@@ -105,10 +114,29 @@ export function SettingsTab({
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [timezoneBusy, setTimezoneBusy] = useState(false);
 
   const activeAlerts = useQuery(api.supplyAlerts.getActive, { secretLink, actingCaregiverName: selectedCaregiver });
   const addCaregiver = useMutation(api.trackers.addCaregiver);
   const removeCaregiver = useMutation(api.trackers.removeCaregiver);
+  const updateTimezone = useMutation(api.trackers.updateTimezone);
+  const deleteAccount = useMutation(api.accountDeletion.deleteAccount);
+
+  const villageTimezone =
+    timezone?.trim() ||
+    pumpSchedule?.timezone?.trim() ||
+    DEFAULT_TRACKER_TIMEZONE;
+
+  const timezoneOptions = (() => {
+    const device = detectDeviceTimezone();
+    const set = new Set<string>([
+      ...VILLAGE_TIMEZONE_OPTIONS,
+      villageTimezone,
+      device,
+    ]);
+    return Array.from(set).sort();
+  })();
 
   const isAdmin = viewerIsOwner;
   const adminCount = caregivers.filter((c) => c.role === "admin").length;
@@ -317,6 +345,30 @@ export function SettingsTab({
             >
               {t("signOut")}
             </button>
+            <button
+              type="button"
+              disabled={deleteBusy}
+              onClick={() => {
+                if (!confirm(t("deleteAccountConfirm"))) return;
+                setDeleteBusy(true);
+                void (async () => {
+                  try {
+                    await deleteAccount({ confirm: "DELETE" });
+                    await signOut();
+                    router.replace("/");
+                  } catch (err) {
+                    console.error(err);
+                    alert(t("deleteAccountFailed"));
+                  } finally {
+                    setDeleteBusy(false);
+                  }
+                })();
+              }}
+              className="w-full mt-2 py-3.5 px-4 rounded-xl border border-red-200 bg-red-50 text-sm font-semibold text-red-700 touch-manipulation min-h-[44px] disabled:opacity-50"
+            >
+              {deleteBusy ? t("deletingAccount") : t("deleteAccount")}
+            </button>
+            <p className="text-xs text-muted mt-2">{t("deleteAccountHint")}</p>
           </>
         ) : (
           <>
@@ -354,6 +406,44 @@ export function SettingsTab({
           </>
         )}
       </div>
+
+      {isAdmin && (
+        <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
+          <p className="text-sm font-semibold text-foreground mb-1">
+            {t("villageTimezone")}
+          </p>
+          <p className="text-xs text-muted mb-3">{t("villageTimezoneDesc")}</p>
+          <select
+            className="input-field"
+            value={villageTimezone}
+            disabled={timezoneBusy}
+            onChange={(e) => {
+              const next = e.target.value;
+              setTimezoneBusy(true);
+              void (async () => {
+                try {
+                  await updateTimezone({
+                    secretLink,
+                    actingCaregiverName: selectedCaregiver,
+                    timezone: next,
+                  });
+                } catch (err) {
+                  console.error(err);
+                  alert(t("updateFailed"));
+                } finally {
+                  setTimezoneBusy(false);
+                }
+              })();
+            }}
+          >
+            {timezoneOptions.map((tz) => (
+              <option key={tz} value={tz}>
+                {tz}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
         <p className="text-sm font-semibold text-foreground mb-1">
