@@ -207,12 +207,37 @@ export function computeNotifyAt(
  * Cancel stale schedules and (re)schedule feed + upcoming pump notifications.
  * Call whenever last feed/pump or reminder settings change.
  */
+/** Drop catch-up flags when the feed due cycle changes (new last feed). */
+let lastSyncedFeedDueAt: number | null | undefined;
+function clearFeedNotifAckKeysIfDueChanged(feedDueAt: number | null): void {
+  if (lastSyncedFeedDueAt === feedDueAt) return;
+  lastSyncedFeedDueAt = feedDueAt;
+  if (typeof window === "undefined") return;
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (
+        key &&
+        (key.startsWith("deviceNotifFired:feed-") ||
+          key.startsWith("deviceNotifArm:feed-"))
+      ) {
+        keys.push(key);
+      }
+    }
+    for (const key of keys) localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
 export async function syncDueNotifications(
   payload: DueNotificationPayload
 ): Promise<void> {
   const enabled = getDeviceRemindersEnabled();
   const permission = await getNotificationPermission();
 
+  clearFeedNotifAckKeysIfDueChanged(payload.feedDueAt);
   await cancelAllDueNotifications();
 
   if (!enabled || permission !== "granted") {

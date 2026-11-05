@@ -157,7 +157,7 @@ The web app schedules **on-device** feed / pump reminders via `@capacitor/local-
 4. Rebuild/Archive the iOS app after native `pushType: .token` changes
 5. Tokens register via `pushRegistrations.upsertLiveActivity` when Live Activity starts
 
-Local notifications still reschedule when the app is open or returns to foreground. Silent device wakes for local-notif reschedule can use `devicePushTokens` once a device APNs token is wired.
+Local notifications reschedule when the app is open or returns to foreground. With device reminders enabled, the app also registers an APNs device token (`devicePushTokens`). When another caregiver logs a milk feed, Convex sends a silent `feed_changed` push; native `AppDelegate` cancels pending local feed/pump/nap schedules so outdated “feed due” alerts do not fire. Rebuild the iOS app after this change (`npm run cap:sync`, then Xcode Run/Archive) and keep **Push Notifications** + **Background Modes → Remote notifications** enabled.
 
 ## Live Activities / Dynamic Island (Lock Screen countdown)
 

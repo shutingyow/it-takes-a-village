@@ -42,6 +42,11 @@ const config: CapacitorConfig = {
       // Shrink the WebView with the keyboard so forms can scroll above it.
       resize: KeyboardResize.Native,
     },
+    // Silent feed_changed wakes are handled in AppDelegate (cancel local
+    // schedules). Keep presentation empty so silent pushes stay silent.
+    PushNotifications: {
+      presentationOptions: [],
+    },
   },
   // Native min iOS is set in Xcode (IPHONEOS_DEPLOYMENT_TARGET = 17.0).
   // Live Activities package needs iOS 16+; project targets 17 to match Xcode.

@@ -12,6 +12,7 @@ import {
   getDeviceRemindersEnabled,
   syncDueNotifications,
 } from "@/app/lib/deviceNotifications";
+import { syncDevicePushRegistration } from "@/app/lib/devicePush";
 import {
   getOrCreateDeviceId,
   setLiveActivityPushTokenHandler,
@@ -62,7 +63,12 @@ export function ReminderScheduler({
   const upsertLiveActivity = useMutation(
     api.pushRegistrations.upsertLiveActivity
   );
+  const upsertDevicePushToken = useMutation(
+    api.pushRegistrations.upsertDevicePushToken
+  );
   const [now, setNow] = useState(() => Date.now());
+  // Re-check opt-in / feed-timer when returning to the tab (settings may have changed).
+  const [optInTick, setOptInTick] = useState(0);
 
   useEffect(() => {
     setLiveActivityPushTokenHandler(({ activityId, pushToken }) => {
@@ -77,13 +83,22 @@ export function ReminderScheduler({
     return () => setLiveActivityPushTokenHandler(null);
   }, [secretLink, selectedCaregiver, upsertLiveActivity]);
 
+  // Register APNs device token so Convex can silent-wake and cancel stale
+  // local feed alerts when another caregiver logs a feed.
+  useEffect(() => {
+    void syncDevicePushRegistration({
+      enabled: getDeviceRemindersEnabled(),
+      secretLink,
+      actingCaregiverName: selectedCaregiver,
+      upsert: upsertDevicePushToken,
+    });
+  }, [secretLink, selectedCaregiver, upsertDevicePushToken, optInTick]);
+
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
 
-  // Re-check opt-in / feed-timer when returning to the tab (settings may have changed).
-  const [optInTick, setOptInTick] = useState(0);
   useEffect(() => {
     const onFocus = () => setOptInTick((n) => n + 1);
     const onStorage = (e: StorageEvent) => {
