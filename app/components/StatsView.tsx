@@ -775,50 +775,49 @@ export function StatsView({
             {day.sleepMinutes === 0 ? (
               <p className="text-sm text-muted">{t("noDataYet")}</p>
             ) : (
-              <>
-                <StatLine
-                  label={t("statsSleepTotal")}
-                  value={formatSleepTotal(day.sleepMinutes)}
-                />
-                <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
-                  <StatLine
-                    label={t("statsSleepBedtime")}
-                    value={
-                      day.nightSleepMinutes > 0
-                        ? formatSleepTotal(day.nightSleepMinutes)
-                        : "—"
-                    }
-                  />
-                  <StatLine
-                    label={t("statsSleepNaps")}
-                    value={
-                      day.napSleepMinutes > 0
-                        ? formatSleepTotal(day.napSleepMinutes)
-                        : "—"
-                    }
-                  />
-                </div>
-                {day.napSessions.length > 0 && (
-                  <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
-                    {day.napSessions.map((session) => (
-                      <div
-                        key={`${session.startTime}-${session.minutes}`}
-                        className="flex items-baseline justify-between gap-2"
+              <div className="space-y-2">
+                <p className="text-xl font-semibold text-foreground tabular-nums leading-none">
+                  {formatSleepTotal(day.sleepMinutes)}
+                </p>
+                <p className="text-xs text-muted">
+                  {[
+                    day.nightSleepMinutes > 0
+                      ? `${t("statsSleepBedtime")} ${formatSleepTotal(day.nightSleepMinutes)}`
+                      : null,
+                    day.napSleepMinutes > 0
+                      ? `${t("statsSleepNaps")} ${formatSleepTotal(day.napSleepMinutes)}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {day.sleepSessions.length > 0 && (
+                  <ul className="space-y-1 pt-1">
+                    {day.sleepSessions.map((session) => (
+                      <li
+                        key={`${session.type}-${session.startTime}-${session.minutes}`}
+                        className="flex items-baseline justify-between gap-2 text-sm"
                       >
-                        <span className="text-xs text-muted">
+                        <span className="text-muted min-w-0 truncate">
+                          <span className="text-foreground/80 font-medium">
+                            {session.type === "night"
+                              ? t("statsSleepBedtime")
+                              : t("nap")}
+                          </span>
+                          {" · "}
                           {formatTime(session.startTime)}
                           {session.endTime
                             ? `–${formatTime(session.endTime)}`
                             : ` ${t("sleepActive")}`}
                         </span>
-                        <span className="text-sm font-semibold text-foreground tabular-nums">
+                        <span className="font-semibold text-foreground tabular-nums shrink-0">
                           {formatSleepTotal(session.minutes)}
                         </span>
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
-              </>
+              </div>
             )}
           </SummaryCard>
         </div>
