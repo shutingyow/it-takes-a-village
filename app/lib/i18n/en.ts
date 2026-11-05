@@ -87,9 +87,12 @@ export const translations = {
   villageTimezoneDesc:
     "Used for “today”, night feed windows, and schedules for everyone in this village.",
   accountSection: "Account",
+  accountSettings: "Account settings",
+  accountSettingsDesc: "Sign in, language, appearance & timezone",
+  babyDetails: "Baby details",
   accountSignedIn: "You’re signed in. Admin settings use this account.",
   accountSignedOut:
-    "Sign in to manage this village (birth date, caregivers). Caregivers don’t need an account.",
+    "Sign in to manage this village (caregivers). Caregivers don’t need an account.",
   adminPickLockedHint:
     "Admin names show after you sign in and add this village. Caregivers can pick a name below to log.",
   noCaregiverNamesYet: "No caregiver names yet. Ask the parent to add yours.",
@@ -186,9 +189,9 @@ export const translations = {
   backToProfile: "‹ Back to Profile",
   backToSettings: "‹ Back to Settings",
   profileHub: "Profile",
-  profileHubDesc: "Notes, health, growth & more",
+  profileHubDesc: "Baby details, notes, health & more",
   settingsHub: "Settings",
-  settingsHubDesc: "Language, export & admin",
+  settingsHubDesc: "Account, reminders, export & admin",
   notesDesc: "Handover notes for caregivers",
   upcomingDesc: "Appointments & reminders",
 

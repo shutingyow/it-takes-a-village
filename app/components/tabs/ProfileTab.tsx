@@ -20,6 +20,8 @@ import {
   IconPump,
 } from "../icons";
 import { MilkStashPanel } from "../MilkStashPanel";
+import { BirthDateField } from "../BirthDateField";
+import { BabySexField } from "../BabySexField";
 
 export type ProfileView =
   | "menu"
@@ -35,12 +37,18 @@ interface ProfileTabProps {
   secretLink: string;
   selectedCaregiver: string;
   openView?: ProfileView | null;
+  birthDate?: string;
+  sex?: "female" | "male" | "unspecified";
+  viewerIsOwner?: boolean;
 }
 
 export function ProfileTab({
   secretLink,
   selectedCaregiver,
   openView,
+  birthDate,
+  sex,
+  viewerIsOwner = false,
 }: ProfileTabProps) {
   const { t } = useLanguage();
   const [view, setView] = useState<ProfileView>("menu");
@@ -165,6 +173,30 @@ export function ProfileTab({
     <div className="p-4">
       <p className="section-label">{t("profileHub")}</p>
       <p className="text-sm text-muted mb-4 -mt-2">{t("profileHubDesc")}</p>
+
+      <div className="mb-4">
+        <p className="text-sm font-semibold text-foreground mb-2">
+          {t("babyDetails")}
+        </p>
+        <BirthDateField
+          secretLink={secretLink}
+          actingCaregiverName={selectedCaregiver}
+          birthDate={birthDate}
+          canEdit={viewerIsOwner}
+        />
+        <BabySexField
+          secretLink={secretLink}
+          actingCaregiverName={selectedCaregiver}
+          sex={sex}
+          canEdit={viewerIsOwner}
+        />
+        {!viewerIsOwner && !birthDate && (
+          <p className="text-xs text-muted break-words">
+            {t("birthDateAdminOnly")}
+          </p>
+        )}
+      </div>
+
       <div className="space-y-2">
         {menuItems.map((item) => (
           <button

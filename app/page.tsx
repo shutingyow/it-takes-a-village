@@ -40,7 +40,6 @@ export default function Home() {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { signIn, signOut } = useAuthActions();
   const createTracker = useMutation(api.trackers.create);
-  const deleteAccount = useMutation(api.accountDeletion.deleteAccount);
   const myVillages = useQuery(
     api.trackers.listMine,
     isAuthenticated ? {} : "skip"
@@ -286,9 +285,29 @@ export default function Home() {
     savedTracker?.babyName ?? lastVisited?.babyName ?? t("yourTracker");
 
   const canContinue =
-    lastVisited && savedTracker !== undefined && savedTracker !== null;
+    !!lastVisited && savedTracker !== undefined && savedTracker !== null;
+
+  /** Avoid flashing parent/caregiver chooser while last village loads. */
+  const lastVisitedLoading =
+    !!lastVisited && savedTracker === undefined && !isAuthenticated;
 
   const isOpening = pendingOpenSecret !== null;
+
+  const renderOpenLastVillage = () => {
+    if (!lastVisited || !canContinue) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => router.push(`/tracker/${lastVisited.secretLink}`)}
+        className="btn-primary w-full text-left px-4 py-4"
+      >
+        <p className="text-xs font-medium text-white/80 mb-1">
+          {t("openVillage")}
+        </p>
+        <p className="text-base font-semibold text-white">{continueLabel}</p>
+      </button>
+    );
+  };
 
   const handleOpenExisting = () => {
     setError(null);
@@ -633,34 +652,13 @@ export default function Home() {
       {/* Below status bar / battery — not absolute under the Dynamic Island */}
       <div className="mx-auto max-w-md w-full flex items-center justify-end gap-2 pt-3 pb-3">
         {isAuthenticated && (
-          <>
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="text-sm font-semibold text-muted hover:text-foreground px-2 py-2 min-h-11"
-            >
-              {t("signOut")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!confirm(t("deleteAccountConfirm"))) return;
-                void (async () => {
-                  try {
-                    await deleteAccount({ confirm: "DELETE" });
-                    await signOut();
-                    router.replace("/");
-                  } catch (err) {
-                    console.error(err);
-                    setError(t("deleteAccountFailed"));
-                  }
-                })();
-              }}
-              className="text-sm font-semibold text-red-600 hover:text-red-700 px-2 py-2 min-h-11"
-            >
-              {t("deleteAccount")}
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="text-sm font-semibold text-muted hover:text-foreground px-2 py-2 min-h-11"
+          >
+            {t("signOut")}
+          </button>
         )}
         <LanguageToggle />
       </div>
@@ -699,10 +697,16 @@ export default function Home() {
             </div>
           )}
 
-          {/* Signed-in admin: one village entry (My villages), not Continue + Open */}
-          {isAuthenticated ? (
+          {/* Signed-in owners: My villages. Caregivers / returning guests: Open {baby}. */}
+          {authLoading || lastVisitedLoading ? (
+            <p className="text-sm text-muted text-center">{t("loadingTracker")}</p>
+          ) : isAuthenticated ? (
             <>
-              {renderMyVillages()}
+              {myVillages !== undefined &&
+              myVillages.length === 0 &&
+              canContinue
+                ? renderOpenLastVillage()
+                : renderMyVillages()}
               <button
                 type="button"
                 onClick={() => setShowCreateForm((v) => !v)}
@@ -724,26 +728,10 @@ export default function Home() {
                 )}
               </div>
             </>
-          ) : authLoading ? (
-            <p className="text-sm text-muted text-center">{t("loadingTracker")}</p>
           ) : canContinue && joinPath === "choose" && !showSomethingElse ? (
-            /* Returning guest: Continue first, other paths tucked away */
+            /* Returning caregiver/guest: same Open {baby} entry as admin */
             <>
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(`/tracker/${lastVisited!.secretLink}`)
-                }
-                className="btn-primary w-full text-left px-4 py-4"
-              >
-                <p className="text-xs font-medium text-white/80 mb-1">
-                  {t("continue")}
-                </p>
-                <p className="text-base font-semibold text-white">
-                  {t("continueWith", { name: continueLabel })}
-                </p>
-                <p className="text-sm text-white/75 mt-1">{t("continueHint")}</p>
-              </button>
+              {renderOpenLastVillage()}
               <div>
                 <button
                   type="button"

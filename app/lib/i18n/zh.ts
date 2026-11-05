@@ -79,9 +79,11 @@ export const zh: Translations = {
   villageTimezone: "村庄时区",
   villageTimezoneDesc: "用于“今天”、夜间喂养窗口和排程，全村共用。",
   accountSection: "账户",
+  accountSettings: "账户设置",
+  accountSettingsDesc: "登录、语言、外观与时区",
+  babyDetails: "宝宝资料",
   accountSignedIn: "你已登录。管理设置使用此账户。",
-  accountSignedOut:
-    "登录后可管理本村（出生日期、照护者）。照护者记日志无需账户。",
+  accountSignedOut: "登录后可管理本村（照护者）。照护者记日志无需账户。",
   adminPickLockedHint:
     "登录并加入本村后才会显示管理员名字。照护者可在下方选择名字来记录。",
   noCaregiverNamesYet: "还没有照护者名字。请让家长添加。",
@@ -173,9 +175,9 @@ export const zh: Translations = {
   backToProfile: "‹ 返回档案",
   backToSettings: "‹ 返回设置",
   profileHub: "档案",
-  profileHubDesc: "备注、健康、成长等",
+  profileHubDesc: "宝宝资料、备注、健康等",
   settingsHub: "设置",
-  settingsHubDesc: "语言、导出与管理",
+  settingsHubDesc: "账户、提醒、导出与管理",
   notesDesc: "照护者交接备注",
   upcomingDesc: "预约与提醒",
 

@@ -2,7 +2,7 @@
 
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CaregiverLockScreen } from "@/app/components/CaregiverLockScreen";
 import { LockedCaregiverBadge } from "@/app/components/LockedCaregiverBadge";
@@ -54,6 +54,7 @@ export default function TrackerPage({
   const [profileOpenView, setProfileOpenView] = useState<ProfileView | null>(
     null
   );
+  const mainRef = useRef<HTMLElement>(null);
   const [showLogSheet, setShowLogSheet] = useState(false);
   const [activeLogModal, setActiveLogModal] = useState<LogType | null>(null);
   const [lockedCaregiver, setLockedCaregiver] = useState<string | null>(null);
@@ -94,22 +95,31 @@ export default function TrackerPage({
   }, [secretLink, ensureMigrated]);
 
   useEffect(() => {
-    // Don't pin a foreign village as "last visited" for signed-in parents —
-    // that recreates the Who-are-you loop after the next launch.
+    // Don't pin a foreign village as "last visited" for signed-in parents who
+    // already own a village — that recreates the Who-are-you loop after launch.
+    // Caregivers (signed-in or not) with no owned villages should keep the pin
+    // so home can show “Open {baby}” like the admin path.
     if (!tracker) return;
     if (
       isAuthenticated &&
       !tracker.viewerIsOwner &&
-      tracker.ownerUserId !== undefined
+      tracker.ownerUserId !== undefined &&
+      myVillages !== undefined &&
+      myVillages.length > 0
+    ) {
+      return;
+    }
+    // Wait until we know whether they own villages before deciding.
+    if (
+      isAuthenticated &&
+      !tracker.viewerIsOwner &&
+      tracker.ownerUserId !== undefined &&
+      myVillages === undefined
     ) {
       return;
     }
     saveLastVisitedTracker(secretLink, tracker.babyName);
-  }, [
-    secretLink,
-    tracker,
-    isAuthenticated,
-  ]);
+  }, [secretLink, tracker, isAuthenticated, myVillages]);
 
   useEffect(() => {
     setHydrated(false);
@@ -160,15 +170,18 @@ export default function TrackerPage({
     if (activeTab !== "profile") setProfileOpenView(null);
   }, [activeTab]);
 
+  // Always land at the top when switching tabs (shared scroll container).
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [activeTab]);
+
   // Signed in on someone else's link → go to your village (or home if several).
+  // Caregivers with no owned villages stay on the shared link.
   useEffect(() => {
     if (!isAuthenticated || !tracker || tracker.viewerIsOwner) return;
     if (tracker.ownerUserId === undefined) return; // claimable — stay
     if (myVillages === undefined) return; // still loading
-    if (myVillages.length === 0) {
-      router.replace("/");
-      return;
-    }
+    if (myVillages.length === 0) return;
     const mine =
       myVillages.find((v) => v.secretLink === secretLink) ?? myVillages[0]!;
     if (mine.secretLink === secretLink) return;
@@ -356,7 +369,10 @@ export default function TrackerPage({
         />
       )}
 
-      <main className="flex-1 min-h-0 min-w-0 overflow-x-clip overflow-y-auto overscroll-y-contain pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))]">
+      <main
+        ref={mainRef}
+        className="flex-1 min-h-0 min-w-0 overflow-x-clip overflow-y-auto overscroll-y-contain pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))]"
+      >
         {activeTab === "today" && (
           <HomeTab
             secretLink={secretLink}
@@ -399,6 +415,9 @@ export default function TrackerPage({
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
             openView={profileOpenView}
+            birthDate={tracker.birthDate}
+            sex={tracker.sex}
+            viewerIsOwner={tracker.viewerIsOwner}
           />
         )}
         {activeTab === "settings" && (
@@ -407,8 +426,6 @@ export default function TrackerPage({
             selectedCaregiver={lockedCaregiver}
             caregivers={tracker.caregivers}
             babyName={tracker.babyName}
-            birthDate={tracker.birthDate}
-            sex={tracker.sex}
             timezone={tracker.timezone}
             feedIntervalHours={tracker.feedIntervalHours}
             nightFeedIntervalEnabled={tracker.nightFeedIntervalEnabled}
@@ -421,6 +438,9 @@ export default function TrackerPage({
             napRemindersEnabled={tracker.napRemindersEnabled}
             pumpSchedule={tracker.pumpSchedule}
             viewerIsOwner={tracker.viewerIsOwner}
+            onScrollToTop={() =>
+              mainRef.current?.scrollTo({ top: 0, behavior: "auto" })
+            }
           />
         )}
       </main>

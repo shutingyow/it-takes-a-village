@@ -15,14 +15,13 @@ import {
   IconChevronRight,
   IconExport,
   IconReminders,
+  IconSettings,
   IconUsers,
   IconWarning,
 } from "../icons";
 import type { CaregiverInfo } from "@/app/lib/trackerStorage";
 import { Capacitor } from "@capacitor/core";
 import { signInWithOAuth } from "@/app/lib/oauthSignIn";
-import { BirthDateField } from "../BirthDateField";
-import { BabySexField } from "../BabySexField";
 import { EmailPasswordForm } from "../EmailPasswordForm";
 import {
   DEFAULT_TRACKER_TIMEZONE,
@@ -48,6 +47,7 @@ async function openPrivacyPolicy(): Promise<void> {
 
 export type SettingsView =
   | "menu"
+  | "account"
   | "export"
   | "reminders"
   | "caregivers";
@@ -57,8 +57,6 @@ interface SettingsTabProps {
   selectedCaregiver: string;
   caregivers: CaregiverInfo[];
   babyName?: string;
-  sex?: "female" | "male" | "unspecified";
-  birthDate?: string;
   timezone?: string;
   feedIntervalHours?: number;
   nightFeedIntervalEnabled?: boolean;
@@ -80,6 +78,7 @@ interface SettingsTabProps {
   openView?: SettingsView | null;
   /** SSO owner of this village — gates admin settings. */
   viewerIsOwner?: boolean;
+  onScrollToTop?: () => void;
 }
 
 export function SettingsTab({
@@ -87,8 +86,6 @@ export function SettingsTab({
   selectedCaregiver,
   caregivers,
   babyName,
-  birthDate,
-  sex,
   timezone,
   feedIntervalHours,
   nightFeedIntervalEnabled,
@@ -102,6 +99,7 @@ export function SettingsTab({
   pumpSchedule,
   openView,
   viewerIsOwner = false,
+  onScrollToTop,
 }: SettingsTabProps) {
   const { t, language, setLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
@@ -117,7 +115,10 @@ export function SettingsTab({
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [timezoneBusy, setTimezoneBusy] = useState(false);
 
-  const activeAlerts = useQuery(api.supplyAlerts.getActive, { secretLink, actingCaregiverName: selectedCaregiver });
+  const activeAlerts = useQuery(api.supplyAlerts.getActive, {
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
+  });
   const addCaregiver = useMutation(api.trackers.addCaregiver);
   const removeCaregiver = useMutation(api.trackers.removeCaregiver);
   const updateTimezone = useMutation(api.trackers.updateTimezone);
@@ -153,6 +154,12 @@ export function SettingsTab({
   useEffect(() => {
     if (openView) setView(openView);
   }, [openView]);
+
+  useEffect(() => {
+    onScrollToTop?.();
+    // Parent passes a fresh callback each render; only re-scroll on view change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [view]);
 
   if (view === "export") {
     return (
@@ -204,53 +211,54 @@ export function SettingsTab({
           </div>
         )}
         {adminMessage && (
-          <div className="mb-3 rounded-xl border border-accent-diaper/30 bg-accent-diaper-light px-3 py-2 text-sm text-accent-diaper">
+          <div className="mb-3 rounded-xl border border-secondary/30 bg-secondary-light px-3 py-2 text-sm text-secondary">
             {adminMessage}
           </div>
         )}
 
         <div className="space-y-2 mb-4">
-          {caregivers.map((caregiver) => (
+          {caregivers.map((c) => (
             <div
-              key={caregiver.name}
-              className="flex items-center justify-between bg-surface border border-border rounded-xl px-4 py-3"
+              key={c.name}
+              className="flex items-center gap-3 bg-surface border border-border rounded-2xl px-4 py-3 card-shadow"
             >
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-foreground">
-                  {caregiver.name}
-                </span>
-                {caregiver.role === "admin" && (
-                  <span className="text-[10px] font-bold uppercase tracking-wide bg-accent-diaper/20 text-accent-diaper px-2 py-0.5 rounded-full">
-                    {t("admin")}
-                  </span>
-                )}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-foreground truncate">
+                  {c.name}
+                  {c.role === "admin" && (
+                    <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-accent-diaper">
+                      {t("admin")}
+                    </span>
+                  )}
+                </p>
               </div>
-              {!(caregiver.role === "admin" && adminCount <= 1) && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setAdminError(null);
-                    setAdminMessage(null);
-                    try {
-                      await removeCaregiver({
-                        secretLink,
-                        actingCaregiverName: selectedCaregiver,
-                        name: caregiver.name,
-                      });
-                      setAdminMessage(t("caregiverRemoved"));
-                    } catch (err) {
-                      setAdminError(
-                        err instanceof Error
-                          ? err.message
-                          : "Failed to remove caregiver"
-                      );
-                    }
-                  }}
-                  className="text-xs font-medium text-[#9b3b3b] hover:underline"
-                >
-                  {t("remove")}
-                </button>
-              )}
+              {caregivers.length > 1 &&
+                !(c.role === "admin" && adminCount <= 1) && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setAdminError(null);
+                      setAdminMessage(null);
+                      try {
+                        await removeCaregiver({
+                          secretLink,
+                          actingCaregiverName: selectedCaregiver,
+                          name: c.name,
+                        });
+                        setAdminMessage(t("caregiverRemoved"));
+                      } catch (err) {
+                        setAdminError(
+                          err instanceof Error
+                            ? err.message
+                            : "Failed to remove caregiver"
+                        );
+                      }
+                    }}
+                    className="text-sm font-semibold text-muted hover:text-foreground"
+                  >
+                    {t("remove")}
+                  </button>
+                )}
             </div>
           ))}
         </div>
@@ -292,13 +300,218 @@ export function SettingsTab({
     );
   }
 
-  const adminItems: {
+  if (view === "account") {
+    return (
+      <div className="p-4">
+        <button
+          type="button"
+          onClick={() => setView("menu")}
+          className="mb-3 text-sm font-semibold text-terracotta flex items-center gap-1"
+        >
+          {t("backToSettings")}
+        </button>
+        <p className="section-label">{t("accountSettings")}</p>
+        <p className="text-sm text-muted mb-4 -mt-2">
+          {t("accountSettingsDesc")}
+        </p>
+
+        <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
+          <p className="text-sm font-semibold text-foreground mb-1">
+            {t("accountSection")}
+          </p>
+          {isAuthenticated ? (
+            <>
+              <p className="text-xs text-muted mb-3">{t("accountSignedIn")}</p>
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="w-full py-3.5 px-4 rounded-xl border border-border bg-background text-sm font-semibold text-foreground touch-manipulation min-h-[44px]"
+              >
+                {t("signOut")}
+              </button>
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => {
+                  if (!confirm(t("deleteAccountConfirm"))) return;
+                  setDeleteBusy(true);
+                  void (async () => {
+                    try {
+                      await deleteAccount({ confirm: "DELETE" });
+                      await signOut();
+                      router.replace("/");
+                    } catch (err) {
+                      console.error(err);
+                      alert(t("deleteAccountFailed"));
+                    } finally {
+                      setDeleteBusy(false);
+                    }
+                  })();
+                }}
+                className="w-full mt-2 py-3.5 px-4 rounded-xl border border-red-200 bg-red-50 text-sm font-semibold text-red-700 touch-manipulation min-h-[44px] disabled:opacity-50"
+              >
+                {deleteBusy ? t("deletingAccount") : t("deleteAccount")}
+              </button>
+              <p className="text-xs text-muted mt-2">{t("deleteAccountHint")}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-muted mb-3">{t("accountSignedOut")}</p>
+              <div className="space-y-3">
+                <EmailPasswordForm
+                  disabled={authBusy}
+                  onBusyChange={setAuthBusy}
+                />
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs text-muted">{t("orContinueWith")}</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <button
+                  type="button"
+                  disabled={authBusy}
+                  onClick={() => void handleSignIn("apple")}
+                  className="w-full py-3.5 px-4 rounded-xl bg-foreground text-background text-sm font-semibold touch-manipulation min-h-[44px] disabled:opacity-50"
+                >
+                  {t("signInWithApple")}
+                </button>
+                <button
+                  type="button"
+                  disabled={authBusy}
+                  onClick={() => void handleSignIn("google")}
+                  className="w-full py-3.5 px-4 rounded-xl border border-border bg-background text-sm font-semibold text-foreground touch-manipulation min-h-[44px] disabled:opacity-50"
+                >
+                  {t("signInWithGoogle")}
+                </button>
+                <p className="text-center text-xs text-muted pt-1">
+                  {t("signInForAdmin")}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
+        {isAdmin && (
+          <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
+            <p className="text-sm font-semibold text-foreground mb-1">
+              {t("villageTimezone")}
+            </p>
+            <p className="text-xs text-muted mb-3">{t("villageTimezoneDesc")}</p>
+            <select
+              className="input-field"
+              value={villageTimezone}
+              disabled={timezoneBusy}
+              onChange={(e) => {
+                const next = e.target.value;
+                setTimezoneBusy(true);
+                void (async () => {
+                  try {
+                    await updateTimezone({
+                      secretLink,
+                      actingCaregiverName: selectedCaregiver,
+                      timezone: next,
+                    });
+                  } catch (err) {
+                    console.error(err);
+                    alert(t("updateFailed"));
+                  } finally {
+                    setTimezoneBusy(false);
+                  }
+                })();
+              }}
+            >
+              {timezoneOptions.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
+          <p className="text-sm font-semibold text-foreground mb-1">
+            {t("language")}
+          </p>
+          <p className="text-xs text-muted mb-3">{t("languageDesc")}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setLanguage("en")}
+              className={cn(
+                "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors",
+                language === "en"
+                  ? "bg-terracotta text-white"
+                  : "bg-beige-light text-muted hover:text-foreground"
+              )}
+            >
+              {t("english")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage("zh")}
+              className={cn(
+                "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors",
+                language === "zh"
+                  ? "bg-terracotta text-white"
+                  : "bg-beige-light text-muted hover:text-foreground"
+              )}
+            >
+              {t("chinese")}
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
+          <p className="text-sm font-semibold text-foreground mb-1">
+            {t("appearance")}
+          </p>
+          <p className="text-xs text-muted mb-3">{t("appearanceDesc")}</p>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                { id: "light" as const, labelKey: "themeLight" as const },
+                { id: "dark" as const, labelKey: "themeDark" as const },
+                { id: "system" as const, labelKey: "themeSystem" as const },
+              ] satisfies Array<{
+                id: ThemePreference;
+                labelKey: TranslationKey;
+              }>
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setTheme(opt.id)}
+                className={cn(
+                  "py-2.5 rounded-xl text-sm font-semibold transition-colors touch-manipulation min-h-[44px]",
+                  theme === opt.id
+                    ? "bg-terracotta text-white"
+                    : "bg-beige-light text-muted hover:text-foreground"
+                )}
+                aria-pressed={theme === opt.id}
+              >
+                {t(opt.labelKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const hubItems: {
     id: SettingsView | "supply";
     icon: React.ReactNode;
     label: string;
     description: string;
     adminOnly?: boolean;
   }[] = [
+    {
+      id: "account",
+      icon: <IconSettings size={20} className="text-terracotta" />,
+      label: t("accountSettings"),
+      description: t("accountSettingsDesc"),
+    },
     {
       id: "reminders",
       icon: <IconReminders size={20} className="text-terracotta" />,
@@ -331,218 +544,8 @@ export function SettingsTab({
       <p className="section-label">{t("settingsHub")}</p>
       <p className="text-sm text-muted mb-4 -mt-2">{t("settingsHubDesc")}</p>
 
-      <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
-        <p className="text-sm font-semibold text-foreground mb-1">
-          {t("accountSection")}
-        </p>
-        {isAuthenticated ? (
-          <>
-            <p className="text-xs text-muted mb-3">{t("accountSignedIn")}</p>
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="w-full py-3.5 px-4 rounded-xl border border-border bg-background text-sm font-semibold text-foreground touch-manipulation min-h-[44px]"
-            >
-              {t("signOut")}
-            </button>
-            <button
-              type="button"
-              disabled={deleteBusy}
-              onClick={() => {
-                if (!confirm(t("deleteAccountConfirm"))) return;
-                setDeleteBusy(true);
-                void (async () => {
-                  try {
-                    await deleteAccount({ confirm: "DELETE" });
-                    await signOut();
-                    router.replace("/");
-                  } catch (err) {
-                    console.error(err);
-                    alert(t("deleteAccountFailed"));
-                  } finally {
-                    setDeleteBusy(false);
-                  }
-                })();
-              }}
-              className="w-full mt-2 py-3.5 px-4 rounded-xl border border-red-200 bg-red-50 text-sm font-semibold text-red-700 touch-manipulation min-h-[44px] disabled:opacity-50"
-            >
-              {deleteBusy ? t("deletingAccount") : t("deleteAccount")}
-            </button>
-            <p className="text-xs text-muted mt-2">{t("deleteAccountHint")}</p>
-          </>
-        ) : (
-          <>
-            <p className="text-xs text-muted mb-3">{t("accountSignedOut")}</p>
-            <div className="space-y-3">
-              <EmailPasswordForm
-                disabled={authBusy}
-                onBusyChange={setAuthBusy}
-              />
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-xs text-muted">{t("orContinueWith")}</span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-              <button
-                type="button"
-                disabled={authBusy}
-                onClick={() => void handleSignIn("apple")}
-                className="w-full py-3.5 px-4 rounded-xl bg-foreground text-background text-sm font-semibold touch-manipulation min-h-[44px] disabled:opacity-50"
-              >
-                {t("signInWithApple")}
-              </button>
-              <button
-                type="button"
-                disabled={authBusy}
-                onClick={() => void handleSignIn("google")}
-                className="w-full py-3.5 px-4 rounded-xl border border-border bg-background text-sm font-semibold text-foreground touch-manipulation min-h-[44px] disabled:opacity-50"
-              >
-                {t("signInWithGoogle")}
-              </button>
-              <p className="text-center text-xs text-muted pt-1">
-                {t("signInForAdmin")}
-              </p>
-            </div>
-          </>
-        )}
-      </div>
-
-      {isAdmin && (
-        <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
-          <p className="text-sm font-semibold text-foreground mb-1">
-            {t("villageTimezone")}
-          </p>
-          <p className="text-xs text-muted mb-3">{t("villageTimezoneDesc")}</p>
-          <select
-            className="input-field"
-            value={villageTimezone}
-            disabled={timezoneBusy}
-            onChange={(e) => {
-              const next = e.target.value;
-              setTimezoneBusy(true);
-              void (async () => {
-                try {
-                  await updateTimezone({
-                    secretLink,
-                    actingCaregiverName: selectedCaregiver,
-                    timezone: next,
-                  });
-                } catch (err) {
-                  console.error(err);
-                  alert(t("updateFailed"));
-                } finally {
-                  setTimezoneBusy(false);
-                }
-              })();
-            }}
-          >
-            {timezoneOptions.map((tz) => (
-              <option key={tz} value={tz}>
-                {tz}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
-        <p className="text-sm font-semibold text-foreground mb-1">
-          {t("language")}
-        </p>
-        <p className="text-xs text-muted mb-3">{t("languageDesc")}</p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setLanguage("en")}
-            className={cn(
-              "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors",
-              language === "en"
-                ? "bg-terracotta text-white"
-                : "bg-beige-light text-muted hover:text-foreground"
-            )}
-          >
-            {t("english")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setLanguage("zh")}
-            className={cn(
-              "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors",
-              language === "zh"
-                ? "bg-terracotta text-white"
-                : "bg-beige-light text-muted hover:text-foreground"
-            )}
-          >
-            {t("chinese")}
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
-        <p className="text-sm font-semibold text-foreground mb-1">
-          {t("appearance")}
-        </p>
-        <p className="text-xs text-muted mb-3">{t("appearanceDesc")}</p>
-        <div className="grid grid-cols-3 gap-2">
-          {(
-            [
-              { id: "light" as const, labelKey: "themeLight" as const },
-              { id: "dark" as const, labelKey: "themeDark" as const },
-              { id: "system" as const, labelKey: "themeSystem" as const },
-            ] satisfies Array<{ id: ThemePreference; labelKey: TranslationKey }>
-          ).map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setTheme(opt.id)}
-              className={cn(
-                "py-2.5 rounded-xl text-sm font-semibold transition-colors touch-manipulation min-h-[44px]",
-                theme === opt.id
-                  ? "bg-terracotta text-white"
-                  : "bg-beige-light text-muted hover:text-foreground"
-              )}
-              aria-pressed={theme === opt.id}
-            >
-              {t(opt.labelKey)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <BirthDateField
-        secretLink={secretLink}
-        actingCaregiverName={selectedCaregiver}
-        birthDate={birthDate}
-        canEdit={isAdmin}
-      />
-      <BabySexField
-        secretLink={secretLink}
-        actingCaregiverName={selectedCaregiver}
-        sex={sex}
-        canEdit={isAdmin}
-      />
-      {!isAdmin && !birthDate && (
-        <p className="mb-4 text-xs text-muted break-words">
-          {t("birthDateAdminOnly")}
-        </p>
-      )}
-
-      <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
-        <p className="text-sm font-semibold text-foreground mb-1">
-          {t("legalSection")}
-        </p>
-        <p className="text-xs text-muted mb-3">{t("legalSectionDesc")}</p>
-        <button
-          type="button"
-          onClick={() => void openPrivacyPolicy()}
-          className="w-full py-3.5 px-4 rounded-xl border border-border bg-background text-sm font-semibold text-foreground touch-manipulation min-h-[44px]"
-        >
-          {t("privacyPolicy")}
-        </button>
-      </div>
-
-      <div className="space-y-2">
-        {adminItems
+      <div className="space-y-2 mb-4">
+        {hubItems
           .filter((item) => !item.adminOnly || isAdmin)
           .map((item) => (
             <button
@@ -585,6 +588,20 @@ export function SettingsTab({
               </div>
             </button>
           ))}
+      </div>
+
+      <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
+        <p className="text-sm font-semibold text-foreground mb-1">
+          {t("legalSection")}
+        </p>
+        <p className="text-xs text-muted mb-3">{t("legalSectionDesc")}</p>
+        <button
+          type="button"
+          onClick={() => void openPrivacyPolicy()}
+          className="w-full py-3.5 px-4 rounded-xl border border-border bg-background text-sm font-semibold text-foreground touch-manipulation min-h-[44px]"
+        >
+          {t("privacyPolicy")}
+        </button>
       </div>
 
       {showSupplyModal && (
