@@ -261,21 +261,6 @@ function ChartLegend({
   );
 }
 
-function SummaryCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="bg-surface border border-border rounded-2xl p-3 card-shadow mb-3">
-      <p className="text-sm font-semibold text-foreground mb-2">{title}</p>
-      {children}
-    </div>
-  );
-}
-
 function StatLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-2 py-0.5">
@@ -283,6 +268,74 @@ function StatLine({ label, value }: { label: string; value: string }) {
       <span className="text-sm font-semibold text-foreground tabular-nums">
         {value}
       </span>
+    </div>
+  );
+}
+
+/** Headline number only; tap to reveal breakdown. */
+function ExpandableSummary({
+  title,
+  value,
+  empty,
+  emptyLabel,
+  children,
+}: {
+  title: string;
+  /** Main number shown when there is data. */
+  value: string | null;
+  empty?: boolean;
+  emptyLabel: string;
+  children?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasDetail = !empty && children != null && value != null;
+
+  if (empty || value == null) {
+    return (
+      <div className="bg-surface border border-border rounded-2xl px-3 py-3 card-shadow mb-2">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-sm text-muted">{emptyLabel}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-surface border border-border rounded-2xl card-shadow mb-2 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => hasDetail && setOpen((v) => !v)}
+        className={cn(
+          "w-full flex items-center justify-between gap-3 px-3 py-3 text-left touch-manipulation min-h-[48px]",
+          hasDetail && "active:bg-beige-light/40"
+        )}
+        aria-expanded={hasDetail ? open : undefined}
+        disabled={!hasDetail}
+      >
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <span className="flex items-center gap-2 shrink-0">
+          <span className="text-lg font-semibold text-foreground tabular-nums leading-none">
+            {value}
+          </span>
+          {hasDetail && (
+            <span
+              className={cn(
+                "text-muted text-xs transition-transform",
+                open && "rotate-90"
+              )}
+              aria-hidden
+            >
+              ›
+            </span>
+          )}
+        </span>
+      </button>
+      {hasDetail && open && (
+        <div className="px-3 pb-3 pt-0 border-t border-border/60 space-y-1.5">
+          <div className="pt-2">{children}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -650,176 +703,138 @@ export function StatsView({
       ) : rangeMode === "daily" && day ? (
         <div className="space-y-0">
           <p className="section-label">{t("todaysSummary")}</p>
-          <SummaryCard title={t("feeds")}>
-            {day.feedCount === 0 ? (
-              <p className="text-sm text-muted">{t("noDataYet")}</p>
-            ) : (
-              <>
-                <StatLine
-                  label={t("statsTotalFeeds")}
-                  value={String(day.feedCount)}
-                />
-                <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
-                  <StatLine
-                    label={t("statsBreastfeeding")}
-                    value={String(day.breastCount)}
-                  />
-                  <StatLine
-                    label={t("statsBottle")}
-                    value={String(day.bottleCount)}
-                  />
-                </div>
-              </>
-            )}
-          </SummaryCard>
+          <ExpandableSummary
+            title={t("feeds")}
+            empty={day.feedCount === 0}
+            emptyLabel={t("noDataYet")}
+            value={String(day.feedCount)}
+          >
+            <StatLine
+              label={t("statsBreastfeeding")}
+              value={String(day.breastCount)}
+            />
+            <StatLine
+              label={t("statsBottle")}
+              value={String(day.bottleCount)}
+            />
+          </ExpandableSummary>
 
-          <SummaryCard title={t("milkMl")}>
-            {day.formulaMl + day.breastmilkMl + day.breastDurationMinutes ===
-            0 ? (
-              <p className="text-sm text-muted">{t("noDataYet")}</p>
-            ) : (
-              <>
-                <StatLine
-                  label={t("statsTotalMilkMl")}
-                  value={`${day.formulaMl + day.breastmilkMl} ml`}
-                />
-                <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
-                  <StatLine
-                    label={t("statsBreastMilkMl")}
-                    value={
-                      day.breastmilkMl > 0 ? `${day.breastmilkMl} ml` : "—"
-                    }
-                  />
-                  <StatLine
-                    label={t("statsFormulaMl")}
-                    value={day.formulaMl > 0 ? `${day.formulaMl} ml` : "—"}
-                  />
-                  <StatLine
-                    label={t("statsBreastMinutes")}
-                    value={
-                      day.breastDurationMinutes > 0
-                        ? t("statsMinutesValue", {
-                            minutes: String(day.breastDurationMinutes),
-                          })
-                        : "—"
-                    }
-                  />
-                </div>
-              </>
-            )}
-          </SummaryCard>
+          <ExpandableSummary
+            title={t("milkMl")}
+            empty={
+              day.formulaMl + day.breastmilkMl + day.breastDurationMinutes === 0
+            }
+            emptyLabel={t("noDataYet")}
+            value={`${day.formulaMl + day.breastmilkMl} ml`}
+          >
+            <StatLine
+              label={t("statsBreastMilkMl")}
+              value={day.breastmilkMl > 0 ? `${day.breastmilkMl} ml` : "—"}
+            />
+            <StatLine
+              label={t("statsFormulaMl")}
+              value={day.formulaMl > 0 ? `${day.formulaMl} ml` : "—"}
+            />
+            <StatLine
+              label={t("statsBreastMinutes")}
+              value={
+                day.breastDurationMinutes > 0
+                  ? t("statsMinutesValue", {
+                      minutes: String(day.breastDurationMinutes),
+                    })
+                  : "—"
+              }
+            />
+          </ExpandableSummary>
 
           {day.solidsCount > 0 && (
-            <SummaryCard title={t("solidsDayTotal")}>
-              <StatLine
-                label={t("statsTotalFeeds")}
-                value={
-                  day.solidsGrams > 0
-                    ? t("solidsMealsGrams", {
-                        count: day.solidsCount,
-                        grams: day.solidsGrams,
-                      })
-                    : t("solidsMealsOnly", { count: day.solidsCount })
-                }
-              />
-            </SummaryCard>
+            <ExpandableSummary
+              title={t("solidsDayTotal")}
+              emptyLabel={t("noDataYet")}
+              value={
+                day.solidsGrams > 0
+                  ? t("solidsMealsGrams", {
+                      count: day.solidsCount,
+                      grams: day.solidsGrams,
+                    })
+                  : t("solidsMealsOnly", { count: day.solidsCount })
+              }
+            />
           )}
 
-          <SummaryCard title={t("diapers")}>
-            {day.diaperCount === 0 ? (
-              <p className="text-sm text-muted">{t("noDataYet")}</p>
-            ) : (
-              <>
-                <StatLine
-                  label={t("statsTotalDiapers")}
-                  value={String(day.diaperCount)}
-                />
-                <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
-                  <StatLine label={t("wet")} value={String(wetOnly)} />
-                  <StatLine label={t("dirty")} value={String(dirtyOnly)} />
-                  <StatLine label={t("both")} value={String(day.bothCount)} />
-                </div>
-              </>
-            )}
-          </SummaryCard>
+          <ExpandableSummary
+            title={t("diapers")}
+            empty={day.diaperCount === 0}
+            emptyLabel={t("noDataYet")}
+            value={String(day.diaperCount)}
+          >
+            <StatLine label={t("wet")} value={String(wetOnly)} />
+            <StatLine label={t("dirty")} value={String(dirtyOnly)} />
+            <StatLine label={t("both")} value={String(day.bothCount)} />
+          </ExpandableSummary>
 
-          <SummaryCard title={t("pumps")}>
-            {day.pumpCount === 0 ? (
-              <p className="text-sm text-muted">{t("noDataYet")}</p>
-            ) : (
-              <>
-                <StatLine
-                  label={t("statsPumpTotalMl")}
-                  value={`${day.pumpTotalMl} ml`}
-                />
-                <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
-                  {day.pumpSessions.map((session) => (
-                    <div
-                      key={`${session.timestamp}-${session.amount}`}
-                      className="flex items-baseline justify-between gap-2"
-                    >
-                      <span className="text-xs text-muted">
-                        {formatTime(session.timestamp)}
-                      </span>
-                      <span className="text-sm font-semibold text-foreground tabular-nums">
-                        {session.amount} ml
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </SummaryCard>
-
-          <SummaryCard title={t("sleep")}>
-            {day.sleepMinutes === 0 ? (
-              <p className="text-sm text-muted">{t("noDataYet")}</p>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-xl font-semibold text-foreground tabular-nums leading-none">
-                  {formatSleepTotal(day.sleepMinutes)}
-                </p>
-                <p className="text-xs text-muted">
-                  {[
-                    day.nightSleepMinutes > 0
-                      ? `${t("statsSleepBedtime")} ${formatSleepTotal(day.nightSleepMinutes)}`
-                      : null,
-                    day.napSleepMinutes > 0
-                      ? `${t("statsSleepNaps")} ${formatSleepTotal(day.napSleepMinutes)}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-                {day.sleepSessions.length > 0 && (
-                  <ul className="space-y-1 pt-1">
-                    {day.sleepSessions.map((session) => (
-                      <li
-                        key={`${session.type}-${session.startTime}-${session.minutes}`}
-                        className="flex items-baseline justify-between gap-2 text-sm"
-                      >
-                        <span className="text-muted min-w-0 truncate">
-                          <span className="text-foreground/80 font-medium">
-                            {session.type === "night"
-                              ? t("statsSleepBedtime")
-                              : t("nap")}
-                          </span>
-                          {" · "}
-                          {formatTime(session.startTime)}
-                          {session.endTime
-                            ? `–${formatTime(session.endTime)}`
-                            : ` ${t("sleepActive")}`}
-                        </span>
-                        <span className="font-semibold text-foreground tabular-nums shrink-0">
-                          {formatSleepTotal(session.minutes)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+          <ExpandableSummary
+            title={t("pumps")}
+            empty={day.pumpCount === 0}
+            emptyLabel={t("noDataYet")}
+            value={`${day.pumpTotalMl} ml`}
+          >
+            {day.pumpSessions.map((session) => (
+              <div
+                key={`${session.timestamp}-${session.amount}`}
+                className="flex items-baseline justify-between gap-2"
+              >
+                <span className="text-xs text-muted">
+                  {formatTime(session.timestamp)}
+                </span>
+                <span className="text-sm font-semibold text-foreground tabular-nums">
+                  {session.amount} ml
+                </span>
               </div>
-            )}
-          </SummaryCard>
+            ))}
+          </ExpandableSummary>
+
+          <ExpandableSummary
+            title={t("sleep")}
+            empty={day.sleepMinutes === 0}
+            emptyLabel={t("noDataYet")}
+            value={formatSleepTotal(day.sleepMinutes)}
+          >
+            <p className="text-xs text-muted pb-1">
+              {[
+                day.nightSleepMinutes > 0
+                  ? `${t("statsSleepBedtime")} ${formatSleepTotal(day.nightSleepMinutes)}`
+                  : null,
+                day.napSleepMinutes > 0
+                  ? `${t("statsSleepNaps")} ${formatSleepTotal(day.napSleepMinutes)}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+            {day.sleepSessions.map((session) => (
+              <div
+                key={`${session.type}-${session.startTime}-${session.minutes}`}
+                className="flex items-baseline justify-between gap-2"
+              >
+                <span className="text-xs text-muted min-w-0 truncate">
+                  <span className="text-foreground/80 font-medium">
+                    {session.type === "night"
+                      ? t("statsSleepBedtime")
+                      : t("nap")}
+                  </span>
+                  {" · "}
+                  {formatTime(session.startTime)}
+                  {session.endTime
+                    ? `–${formatTime(session.endTime)}`
+                    : ` ${t("sleepActive")}`}
+                </span>
+                <span className="text-sm font-semibold text-foreground tabular-nums shrink-0">
+                  {formatSleepTotal(session.minutes)}
+                </span>
+              </div>
+            ))}
+          </ExpandableSummary>
         </div>
       ) : (
         <>
