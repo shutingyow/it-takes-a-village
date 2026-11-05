@@ -1,33 +1,44 @@
 /**
- * Lock-screen Live Activity: time since last feed (iOS 16.2+).
+ * Lock-screen Live Activities: time since last feed / pump / nap (iOS 16.2+).
  *
  * Native bridge: `FeedLiveActivityPlugin` registered from AppBridgeViewController.
- * Passes lastFeedAtMs — iOS Text(..., .timer) counts *up* from a past date.
- * Push tokens are registered with Convex for cross-caregiver APNs updates.
+ * Passes lastAtMs — iOS Text(..., .timer) counts *up* from a past date.
+ * Push tokens are registered with Convex for cross-caregiver APNs updates (feed).
  */
 
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { isNativePlatform } from "@/app/lib/deviceNotifications";
 
+export type LiveActivityKind = "last-feed" | "last-pump" | "last-nap";
+
 interface FeedLiveActivityPlugin {
   areActivitiesSupported(): Promise<{ supported: boolean; reason?: string }>;
   startActivity(options: {
+    kind: LiveActivityKind;
     title: string;
     subtitle: string;
-    /** Epoch ms of last feed — timer counts up from this. */
+    /** Epoch ms of last event — timer counts up from this. */
     dueAtMs: number;
   }): Promise<{ activityId: string }>;
   updateActivity(options: {
+    kind: LiveActivityKind;
     activityId?: string;
     title: string;
     subtitle: string;
     dueAtMs: number;
   }): Promise<{ activityId: string }>;
-  endActivity(options?: { activityId?: string }): Promise<void>;
+  endActivity(options?: {
+    kind?: LiveActivityKind;
+    activityId?: string;
+  }): Promise<void>;
   endAll(): Promise<void>;
   addListener?(
     eventName: "liveActivityPushToken",
-    listenerFunc: (data: { activityId: string; pushToken: string }) => void
+    listenerFunc: (data: {
+      activityId: string;
+      pushToken: string;
+      kind?: string;
+    }) => void
   ): Promise<{ remove: () => Promise<void> }>;
 }
 
@@ -35,23 +46,34 @@ const FeedLiveActivityNative = registerPlugin<FeedLiveActivityPlugin>(
   "FeedLiveActivity"
 );
 
-const ACTIVITY_STORAGE_KEY = "feedLiveActivityId";
+const STORAGE_KEYS: Record<LiveActivityKind, string> = {
+  "last-feed": "feedLiveActivityId",
+  "last-pump": "pumpLiveActivityId",
+  "last-nap": "napLiveActivityId",
+};
+
+const PREF_KEYS: Record<LiveActivityKind, string> = {
+  "last-feed": "liveActivityFeedEnabled",
+  "last-pump": "liveActivityPumpEnabled",
+  "last-nap": "liveActivityNapEnabled",
+};
+
 const DEVICE_ID_KEY = "ittavDeviceId";
 
-function readStoredId(): string | null {
+function readStoredId(kind: LiveActivityKind): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return localStorage.getItem(ACTIVITY_STORAGE_KEY);
+    return localStorage.getItem(STORAGE_KEYS[kind]);
   } catch {
     return null;
   }
 }
 
-function writeStoredId(id: string | null): void {
+function writeStoredId(kind: LiveActivityKind, id: string | null): void {
   if (typeof window === "undefined") return;
   try {
-    if (id) localStorage.setItem(ACTIVITY_STORAGE_KEY, id);
-    else localStorage.removeItem(ACTIVITY_STORAGE_KEY);
+    if (id) localStorage.setItem(STORAGE_KEYS[kind], id);
+    else localStorage.removeItem(STORAGE_KEYS[kind]);
   } catch {
     // ignore
   }
@@ -73,9 +95,34 @@ export function getOrCreateDeviceId(): string {
   }
 }
 
+/** Feed defaults on (matches prior behavior); pump/nap opt-in. */
+export function getLiveActivityKindEnabled(kind: LiveActivityKind): boolean {
+  if (typeof window === "undefined") return kind === "last-feed";
+  try {
+    const raw = localStorage.getItem(PREF_KEYS[kind]);
+    if (raw === null) return kind === "last-feed";
+    return raw === "1";
+  } catch {
+    return kind === "last-feed";
+  }
+}
+
+export function setLiveActivityKindEnabled(
+  kind: LiveActivityKind,
+  enabled: boolean
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PREF_KEYS[kind], enabled ? "1" : "0");
+  } catch {
+    // ignore
+  }
+}
+
 type PushTokenHandler = (data: {
   activityId: string;
   pushToken: string;
+  kind?: string;
 }) => void;
 
 let pushTokenHandler: PushTokenHandler | null = null;
@@ -106,15 +153,16 @@ async function ensurePushTokenListener(): Promise<void> {
   }
 }
 
-export async function syncFeedLiveActivity(opts: {
+export async function syncLiveActivity(opts: {
+  kind: LiveActivityKind;
   enabled: boolean;
-  /** Timestamp of the last milk feed. */
-  lastFeedAt: number | null;
+  /** Timestamp of the last event (feed / pump / nap end). */
+  lastAt: number | null;
   title: string;
   subtitle: string;
 }): Promise<"live" | "unsupported" | "skipped" | "error"> {
   if (!isNativePlatform() || !opts.enabled) {
-    await endFeedLiveActivity();
+    await endLiveActivity(opts.kind);
     return "skipped";
   }
 
@@ -132,7 +180,7 @@ export async function syncFeedLiveActivity(opts: {
       await FeedLiveActivityNative.areActivitiesSupported();
     if (!supported) {
       console.warn("Live Activities unsupported:", reason);
-      await endFeedLiveActivity();
+      await endLiveActivity(opts.kind);
       return "unsupported";
     }
   } catch (err) {
@@ -140,19 +188,20 @@ export async function syncFeedLiveActivity(opts: {
     return "unsupported";
   }
 
-  const lastFeedAt = opts.lastFeedAt;
-  if (lastFeedAt === null || lastFeedAt > Date.now() + 60_000) {
-    await endFeedLiveActivity();
+  const lastAt = opts.lastAt;
+  if (lastAt === null || lastAt > Date.now() + 60_000) {
+    await endLiveActivity(opts.kind);
     return "skipped";
   }
 
   const payload = {
+    kind: opts.kind,
     title: opts.title,
     subtitle: opts.subtitle,
-    dueAtMs: lastFeedAt,
+    dueAtMs: lastAt,
   };
 
-  const existing = readStoredId();
+  const existing = readStoredId(opts.kind);
 
   try {
     if (existing) {
@@ -161,36 +210,69 @@ export async function syncFeedLiveActivity(opts: {
           activityId: existing,
           ...payload,
         });
-        writeStoredId(activityId || existing);
+        writeStoredId(opts.kind, activityId || existing);
         return "live";
       } catch {
-        writeStoredId(null);
+        writeStoredId(opts.kind, null);
       }
     }
 
     const { activityId } = await FeedLiveActivityNative.startActivity(payload);
-    writeStoredId(activityId);
+    writeStoredId(opts.kind, activityId);
     return "live";
   } catch (err) {
-    console.warn("Feed Live Activity unavailable", err);
-    writeStoredId(null);
+    console.warn("Live Activity unavailable", opts.kind, err);
+    writeStoredId(opts.kind, null);
     return "error";
   }
 }
 
-export async function endFeedLiveActivity(): Promise<void> {
-  const id = readStoredId();
+/** @deprecated Prefer syncLiveActivity({ kind: "last-feed", ... }) */
+export async function syncFeedLiveActivity(opts: {
+  enabled: boolean;
+  lastFeedAt: number | null;
+  title: string;
+  subtitle: string;
+}): Promise<"live" | "unsupported" | "skipped" | "error"> {
+  return syncLiveActivity({
+    kind: "last-feed",
+    enabled: opts.enabled,
+    lastAt: opts.lastFeedAt,
+    title: opts.title,
+    subtitle: opts.subtitle,
+  });
+}
+
+export async function endLiveActivity(kind: LiveActivityKind): Promise<void> {
+  const id = readStoredId(kind);
   try {
     if (isNativePlatform() && Capacitor.isPluginAvailable("FeedLiveActivity")) {
-      if (id) {
-        await FeedLiveActivityNative.endActivity({ activityId: id });
-      } else {
-        await FeedLiveActivityNative.endAll();
-      }
+      await FeedLiveActivityNative.endActivity({
+        kind,
+        activityId: id ?? undefined,
+      });
     }
   } catch {
     // ignore
   } finally {
-    writeStoredId(null);
+    writeStoredId(kind, null);
+  }
+}
+
+export async function endFeedLiveActivity(): Promise<void> {
+  await endLiveActivity("last-feed");
+}
+
+export async function endAllLiveActivities(): Promise<void> {
+  try {
+    if (isNativePlatform() && Capacitor.isPluginAvailable("FeedLiveActivity")) {
+      await FeedLiveActivityNative.endAll();
+    }
+  } catch {
+    // ignore
+  } finally {
+    writeStoredId("last-feed", null);
+    writeStoredId("last-pump", null);
+    writeStoredId("last-nap", null);
   }
 }

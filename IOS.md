@@ -187,8 +187,8 @@ In Xcode:
 3. Signing: same Team on App + extension; bundle IDs `com.ittakesavillage.app` and `com.ittakesavillage.app.FeedLiveActivity`
 4. Deployment target **iOS 17.0+** for both
 5. On the phone: **Settings → Face ID & Passcode / Live Activities** — allow for It Takes A Village
-6. In the app: **Settings → Reminders** → enable device reminders, with a feed interval set (needs a recent feed so “next due” exists)
-7. **Product → Clean Build Folder**, then **Run** — open the tracker, then lock the phone; you should see a ticking next-feed Live Activity
+6. In the app: **Settings → Reminders** → enable device reminders, then under **Lock screen timers** choose Feed / Pump / Nap
+7. **Product → Clean Build Folder**, then **Run** — open the tracker, then lock the phone; enabled timers show time since the last feed, pump, or nap end
 
 ### Troubleshooting: “FeedLiveActivity failed to launch / valid code signature”
 

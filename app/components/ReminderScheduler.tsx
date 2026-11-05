@@ -14,9 +14,10 @@ import {
 } from "@/app/lib/deviceNotifications";
 import { syncDevicePushRegistration } from "@/app/lib/devicePush";
 import {
+  getLiveActivityKindEnabled,
   getOrCreateDeviceId,
   setLiveActivityPushTokenHandler,
-  syncFeedLiveActivity,
+  syncLiveActivity,
 } from "@/app/lib/feedLiveActivity";
 import { isFeedTimerRecording } from "@/app/lib/feedTimer";
 
@@ -71,13 +72,14 @@ export function ReminderScheduler({
   const [optInTick, setOptInTick] = useState(0);
 
   useEffect(() => {
-    setLiveActivityPushTokenHandler(({ activityId, pushToken }) => {
+    setLiveActivityPushTokenHandler(({ activityId, pushToken, kind }) => {
       void upsertLiveActivity({
         secretLink,
         actingCaregiverName: selectedCaregiver,
         activityId,
         pushToken,
         deviceId: getOrCreateDeviceId(),
+        kind: kind ?? "last-feed",
       });
     });
     return () => setLiveActivityPushTokenHandler(null);
@@ -259,17 +261,49 @@ export function ReminderScheduler({
       formatClock: formatTime,
     });
 
-    // Lock screen: time since last feed (counts up), not next-due countdown.
+    // Lock screen timers: time since last feed / pump / nap (count up).
     const lastMilkFeedAt = lastFeed?.timestamp ?? null;
-    void syncFeedLiveActivity({
-      enabled: enabled && !recording,
-      lastFeedAt: lastMilkFeedAt,
+    void syncLiveActivity({
+      kind: "last-feed",
+      enabled:
+        enabled && !recording && getLiveActivityKindEnabled("last-feed"),
+      lastAt: lastMilkFeedAt,
       title: t("liveActivityLastFeedTitle"),
       subtitle: lastMilkFeedAt
         ? t("liveActivityLastFeedSubtitle", {
             time: formatTime(lastMilkFeedAt),
           })
         : t("liveActivityLastFeedSubtitleEmpty"),
+    });
+
+    const lastPumpAt = lastPump?.timestamp ?? null;
+    void syncLiveActivity({
+      kind: "last-pump",
+      enabled: enabled && getLiveActivityKindEnabled("last-pump"),
+      lastAt: lastPumpAt,
+      title: t("liveActivityLastPumpTitle"),
+      subtitle: lastPumpAt
+        ? t("liveActivityLastPumpSubtitle", {
+            time: formatTime(lastPumpAt),
+          })
+        : t("liveActivityLastPumpSubtitleEmpty"),
+    });
+
+    const lastNapEnd =
+      recentSleep?.find(
+        (entry) => entry.type === "nap" && entry.endTime !== undefined
+      )?.endTime ?? null;
+    void syncLiveActivity({
+      kind: "last-nap",
+      enabled:
+        enabled && !activeSleep && getLiveActivityKindEnabled("last-nap"),
+      lastAt: lastNapEnd,
+      title: t("liveActivityLastNapTitle"),
+      subtitle: lastNapEnd
+        ? t("liveActivityLastNapSubtitle", {
+            time: formatTime(lastNapEnd),
+          })
+        : t("liveActivityLastNapSubtitleEmpty"),
     });
   }, [
     dueStatus,

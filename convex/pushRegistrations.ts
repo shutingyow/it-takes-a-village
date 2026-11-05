@@ -10,6 +10,7 @@ export const upsertLiveActivity = mutation({
     activityId: v.string(),
     pushToken: v.string(),
     deviceId: v.string(),
+    kind: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -21,6 +22,7 @@ export const upsertLiveActivity = mutation({
     const token = args.pushToken.trim().toLowerCase();
     const activityId = args.activityId.trim();
     const deviceId = args.deviceId.trim();
+    const kind = (args.kind?.trim() || "last-feed") || "last-feed";
     if (!token || !activityId || !deviceId) {
       throw new Error("Missing Live Activity registration fields");
     }
@@ -36,6 +38,7 @@ export const upsertLiveActivity = mutation({
         trackerId: tracker._id,
         pushToken: token,
         deviceId,
+        kind,
         updatedAt: now,
       });
       return null;
@@ -46,7 +49,8 @@ export const upsertLiveActivity = mutation({
       .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
       .collect();
     for (const row of byDevice) {
-      if (row.trackerId === tracker._id) {
+      // Replace same device + same kind only — keep other timers (pump/nap).
+      if (row.trackerId === tracker._id && (row.kind ?? "last-feed") === kind) {
         await ctx.db.delete(row._id);
       }
     }
@@ -56,6 +60,7 @@ export const upsertLiveActivity = mutation({
       activityId,
       pushToken: token,
       deviceId,
+      kind,
       updatedAt: now,
     });
     return null;

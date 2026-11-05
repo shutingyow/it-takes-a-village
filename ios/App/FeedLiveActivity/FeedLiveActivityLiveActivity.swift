@@ -17,8 +17,8 @@ struct FeedLiveActivityLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(systemName: "bottle.fill")
-                        .foregroundStyle(Color(red: 0.83, green: 0.42, blue: 0.42))
+                    Image(systemName: iconName(for: context.attributes.kind))
+                        .foregroundStyle(accentColor(for: context.attributes.kind))
                         .font(.title2)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
@@ -36,25 +36,25 @@ struct FeedLiveActivityLiveActivity: Widget {
                         .lineLimit(2)
                 }
             } compactLeading: {
-                Image(systemName: "bottle.fill")
-                    .foregroundStyle(Color(red: 0.83, green: 0.42, blue: 0.42))
+                Image(systemName: iconName(for: context.attributes.kind))
+                    .foregroundStyle(accentColor(for: context.attributes.kind))
             } compactTrailing: {
                 sinceText(from: context.state.dueAt, font: .caption.weight(.semibold))
             } minimal: {
-                Image(systemName: "bottle.fill")
-                    .foregroundStyle(Color(red: 0.83, green: 0.42, blue: 0.42))
+                Image(systemName: iconName(for: context.attributes.kind))
+                    .foregroundStyle(accentColor(for: context.attributes.kind))
             }
             .widgetURL(URL(string: "https://it-takes-a-village.vercel.app"))
-            .keylineTint(Color(red: 0.83, green: 0.42, blue: 0.42))
+            .keylineTint(accentColor(for: context.attributes.kind))
         }
     }
 
     @ViewBuilder
     private func lockScreenView(context: ActivityViewContext<FeedCountdownAttributes>) -> some View {
         HStack(spacing: 14) {
-            Image(systemName: "bottle.fill")
+            Image(systemName: iconName(for: context.attributes.kind))
                 .font(.system(size: 28, weight: .semibold))
-                .foregroundStyle(Color(red: 0.83, green: 0.42, blue: 0.42))
+                .foregroundStyle(accentColor(for: context.attributes.kind))
                 .frame(width: 40, height: 40)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -76,13 +76,35 @@ struct FeedLiveActivityLiveActivity: Widget {
         .padding(.vertical, 12)
     }
 
-    /// Counts *up* from last feed (past date + `.timer`).
+    /// Counts *up* from last event (past date + `.timer`).
     @ViewBuilder
-    private func sinceText(from lastFeedAt: Date, font: Font) -> some View {
-        Text(lastFeedAt, style: .timer)
+    private func sinceText(from lastAt: Date, font: Font) -> some View {
+        Text(lastAt, style: .timer)
             .font(font)
             .multilineTextAlignment(.trailing)
             .monospacedDigit()
             .contentTransition(.numericText())
+    }
+
+    private func iconName(for kind: String) -> String {
+        switch kind {
+        case "last-pump":
+            return "drop.fill"
+        case "last-nap":
+            return "moon.zzz.fill"
+        default:
+            return "bottle.fill"
+        }
+    }
+
+    private func accentColor(for kind: String) -> Color {
+        switch kind {
+        case "last-pump":
+            return Color(red: 0.56, green: 0.64, blue: 0.72) // soft blue-grey
+        case "last-nap":
+            return Color(red: 0.45, green: 0.42, blue: 0.62) // soft indigo
+        default:
+            return Color(red: 0.83, green: 0.42, blue: 0.42) // terracotta
+        }
     }
 }

@@ -124,8 +124,10 @@ export const notifyFeedChanged = internalAction({
     if (!config) return null;
 
     const jwt = await createApnsJwt(config);
+    // Only update feed Live Activities — pump/nap timers have their own kind.
     const regs = await ctx.runQuery(internal.apnsHelpers.listLiveActivities, {
       trackerId: args.trackerId,
+      kind: "last-feed",
     });
     const devices = await ctx.runQuery(internal.apnsHelpers.listDeviceTokens, {
       trackerId: args.trackerId,

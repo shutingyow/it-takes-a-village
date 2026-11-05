@@ -4,9 +4,10 @@ import ActivityKit
 import FeedCountdownShared
 
 /**
- * Native Live Activity bridge for time-since-last-feed.
+ * Native Live Activity bridge for time-since-last feed / pump / nap.
  * Registered manually from AppBridgeViewController (not an npm Cap plugin).
- * `dueAtMs` is the last feed timestamp — the widget timer counts up from it.
+ * `dueAtMs` is the last-event timestamp — the widget timer counts up from it.
+ * `kind`: "last-feed" | "last-pump" | "last-nap"
  */
 @objc(FeedLiveActivityPlugin)
 public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -19,6 +20,8 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "endActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endAll", returnType: CAPPluginReturnPromise),
     ]
+
+    private static let knownKinds: Set<String> = ["last-feed", "last-pump", "last-nap", "next-feed"]
 
     @objc func areActivitiesSupported(_ call: CAPPluginCall) {
         guard #available(iOS 16.2, *) else {
@@ -51,15 +54,16 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        let kind = normalizedKind(call.getString("kind"))
         guard let state = contentState(from: call) else {
             call.reject("title, subtitle, and dueAtMs are required")
             return
         }
 
         Task { @MainActor in
-            await endAllActivities()
+            await endActivities(matchingKind: kind)
             do {
-                let activity = try Self.requestActivityReturning(state: state)
+                let activity = try Self.requestActivityReturning(kind: kind, state: state)
                 Self.observePushToken(activity: activity, plugin: self)
                 call.resolve(["activityId": activity.id])
             } catch {
@@ -74,6 +78,7 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        let kind = normalizedKind(call.getString("kind"))
         guard let state = contentState(from: call) else {
             call.reject("title, subtitle, and dueAtMs are required")
             return
@@ -86,13 +91,12 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 if let activityId {
                     return activity.id == activityId
                 }
-                return activity.attributes.kind == "last-feed"
-                    || activity.attributes.kind == "next-feed"
+                return activity.attributes.kind == kind
             }
 
             if matches.isEmpty {
                 do {
-                    let activity = try Self.requestActivityReturning(state: state)
+                    let activity = try Self.requestActivityReturning(kind: kind, state: state)
                     Self.observePushToken(activity: activity, plugin: self)
                     call.resolve(["activityId": activity.id])
                 } catch {
@@ -120,17 +124,22 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         let activityId = call.getString("activityId")
+        let kind = call.getString("kind").map { normalizedKind($0) }
+
         Task { @MainActor in
             let matches = Activity<FeedCountdownAttributes>.activities.filter { activity in
                 if let activityId {
                     return activity.id == activityId
+                }
+                if let kind {
+                    return activity.attributes.kind == kind
                 }
                 return activity.attributes.kind == "last-feed"
                     || activity.attributes.kind == "next-feed"
             }
             for activity in matches {
                 await activity.end(
-                    ActivityContent(state: activity.content.state, staleDate: nil),
+                    ActivityContent(state: activity.contentState, staleDate: nil),
                     dismissalPolicy: .immediate
                 )
             }
@@ -150,10 +159,20 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @available(iOS 16.2, *)
+    private func endActivities(matchingKind kind: String) async {
+        for activity in Activity<FeedCountdownAttributes>.activities where activity.attributes.kind == kind {
+            await activity.end(
+                ActivityContent(state: activity.contentState, staleDate: nil),
+                dismissalPolicy: .immediate
+            )
+        }
+    }
+
+    @available(iOS 16.2, *)
     private func endAllActivities() async {
         for activity in Activity<FeedCountdownAttributes>.activities {
             await activity.end(
-                ActivityContent(state: activity.content.state, staleDate: nil),
+                ActivityContent(state: activity.contentState, staleDate: nil),
                 dismissalPolicy: .immediate
             )
         }
@@ -161,15 +180,16 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @available(iOS 16.2, *)
     private static func requestActivityReturning(
+        kind: String,
         state: FeedCountdownAttributes.ContentState
     ) throws -> Activity<FeedCountdownAttributes> {
-        let attributes = FeedCountdownAttributes(kind: "last-feed")
+        let attributes = FeedCountdownAttributes(kind: kind)
         let content = ActivityContent(
             state: state,
             staleDate: state.dueAt.addingTimeInterval(24 * 60 * 60)
         )
         // .token enables ActivityKit APNs updates from Convex when another
-        // caregiver logs a feed while this device is backgrounded.
+        // caregiver logs while this device is backgrounded.
         return try Activity.request(
             attributes: attributes,
             content: content,
@@ -188,9 +208,16 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 plugin.notifyListeners("liveActivityPushToken", data: [
                     "activityId": activity.id,
                     "pushToken": hex,
+                    "kind": activity.attributes.kind,
                 ])
             }
         }
+    }
+
+    private func normalizedKind(_ raw: String?) -> String {
+        let kind = (raw ?? "last-feed").trimmingCharacters(in: .whitespacesAndNewlines)
+        if Self.knownKinds.contains(kind) { return kind }
+        return "last-feed"
     }
 
     private func contentState(from call: CAPPluginCall) -> FeedCountdownAttributes.ContentState? {

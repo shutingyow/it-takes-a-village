@@ -4,7 +4,13 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useMemo, useState } from "react";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
-import { cn, formatTime, getDateKeyInZone, shiftDateKey } from "@/app/lib/utils";
+import {
+  cn,
+  formatSleepTotal,
+  formatTime,
+  getDateKeyInZone,
+  shiftDateKey,
+} from "@/app/lib/utils";
 import {
   formatAgeOnDate,
   formatInsightDate,
@@ -761,6 +767,57 @@ export function StatsView({
                     </div>
                   ))}
                 </div>
+              </>
+            )}
+          </SummaryCard>
+
+          <SummaryCard title={t("sleep")}>
+            {day.sleepMinutes === 0 ? (
+              <p className="text-sm text-muted">{t("noDataYet")}</p>
+            ) : (
+              <>
+                <StatLine
+                  label={t("statsSleepTotal")}
+                  value={formatSleepTotal(day.sleepMinutes)}
+                />
+                <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
+                  <StatLine
+                    label={t("statsSleepBedtime")}
+                    value={
+                      day.nightSleepMinutes > 0
+                        ? formatSleepTotal(day.nightSleepMinutes)
+                        : "—"
+                    }
+                  />
+                  <StatLine
+                    label={t("statsSleepNaps")}
+                    value={
+                      day.napSleepMinutes > 0
+                        ? formatSleepTotal(day.napSleepMinutes)
+                        : "—"
+                    }
+                  />
+                </div>
+                {day.napSessions.length > 0 && (
+                  <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
+                    {day.napSessions.map((session) => (
+                      <div
+                        key={`${session.startTime}-${session.minutes}`}
+                        className="flex items-baseline justify-between gap-2"
+                      >
+                        <span className="text-xs text-muted">
+                          {formatTime(session.startTime)}
+                          {session.endTime
+                            ? `–${formatTime(session.endTime)}`
+                            : ` ${t("sleepActive")}`}
+                        </span>
+                        <span className="text-sm font-semibold text-foreground tabular-nums">
+                          {formatSleepTotal(session.minutes)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </SummaryCard>

@@ -14,6 +14,12 @@ const pumpSessionValidator = v.object({
   amount: v.number(),
 });
 
+const napSessionValidator = v.object({
+  startTime: v.number(),
+  endTime: v.optional(v.number()),
+  minutes: v.number(),
+});
+
 const dayStatValidator = v.object({
   date: v.string(),
   label: v.string(),
@@ -33,6 +39,9 @@ const dayStatValidator = v.object({
   pumpTotalMl: v.number(),
   pumpSessions: v.array(pumpSessionValidator),
   sleepMinutes: v.number(),
+  nightSleepMinutes: v.number(),
+  napSleepMinutes: v.number(),
+  napSessions: v.array(napSessionValidator),
 });
 
 function sleepMinutesInRange(
@@ -87,6 +96,13 @@ type DayStat = {
   pumpTotalMl: number;
   pumpSessions: Array<{ timestamp: number; amount: number }>;
   sleepMinutes: number;
+  nightSleepMinutes: number;
+  napSleepMinutes: number;
+  napSessions: Array<{
+    startTime: number;
+    endTime?: number;
+    minutes: number;
+  }>;
 };
 
 function buildDayStat(
@@ -110,6 +126,7 @@ function buildDayStat(
   sleepEntries: Array<{
     startTime: number;
     endTime?: number;
+    type: "nap" | "night";
   }>
 ): DayStat {
   const dayFeeds = feeds.filter(
@@ -173,18 +190,37 @@ function buildDayStat(
   }));
   const pumpTotalMl = pumpSessions.reduce((sum, p) => sum + p.amount, 0);
 
-  const sleepMinutes = sleepEntries.reduce(
-    (total, entry) =>
-      total +
-      sleepMinutesInRange(
-        entry.startTime,
-        entry.endTime,
-        dayStart,
-        dayEnd,
-        now
-      ),
-    0
-  );
+  let nightSleepMinutes = 0;
+  let napSleepMinutes = 0;
+  const napSessions: Array<{
+    startTime: number;
+    endTime?: number;
+    minutes: number;
+  }> = [];
+
+  for (const entry of sleepEntries) {
+    const minutes = sleepMinutesInRange(
+      entry.startTime,
+      entry.endTime,
+      dayStart,
+      dayEnd,
+      now
+    );
+    if (minutes <= 0) continue;
+    if (entry.type === "night") {
+      nightSleepMinutes += minutes;
+    } else {
+      napSleepMinutes += minutes;
+      napSessions.push({
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        minutes,
+      });
+    }
+  }
+
+  napSessions.sort((a, b) => a.startTime - b.startTime);
+  const sleepMinutes = nightSleepMinutes + napSleepMinutes;
 
   return {
     date: dateKey,
@@ -205,6 +241,9 @@ function buildDayStat(
     pumpTotalMl,
     pumpSessions,
     sleepMinutes,
+    nightSleepMinutes,
+    napSleepMinutes,
+    napSessions,
   };
 }
 

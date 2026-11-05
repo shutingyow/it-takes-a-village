@@ -17,10 +17,17 @@ import {
   DEFAULT_NOTIFY_BEFORE_MINUTES,
   getDeviceRemindersEnabled,
   getNotificationPermission,
+  isNativePlatform,
   requestNotificationPermission,
   setDeviceRemindersEnabled,
   type NotifPermission,
 } from "@/app/lib/deviceNotifications";
+import {
+  endAllLiveActivities,
+  getLiveActivityKindEnabled,
+  setLiveActivityKindEnabled,
+  type LiveActivityKind,
+} from "@/app/lib/feedLiveActivity";
 import {
   DEFAULT_NIGHT_FEED_END,
   DEFAULT_NIGHT_FEED_INTERVAL_HOURS,
@@ -147,6 +154,9 @@ export function ReminderSettingsView({
   const [deviceEnabled, setDeviceEnabled] = useState(false);
   const [notifStatus, setNotifStatus] = useState<NotifPermission>("unsupported");
   const [notifBusy, setNotifBusy] = useState(false);
+  const [liveFeed, setLiveFeed] = useState(true);
+  const [livePump, setLivePump] = useState(false);
+  const [liveNap, setLiveNap] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -154,8 +164,19 @@ export function ReminderSettingsView({
 
   useEffect(() => {
     setDeviceEnabled(getDeviceRemindersEnabled());
+    setLiveFeed(getLiveActivityKindEnabled("last-feed"));
+    setLivePump(getLiveActivityKindEnabled("last-pump"));
+    setLiveNap(getLiveActivityKindEnabled("last-nap"));
     void getNotificationPermission().then(setNotifStatus);
   }, []);
+
+  const setLiveKind = (kind: LiveActivityKind, next: boolean) => {
+    setLiveActivityKindEnabled(kind, next);
+    if (kind === "last-feed") setLiveFeed(next);
+    if (kind === "last-pump") setLivePump(next);
+    if (kind === "last-nap") setLiveNap(next);
+    notifyRemindersChanged();
+  };
 
   const handleToggleDeviceNotifications = async () => {
     setNotifBusy(true);
@@ -166,6 +187,7 @@ export function ReminderSettingsView({
         setDeviceRemindersEnabled(false);
         setDeviceEnabled(false);
         await cancelAllDueNotifications();
+        await endAllLiveActivities();
         notifyRemindersChanged();
         setMessage(t("disableDeviceNotifications"));
         return;
@@ -357,6 +379,30 @@ export function ReminderSettingsView({
               : t("enableDeviceNotifications")}
         </button>
       </div>
+
+      {deviceEnabled && isNativePlatform() && (
+        <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+          <p className="text-sm font-semibold text-foreground mb-1">
+            {t("liveActivityTimers")}
+          </p>
+          <p className="text-xs text-muted mb-3">{t("liveActivityTimersDesc")}</p>
+          <ReminderToggleRow
+            label={t("liveActivityToggleFeed")}
+            checked={liveFeed}
+            onChange={(next) => setLiveKind("last-feed", next)}
+          />
+          <ReminderToggleRow
+            label={t("liveActivityTogglePump")}
+            checked={livePump}
+            onChange={(next) => setLiveKind("last-pump", next)}
+          />
+          <ReminderToggleRow
+            label={t("liveActivityToggleNap")}
+            checked={liveNap}
+            onChange={(next) => setLiveKind("last-nap", next)}
+          />
+        </div>
+      )}
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
         <ReminderToggleRow

@@ -294,12 +294,14 @@ export default defineSchema({
     .index("by_tracker_and_status", ["trackerId", "status"])
     .index("by_tracker_and_created", ["trackerId", "createdAt"]),
 
-  // ActivityKit Live Activity push tokens (lock-screen timer)
+  // ActivityKit Live Activity push tokens (lock-screen timers)
   liveActivityRegistrations: defineTable({
     trackerId: v.id("trackers"),
     activityId: v.string(),
     pushToken: v.string(), // hex
     deviceId: v.string(),
+    /** "last-feed" | "last-pump" | "last-nap" — defaults to last-feed for older rows. */
+    kind: v.optional(v.string()),
     updatedAt: v.number(),
   })
     .index("by_tracker", ["trackerId"])
