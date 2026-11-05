@@ -187,13 +187,14 @@ export function MilkStashPanel({
                     <button
                       type="button"
                       className="flex-1 rounded-xl border border-border text-sm font-semibold py-2.5 text-foreground"
-                      onClick={() =>
+                      onClick={() => {
+                        if (!confirm(t("stashDiscardConfirm"))) return;
                         void discard({
                           secretLink,
                           bagId: bag._id,
                           actingCaregiverName: selectedCaregiver,
-                        })
-                      }
+                        });
+                      }}
                     >
                       {t("stashDiscard")}
                     </button>

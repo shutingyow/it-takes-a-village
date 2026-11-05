@@ -8,7 +8,8 @@ import { cn, formatTime, getDateKeyInZone, shiftDateKey } from "@/app/lib/utils"
 import {
   formatAgeOnDate,
   formatInsightDate,
-  formatWeekAgeLine,
+  formatInsightRange,
+  formatWeekAgeOnly,
 } from "@/app/lib/babyAge";
 import { ExportView } from "./ExportView";
 import type { TranslationKey } from "@/app/lib/i18n/en";
@@ -449,7 +450,12 @@ export function StatsView({
       ? `${fullDate} · ${t("ageNotBornYet")}`
       : fullDate;
   const weekStartKey = shiftDateKey(selectedWeekEndKey, -6);
-  const weeklyAgeLine = formatWeekAgeLine(
+  const weeklyRangeLine = formatInsightRange(
+    weekStartKey,
+    selectedWeekEndKey,
+    language
+  );
+  const weeklyAgeOnly = formatWeekAgeOnly(
     birthDate,
     weekStartKey,
     selectedWeekEndKey,
@@ -458,6 +464,19 @@ export function StatsView({
   const weekEndAge = birthDate
     ? formatAgeOnDate(birthDate, selectedWeekEndKey, language)
     : null;
+
+  const totalPumpMl =
+    rangeMode === "daily"
+      ? (day?.pumpTotalMl ?? 0)
+      : (days?.reduce((sum, d) => sum + d.pumpTotalMl, 0) ?? 0);
+  const totalPumpMlForAvg =
+    rangeMode === "weekly"
+      ? daysForAverage.reduce((sum, d) => sum + d.pumpTotalMl, 0)
+      : totalPumpMl;
+  const avgPumpMlPerDay =
+    rangeMode === "weekly" && daysForAverage.length > 0
+      ? Math.round(totalPumpMlForAvg / daysForAverage.length)
+      : totalPumpMl;
 
   const wetOnly = day ? day.wetCount - day.bothCount : 0;
   const dirtyOnly = day ? day.dirtyCount - day.bothCount : 0;
@@ -561,13 +580,17 @@ export function StatsView({
           </button>
           <div className="text-center min-w-0 flex-1 px-1">
             <p className="text-sm font-semibold text-foreground break-words leading-snug">
-              {weeklyAgeLine}
+              {weeklyRangeLine}
             </p>
-            {birthDate && !weekEndAge && (
+            {weeklyAgeOnly ? (
+              <p className="text-xs text-muted mt-1 break-words leading-snug">
+                {weeklyAgeOnly}
+              </p>
+            ) : birthDate && !weekEndAge ? (
               <p className="text-[11px] text-muted mt-1 break-words">
                 {t("ageNotBornYet")}
               </p>
-            )}
+            ) : null}
           </div>
           <button
             type="button"
@@ -790,17 +813,46 @@ export function StatsView({
                 </p>
               </div>
             </div>
+          ) : metric === "pumps" ? (
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                  {t("pumpSessionsWeek")}
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {totalCount > 0 ? totalCount : "—"}
+                </p>
+              </div>
+              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                  {t("pumpsPerDay")}
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {avgCountPerDay > 0 ? avgCountPerDay : "—"}
+                </p>
+              </div>
+              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                  {t("pumpVolumeWeek")}
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {totalPumpMl > 0 ? `${totalPumpMl} ml` : "—"}
+                </p>
+              </div>
+              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                  {t("avgPumpMlPerDay")}
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {avgPumpMlPerDay > 0 ? `${avgPumpMlPerDay} ml` : "—"}
+                </p>
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
                 <p className="text-[10px] font-semibold uppercase text-muted mb-1">
-                  {t(
-                    metric === "feeds"
-                      ? "feeds"
-                      : metric === "diapers"
-                        ? "diapers"
-                        : "pumps"
-                  )}
+                  {t(metric === "feeds" ? "feeds" : "diapers")}
                 </p>
                 <p className="text-lg font-bold text-foreground">
                   {totalCount > 0 ? totalCount : "—"}

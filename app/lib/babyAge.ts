@@ -240,6 +240,27 @@ export function rangeCrossesBirthday(
   return false;
 }
 
+/** Age label for a week window (end day, or start–end span on a birthday week). */
+export function formatWeekAgeOnly(
+  birthDate: string | undefined,
+  startKey: string,
+  endKey: string,
+  language: AgeLanguage
+): string | null {
+  if (!birthDate) return null;
+  const endAge = formatAgeOnDate(birthDate, endKey, language);
+  if (!endAge) return null;
+  if (rangeCrossesBirthday(birthDate, startKey, endKey)) {
+    const startAge = formatAgeOnDate(birthDate, startKey, language);
+    if (startAge && startAge !== endAge) {
+      return language === "zh"
+        ? `${startAge}至${endAge}`
+        : `${startAge} to ${endAge}`;
+    }
+  }
+  return endAge;
+}
+
 /** Week range plus age at the last day, or a start–end span on a birthday week. */
 export function formatWeekAgeLine(
   birthDate: string | undefined,
@@ -248,16 +269,7 @@ export function formatWeekAgeLine(
   language: AgeLanguage
 ): string {
   const range = formatInsightRange(startKey, endKey, language);
-  if (!birthDate) return range;
-  const endAge = formatAgeOnDate(birthDate, endKey, language);
-  if (!endAge) return range;
-  if (rangeCrossesBirthday(birthDate, startKey, endKey)) {
-    const startAge = formatAgeOnDate(birthDate, startKey, language);
-    if (startAge && startAge !== endAge) {
-      const span =
-        language === "zh" ? `${startAge}至${endAge}` : `${startAge} to ${endAge}`;
-      return `${range} · ${span}`;
-    }
-  }
-  return `${range} · ${endAge}`;
+  const age = formatWeekAgeOnly(birthDate, startKey, endKey, language);
+  if (!age) return range;
+  return `${range} · ${age}`;
 }
