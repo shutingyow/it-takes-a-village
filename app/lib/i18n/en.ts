@@ -271,6 +271,11 @@ export const translations = {
   cannotRemoveLastAdmin: "Cannot remove the last admin",
   caregiverAdded: "Caregiver added",
   caregiverRemoved: "Caregiver removed",
+  caregiverRemovedRotatePrompt:
+    "Removed. Generate a new link so they can’t rejoin?",
+  caregiverLinkRotated:
+    "New link created. Share it with caregivers who should still have access.",
+  caregiverLinkRotateFailed: "Couldn’t create a new link. Try again from Share.",
 
   // History
   last7Days: "Last 7 days",

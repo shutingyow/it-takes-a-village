@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
 import { assertNotFarFuture } from "./lib/entryValidation";
+import { deleteStorageIds } from "./lib/storageCleanup";
 
 // Create a diaper entry
 export const create = mutation({
@@ -160,13 +161,14 @@ export const remove = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireOwnedEntry(
+    const { entry } = await requireOwnedEntry(
       ctx,
       args.secretLink,
       args.actingCaregiverName,
       args.entryId,
       "Diaper entry not found"
     );
+    await deleteStorageIds(ctx, entry.photoIds);
     await ctx.db.delete(args.entryId);
     return null;
   },

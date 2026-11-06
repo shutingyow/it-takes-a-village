@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { HistoryTab } from "./HistoryTab";
 import { HealthTab } from "./HealthTab";
 import { SupplyAlertModal } from "../modals/SupplyAlertModal";
@@ -29,6 +30,7 @@ import {
   isAdminCaregiver,
   type CaregiverInfo,
 } from "@/app/lib/trackerStorage";
+import { rotateVillageLinkAfterRemove } from "@/app/lib/rotateVillageAfterRemove";
 
 type MoreView =
   | "menu"
@@ -86,6 +88,7 @@ export function MoreTab({
   openView,
 }: MoreTabProps) {
   const { t, language, setLanguage } = useLanguage();
+  const router = useRouter();
   const [view, setView] = useState<MoreView>("menu");
   const [showSupplyModal, setShowSupplyModal] = useState(false);
   const [newCaregiverName, setNewCaregiverName] = useState("");
@@ -95,6 +98,7 @@ export function MoreTab({
   const activeAlerts = useQuery(api.supplyAlerts.getActive, { secretLink, actingCaregiverName: selectedCaregiver });
   const addCaregiver = useMutation(api.trackers.addCaregiver);
   const removeCaregiver = useMutation(api.trackers.removeCaregiver);
+  const regenerateSecret = useMutation(api.trackers.regenerateSecret);
 
   const isAdmin = isAdminCaregiver(caregivers, selectedCaregiver);
   const adminCount = caregivers.filter((c) => c.role === "admin").length;
@@ -194,7 +198,29 @@ export function MoreTab({
         actingCaregiverName: selectedCaregiver,
         name,
       });
-      setAdminMessage(t("caregiverRemoved"));
+      const shouldRotate = window.confirm(t("caregiverRemovedRotatePrompt"));
+      if (!shouldRotate) {
+        setAdminMessage(t("caregiverRemoved"));
+        return;
+      }
+      try {
+        await rotateVillageLinkAfterRemove({
+          confirmRotate: true,
+          regenerate: () =>
+            regenerateSecret({
+              secretLink,
+              actingCaregiverName: selectedCaregiver,
+            }),
+          oldSecretLink: secretLink,
+          selectedCaregiver,
+          babyName,
+          navigate: (next) => router.replace(`/tracker/${next}`),
+        });
+        setAdminMessage(t("caregiverLinkRotated"));
+      } catch {
+        setAdminMessage(t("caregiverRemoved"));
+        setAdminError(t("caregiverLinkRotateFailed"));
+      }
     } catch (err) {
       setAdminError(err instanceof Error ? err.message : "Failed to remove caregiver");
     }

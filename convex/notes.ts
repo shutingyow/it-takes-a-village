@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
+import { deleteStorageIds } from "./lib/storageCleanup";
 
 export const create = mutation({
   args: {
@@ -60,7 +61,7 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireOwnedEntry(
+    const { entry } = await requireOwnedEntry(
       ctx,
       args.secretLink,
       args.actingCaregiverName,
@@ -69,7 +70,12 @@ export const update = mutation({
     );
     const patch: { content?: string; photoIds?: typeof args.photoIds } = {};
     if (args.content !== undefined) patch.content = args.content;
-    if (args.photoIds !== undefined) patch.photoIds = args.photoIds;
+    if (args.photoIds !== undefined) {
+      const next = args.photoIds;
+      const removed = entry.photoIds.filter((id) => !next.includes(id));
+      await deleteStorageIds(ctx, removed);
+      patch.photoIds = next;
+    }
     await ctx.db.patch(args.noteId, patch);
     return null;
   },
@@ -83,13 +89,14 @@ export const remove = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireOwnedEntry(
+    const { entry } = await requireOwnedEntry(
       ctx,
       args.secretLink,
       args.actingCaregiverName,
       args.noteId,
       "Note not found"
     );
+    await deleteStorageIds(ctx, entry.photoIds);
     await ctx.db.delete(args.noteId);
     return null;
   },

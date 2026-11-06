@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
+import { deleteStorageIds } from "./lib/storageCleanup";
 
 const MAX_DURATION_MINUTES = 24 * 60;
 
@@ -453,12 +454,13 @@ export const remove = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireOwnedSleep(
+    const existing = await requireOwnedSleep(
       ctx,
       args.secretLink,
       args.actingCaregiverName,
       args.entryId
     );
+    await deleteStorageIds(ctx, existing.photoIds);
     await ctx.db.delete(args.entryId);
     return null;
   },

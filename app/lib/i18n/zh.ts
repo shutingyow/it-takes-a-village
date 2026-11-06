@@ -252,6 +252,9 @@ export const zh: Translations = {
   cannotRemoveLastAdmin: "不能删除最后一位管理员",
   caregiverAdded: "已添加照护者",
   caregiverRemoved: "已删除照护者",
+  caregiverRemovedRotatePrompt: "已移除。要生成新链接，防止对方重新加入吗？",
+  caregiverLinkRotated: "已生成新链接。请分享给仍需访问的照护者。",
+  caregiverLinkRotateFailed: "无法生成新链接。请稍后在「分享」里再试。",
 
   last7Days: "最近7天",
   loadingHistory: "加载历史中...",

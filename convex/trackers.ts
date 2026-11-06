@@ -24,6 +24,7 @@ import {
   normalizePumpTimes,
 } from "./lib/pumpSchedule";
 import { DEFAULT_TRACKER_TIMEZONE } from "./lib/dayBounds";
+import { deleteStorageIds } from "./lib/storageCleanup";
 
 const medicationReminderValidator = v.object({
   name: v.string(),
@@ -637,6 +638,12 @@ export const updatePhoto = mutation({
       args.secretLink,
       args.actingCaregiverName
     );
+    if (
+      tracker.photoStorageId &&
+      tracker.photoStorageId !== args.photoStorageId
+    ) {
+      await deleteStorageIds(ctx, [tracker.photoStorageId]);
+    }
     await ctx.db.patch(tracker._id, {
       photoStorageId: args.photoStorageId,
     });

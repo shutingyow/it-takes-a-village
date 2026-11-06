@@ -8,6 +8,7 @@ import {
   assertNotFarFuture,
   assertPositive,
 } from "./lib/entryValidation";
+import { deleteStorageIds } from "./lib/storageCleanup";
 
 export const create = mutation({
   args: {
@@ -138,13 +139,14 @@ export const remove = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireOwnedEntry(
+    const { entry } = await requireOwnedEntry(
       ctx,
       args.secretLink,
       args.actingCaregiverName,
       args.entryId,
       "Pump entry not found"
     );
+    await deleteStorageIds(ctx, entry.photoIds);
     await ctx.db.delete(args.entryId);
     return null;
   },

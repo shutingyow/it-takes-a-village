@@ -12,6 +12,7 @@ import {
   assertNotFarFuture,
   assertPositive,
 } from "./lib/entryValidation";
+import { deleteStorageIds } from "./lib/storageCleanup";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
@@ -302,6 +303,7 @@ export const remove = mutation({
       args.entryId,
       "Feed entry not found"
     );
+    await deleteStorageIds(ctx, existing.photoIds);
     await ctx.db.delete(args.entryId);
     if (isMilkFeed(existing.type)) {
       await scheduleFeedPush(ctx, existing.trackerId);

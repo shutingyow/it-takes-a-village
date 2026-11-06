@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
+import { deleteStorageIds } from "./lib/storageCleanup";
 
 async function deleteTrackerRows(
   ctx: MutationCtx,
@@ -12,25 +13,37 @@ async function deleteTrackerRows(
     .query("feedEntries")
     .withIndex("by_tracker", (q) => q.eq("trackerId", trackerId))
     .collect();
-  for (const row of feeds) await ctx.db.delete(row._id);
+  for (const row of feeds) {
+    await deleteStorageIds(ctx, row.photoIds);
+    await ctx.db.delete(row._id);
+  }
 
   const sleep = await ctx.db
     .query("sleepEntries")
     .withIndex("by_tracker", (q) => q.eq("trackerId", trackerId))
     .collect();
-  for (const row of sleep) await ctx.db.delete(row._id);
+  for (const row of sleep) {
+    await deleteStorageIds(ctx, row.photoIds);
+    await ctx.db.delete(row._id);
+  }
 
   const diapers = await ctx.db
     .query("diaperEntries")
     .withIndex("by_tracker", (q) => q.eq("trackerId", trackerId))
     .collect();
-  for (const row of diapers) await ctx.db.delete(row._id);
+  for (const row of diapers) {
+    await deleteStorageIds(ctx, row.photoIds);
+    await ctx.db.delete(row._id);
+  }
 
   const pumps = await ctx.db
     .query("pumpEntries")
     .withIndex("by_tracker", (q) => q.eq("trackerId", trackerId))
     .collect();
-  for (const row of pumps) await ctx.db.delete(row._id);
+  for (const row of pumps) {
+    await deleteStorageIds(ctx, row.photoIds);
+    await ctx.db.delete(row._id);
+  }
 
   const health = await ctx.db
     .query("healthEntries")
@@ -42,7 +55,10 @@ async function deleteTrackerRows(
     .query("notes")
     .withIndex("by_tracker", (q) => q.eq("trackerId", trackerId))
     .collect();
-  for (const row of notes) await ctx.db.delete(row._id);
+  for (const row of notes) {
+    await deleteStorageIds(ctx, row.photoIds);
+    await ctx.db.delete(row._id);
+  }
 
   const diary = await ctx.db
     .query("diaryEntries")
@@ -112,13 +128,10 @@ async function deleteOwnedTrackers(ctx: MutationCtx, userId: Id<"users">) {
     .collect();
 
   for (const tracker of mine) {
-    if (tracker.photoStorageId) {
-      try {
-        await ctx.storage.delete(tracker.photoStorageId);
-      } catch {
-        // Storage may already be gone
-      }
-    }
+    await deleteStorageIds(
+      ctx,
+      tracker.photoStorageId ? [tracker.photoStorageId] : undefined
+    );
     await deleteTrackerRows(ctx, tracker._id);
     await ctx.db.delete(tracker._id);
   }

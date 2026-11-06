@@ -29,6 +29,7 @@ import {
   detectDeviceTimezone,
 } from "@/app/lib/utils";
 import { useRouter } from "next/navigation";
+import { rotateVillageLinkAfterRemove } from "@/app/lib/rotateVillageAfterRemove";
 
 const PRIVACY_POLICY_URL = "https://it-takes-a-village.vercel.app/privacy";
 
@@ -121,6 +122,7 @@ export function SettingsTab({
   });
   const addCaregiver = useMutation(api.trackers.addCaregiver);
   const removeCaregiver = useMutation(api.trackers.removeCaregiver);
+  const regenerateSecret = useMutation(api.trackers.regenerateSecret);
   const updateTimezone = useMutation(api.trackers.updateTimezone);
   const deleteAccount = useMutation(api.accountDeletion.deleteAccount);
 
@@ -245,7 +247,32 @@ export function SettingsTab({
                           actingCaregiverName: selectedCaregiver,
                           name: c.name,
                         });
-                        setAdminMessage(t("caregiverRemoved"));
+                        const shouldRotate = window.confirm(
+                          t("caregiverRemovedRotatePrompt")
+                        );
+                        if (!shouldRotate) {
+                          setAdminMessage(t("caregiverRemoved"));
+                          return;
+                        }
+                        try {
+                          await rotateVillageLinkAfterRemove({
+                            confirmRotate: true,
+                            regenerate: () =>
+                              regenerateSecret({
+                                secretLink,
+                                actingCaregiverName: selectedCaregiver,
+                              }),
+                            oldSecretLink: secretLink,
+                            selectedCaregiver,
+                            babyName,
+                            navigate: (next) =>
+                              router.replace(`/tracker/${next}`),
+                          });
+                          setAdminMessage(t("caregiverLinkRotated"));
+                        } catch {
+                          setAdminMessage(t("caregiverRemoved"));
+                          setAdminError(t("caregiverLinkRotateFailed"));
+                        }
                       } catch (err) {
                         setAdminError(
                           err instanceof Error
