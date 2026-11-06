@@ -53,6 +53,7 @@ export function HomeTab({
         category={category}
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
+        timezone={timezone}
         onBack={() => setCategory(null)}
         onLog={(type) => onQuickLog?.(type)}
       />

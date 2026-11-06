@@ -244,7 +244,7 @@ function getTitle(entry: ActivityEntry, t: TFunction): string {
     return t("bottleFeed");
   }
   if (entry.entryType === "sleep") {
-    return entry.endTime ? t("sleepSession") : t("napStarted");
+    return entry.endTime ? t("statsSleepBedtime") : t("napStarted");
   }
   if (entry.entryType === "nap") {
     return entry.endTime ? t("filterNap") : t("napStarted");

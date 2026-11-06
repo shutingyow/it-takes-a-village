@@ -315,7 +315,7 @@ function ExpandableSummary({
       >
         <p className="text-sm font-semibold text-foreground">{title}</p>
         <span className="flex items-center gap-2 shrink-0">
-          <span className="text-lg font-semibold text-foreground tabular-nums leading-none">
+          <span className="text-sm font-semibold text-foreground tabular-nums leading-none">
             {value}
           </span>
           {hasDetail && (
@@ -503,11 +503,6 @@ export function StatsView({
   const dayAge = birthDate
     ? formatAgeOnDate(birthDate, selectedDateKey, language)
     : null;
-  const dailyAgeLine = dayAge
-    ? `${fullDate} · ${dayAge}`
-    : birthDate
-      ? `${fullDate} · ${t("ageNotBornYet")}`
-      : fullDate;
   const weekStartKey = shiftDateKey(selectedWeekEndKey, -6);
   const weeklyRangeLine = formatInsightRange(
     weekStartKey,
@@ -599,8 +594,17 @@ export function StatsView({
           </button>
           <div className="text-center min-w-0 flex-1 px-1">
             <p className="text-sm font-semibold text-foreground break-words leading-snug">
-              {dailyAgeLine}
+              {fullDate}
             </p>
+            {dayAge ? (
+              <p className="text-xs text-muted mt-1 break-words leading-snug">
+                {dayAge}
+              </p>
+            ) : birthDate ? (
+              <p className="text-[11px] text-muted mt-1 break-words">
+                {t("ageNotBornYet")}
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -725,7 +729,18 @@ export function StatsView({
               day.formulaMl + day.breastmilkMl + day.breastDurationMinutes === 0
             }
             emptyLabel={t("noDataYet")}
-            value={`${day.formulaMl + day.breastmilkMl} ml`}
+            value={(() => {
+              const totalMl = day.formulaMl + day.breastmilkMl;
+              const nursing =
+                day.breastDurationMinutes > 0
+                  ? t("statsMinutesValue", {
+                      minutes: String(day.breastDurationMinutes),
+                    })
+                  : null;
+              if (totalMl > 0 && nursing) return `${totalMl} ml · ${nursing}`;
+              if (totalMl > 0) return `${totalMl} ml`;
+              return nursing;
+            })()}
           >
             <StatLine
               label={t("statsBreastMilkMl")}
