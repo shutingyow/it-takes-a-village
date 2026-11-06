@@ -128,6 +128,25 @@ type PushTokenHandler = (data: {
 let pushTokenHandler: PushTokenHandler | null = null;
 let listenerAttached = false;
 
+/** Serialize sync/end per kind so ReminderScheduler re-runs cannot race. */
+const kindChains: Record<LiveActivityKind, Promise<unknown>> = {
+  "last-feed": Promise.resolve(),
+  "last-pump": Promise.resolve(),
+  "last-nap": Promise.resolve(),
+};
+
+function withKindLock<T>(
+  kind: LiveActivityKind,
+  fn: () => Promise<T>
+): Promise<T> {
+  const next = kindChains[kind].then(fn, fn);
+  kindChains[kind] = next.then(
+    () => undefined,
+    () => undefined
+  );
+  return next;
+}
+
 /** Register callback for ActivityKit push tokens (Convex registration). */
 export function setLiveActivityPushTokenHandler(
   handler: PushTokenHandler | null
@@ -161,8 +180,18 @@ export async function syncLiveActivity(opts: {
   title: string;
   subtitle: string;
 }): Promise<"live" | "unsupported" | "skipped" | "error"> {
+  return withKindLock(opts.kind, () => syncLiveActivityUnlocked(opts));
+}
+
+async function syncLiveActivityUnlocked(opts: {
+  kind: LiveActivityKind;
+  enabled: boolean;
+  lastAt: number | null;
+  title: string;
+  subtitle: string;
+}): Promise<"live" | "unsupported" | "skipped" | "error"> {
   if (!isNativePlatform() || !opts.enabled) {
-    await endLiveActivity(opts.kind);
+    await endLiveActivityUnlocked(opts.kind);
     return "skipped";
   }
 
@@ -180,7 +209,7 @@ export async function syncLiveActivity(opts: {
       await FeedLiveActivityNative.areActivitiesSupported();
     if (!supported) {
       console.warn("Live Activities unsupported:", reason);
-      await endLiveActivity(opts.kind);
+      await endLiveActivityUnlocked(opts.kind);
       return "unsupported";
     }
   } catch (err) {
@@ -190,7 +219,7 @@ export async function syncLiveActivity(opts: {
 
   const lastAt = opts.lastAt;
   if (lastAt === null || lastAt > Date.now() + 60_000) {
-    await endLiveActivity(opts.kind);
+    await endLiveActivityUnlocked(opts.kind);
     return "skipped";
   }
 
@@ -204,6 +233,8 @@ export async function syncLiveActivity(opts: {
   const existing = readStoredId(opts.kind);
 
   try {
+    // Prefer update (native reconciles orphans + stale ids). Fresh start
+    // still ends same-kind first on the native side.
     if (existing) {
       try {
         const { activityId } = await FeedLiveActivityNative.updateActivity({
@@ -244,9 +275,14 @@ export async function syncFeedLiveActivity(opts: {
 }
 
 export async function endLiveActivity(kind: LiveActivityKind): Promise<void> {
+  return withKindLock(kind, () => endLiveActivityUnlocked(kind));
+}
+
+async function endLiveActivityUnlocked(kind: LiveActivityKind): Promise<void> {
   const id = readStoredId(kind);
   try {
     if (isNativePlatform() && Capacitor.isPluginAvailable("FeedLiveActivity")) {
+      // Always pass kind so native ends orphans even when id is stale.
       await FeedLiveActivityNative.endActivity({
         kind,
         activityId: id ?? undefined,
@@ -265,6 +301,11 @@ export async function endFeedLiveActivity(): Promise<void> {
 
 export async function endAllLiveActivities(): Promise<void> {
   try {
+    await Promise.all([
+      endLiveActivity("last-feed"),
+      endLiveActivity("last-pump"),
+      endLiveActivity("last-nap"),
+    ]);
     if (isNativePlatform() && Capacitor.isPluginAvailable("FeedLiveActivity")) {
       await FeedLiveActivityNative.endAll();
     }

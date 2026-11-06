@@ -8,6 +8,9 @@ import FeedCountdownShared
  * Registered manually from AppBridgeViewController (not an npm Cap plugin).
  * `dueAtMs` is the last-event timestamp — the widget timer counts up from it.
  * `kind`: "last-feed" | "last-pump" | "last-nap"
+ *
+ * Always keeps at most one ActivityKit session per kind so stale JS IDs
+ * cannot leave orphan banners (double Live Activities).
  */
 @objc(FeedLiveActivityPlugin)
 public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -64,6 +67,7 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             await endActivities(matchingKind: kind)
             do {
                 let activity = try Self.requestActivityReturning(kind: kind, state: state)
+                await Self.endExtras(matchingKind: kind, keepingId: activity.id)
                 Self.observePushToken(activity: activity, plugin: self)
                 call.resolve(["activityId": activity.id])
             } catch {
@@ -87,16 +91,26 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         let activityId = call.getString("activityId")
 
         Task { @MainActor in
-            let matches = Activity<FeedCountdownAttributes>.activities.filter { activity in
+            var matches = Activity<FeedCountdownAttributes>.activities.filter { activity in
                 if let activityId {
                     return activity.id == activityId
                 }
                 return activity.attributes.kind == kind
             }
 
+            // Stale JS id: fall back to any live session of this kind.
+            if matches.isEmpty, activityId != nil {
+                matches = Activity<FeedCountdownAttributes>.activities.filter {
+                    $0.attributes.kind == kind
+                }
+            }
+
             if matches.isEmpty {
+                // End orphans of this kind before creating a replacement.
+                await endActivities(matchingKind: kind)
                 do {
                     let activity = try Self.requestActivityReturning(kind: kind, state: state)
+                    await Self.endExtras(matchingKind: kind, keepingId: activity.id)
                     Self.observePushToken(activity: activity, plugin: self)
                     call.resolve(["activityId": activity.id])
                 } catch {
@@ -109,11 +123,15 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 state: state,
                 staleDate: state.dueAt.addingTimeInterval(24 * 60 * 60)
             )
+            let keepId = matches.first?.id
             for activity in matches {
                 await activity.update(content)
                 Self.observePushToken(activity: activity, plugin: self)
             }
-            call.resolve(["activityId": matches.first?.id ?? ""])
+            if let keepId {
+                await Self.endExtras(matchingKind: kind, keepingId: keepId)
+            }
+            call.resolve(["activityId": keepId ?? ""])
         }
     }
 
@@ -127,16 +145,37 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         let kind = call.getString("kind").map { normalizedKind($0) }
 
         Task { @MainActor in
-            let matches = Activity<FeedCountdownAttributes>.activities.filter { activity in
-                if let activityId {
-                    return activity.id == activityId
+            // End by id ∪ kind so a stale localStorage id cannot leave orphans.
+            var seen = Set<String>()
+            var matches: [Activity<FeedCountdownAttributes>] = []
+
+            if let activityId {
+                for activity in Activity<FeedCountdownAttributes>.activities
+                where activity.id == activityId {
+                    if seen.insert(activity.id).inserted {
+                        matches.append(activity)
+                    }
                 }
-                if let kind {
-                    return activity.attributes.kind == kind
-                }
-                return activity.attributes.kind == "last-feed"
-                    || activity.attributes.kind == "next-feed"
             }
+
+            if let kind {
+                for activity in Activity<FeedCountdownAttributes>.activities
+                where activity.attributes.kind == kind {
+                    if seen.insert(activity.id).inserted {
+                        matches.append(activity)
+                    }
+                }
+            } else if activityId == nil {
+                for activity in Activity<FeedCountdownAttributes>.activities
+                where activity.attributes.kind == "last-feed"
+                    || activity.attributes.kind == "next-feed"
+                {
+                    if seen.insert(activity.id).inserted {
+                        matches.append(activity)
+                    }
+                }
+            }
+
             for activity in matches {
                 await activity.end(
                     ActivityContent(state: activity.contentState, staleDate: nil),
@@ -161,6 +200,18 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     @available(iOS 16.2, *)
     private func endActivities(matchingKind kind: String) async {
         for activity in Activity<FeedCountdownAttributes>.activities where activity.attributes.kind == kind {
+            await activity.end(
+                ActivityContent(state: activity.contentState, staleDate: nil),
+                dismissalPolicy: .immediate
+            )
+        }
+    }
+
+    /// Ends every session of `kind` except the one we intend to keep.
+    @available(iOS 16.2, *)
+    private static func endExtras(matchingKind kind: String, keepingId: String) async {
+        for activity in Activity<FeedCountdownAttributes>.activities
+        where activity.attributes.kind == kind && activity.id != keepingId {
             await activity.end(
                 ActivityContent(state: activity.contentState, staleDate: nil),
                 dismissalPolicy: .immediate
