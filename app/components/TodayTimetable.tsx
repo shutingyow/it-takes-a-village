@@ -14,7 +14,7 @@ import { ActivityIcon, type ActivityType } from "./icons";
 import type { ActivityEntry } from "./ActivityEntryCard";
 import { EditActivitySheet } from "./EditActivitySheet";
 
-type EventKind = "feed" | "diaper" | "pump" | "nap";
+type EventKind = "feed" | "diaper" | "pump" | "sleep";
 
 type TimetableEvent = {
   id: string;
@@ -60,7 +60,7 @@ const KIND_STYLE: Record<
     bar: "bg-[#2f87c5]",
     swatch: "#2f87c5",
   },
-  nap: {
+  sleep: {
     bg: "bg-[#d8f0e0]",
     text: "text-[#145a32]",
     icon: "nap",
@@ -78,7 +78,7 @@ const HOURS = Array.from(
   (_, i) => DAY_START_HOUR + i
 );
 
-const KIND_ORDER: EventKind[] = ["feed", "diaper", "pump", "nap"];
+const KIND_ORDER: EventKind[] = ["feed", "diaper", "pump", "sleep"];
 
 function msToDayOffset(ms: number, dayStart: number): number {
   return (ms - dayStart) / (1000 * 60 * 60);
@@ -212,6 +212,9 @@ export function TodayTimetable({
                 ? t("dirty")
                 : t("wetDirty")
           }
+          sleepLabel={(type) =>
+            type === "night" ? t("statsSleepBedtime") : t("nap")
+          }
           interactive={canOpenDetails}
           onEventClick={handleEventClick}
         />
@@ -287,6 +290,7 @@ function DayView({
   kindLabel,
   solidsLabel,
   diaperLabel,
+  sleepLabel,
   interactive,
   onEventClick,
 }: {
@@ -304,6 +308,7 @@ function DayView({
   kindLabel: (kind: EventKind) => string;
   solidsLabel: string;
   diaperLabel: (type: "wet" | "dirty" | "both") => string;
+  sleepLabel: (type: "nap" | "night") => string;
   interactive: boolean;
   onEventClick: (eventId: string, dateKey: string) => void;
 }) {
@@ -354,14 +359,17 @@ function DayView({
               event.tone === "solids"
                 ? SOLIDS_STYLE
                 : KIND_STYLE[event.kind];
-            const isPoint = event.kind !== "nap";
+            const isPoint = event.kind !== "sleep";
             const detail =
               event.kind === "diaper" &&
               (event.label === "wet" ||
                 event.label === "dirty" ||
                 event.label === "both")
                 ? diaperLabel(event.label)
-                : event.label;
+                : event.kind === "sleep" &&
+                    (event.label === "nap" || event.label === "night")
+                  ? sleepLabel(event.label)
+                  : event.label;
             const titleParts = [
               event.tone === "solids" ? solidsLabel : kindLabel(event.kind),
               formatTime(event.startMs),

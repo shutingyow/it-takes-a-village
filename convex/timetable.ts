@@ -11,7 +11,7 @@ const eventKindValidator = v.union(
   v.literal("feed"),
   v.literal("diaper"),
   v.literal("pump"),
-  v.literal("nap")
+  v.literal("sleep")
 );
 
 const timetableEventValidator = v.object({
@@ -26,7 +26,7 @@ const timetableEventValidator = v.object({
 });
 
 /**
- * Day / week timetable events for Insights (feed, diaper, pump, nap only).
+ * Day / week timetable events for Insights (feed, diaper, pump, sleep).
  */
 export const getSchedule = query({
   args: {
@@ -62,7 +62,7 @@ export const getSchedule = query({
       dayEnd: number;
       events: Array<{
         id: string;
-        kind: "feed" | "diaper" | "pump" | "nap";
+        kind: "feed" | "diaper" | "pump" | "sleep";
         startMs: number;
         endMs?: number;
         label?: string;
@@ -99,7 +99,7 @@ export const getSchedule = query({
         .filter((q) => q.lt(q.field("timestamp"), dayEnd))
         .collect();
 
-      // Include naps that start in-day or overlap the day window.
+      // Include naps + bedtime that start in-day or overlap the day window.
       const sleepLookback = await ctx.db
         .query("sleepEntries")
         .withIndex("by_tracker_and_start", (q) =>
@@ -109,8 +109,7 @@ export const getSchedule = query({
         )
         .collect();
 
-      const naps = sleepLookback.filter((entry) => {
-        if (entry.type !== "nap") return false;
+      const sleeps = sleepLookback.filter((entry) => {
         const end = entry.endTime ?? args.now;
         return entry.startTime < dayEnd && end > dayStart;
       });
@@ -153,11 +152,12 @@ export const getSchedule = query({
           label: `${e.amount} ml`,
           caregiverName: e.caregiverName,
         })),
-        ...naps.map((e) => ({
+        ...sleeps.map((e) => ({
           id: e._id,
-          kind: "nap" as const,
+          kind: "sleep" as const,
           startMs: e.startTime,
           endMs: e.endTime ?? args.now,
+          label: e.type,
           caregiverName: e.caregiverName,
         })),
       ].sort((a, b) => a.startMs - b.startMs);

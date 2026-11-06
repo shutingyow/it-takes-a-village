@@ -6,10 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   formatDate,
   formatMinutesCompact,
-  formatSleepTotal,
   formatTime,
   formatTimeAgo,
-  getDateKeyInZone,
 } from "@/app/lib/utils";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import type { TranslationKey } from "@/app/lib/i18n/en";
@@ -58,9 +56,9 @@ const CATEGORY_META: Record<
     text: "text-primary",
   },
   nap: {
-    labelKey: "nap",
+    labelKey: "sleep",
     icon: "nap",
-    // Include naps + night/bedtime so caregivers see all sleep here.
+    // Include naps + bedtime so caregivers see all sleep here.
     historyType: "sleep",
     accent: "bg-accent-sleep-light",
     text: "text-accent-sleep",
@@ -78,7 +76,6 @@ interface HomeCategoryDetailProps {
   category: HomeCategory;
   secretLink: string;
   selectedCaregiver: string;
-  timezone?: string;
   onBack: () => void;
   onLog: (type: HomeCategory) => void;
 }
@@ -87,7 +84,6 @@ export function HomeCategoryDetail({
   category,
   secretLink,
   selectedCaregiver,
-  timezone,
   onBack,
   onLog,
 }: HomeCategoryDetailProps) {
@@ -101,27 +97,10 @@ export function HomeCategoryDetail({
     return () => clearInterval(id);
   }, []);
 
-  const todayKey = useMemo(
-    () => getDateKeyInZone(now, timezone),
-    [now, timezone]
-  );
-
   const dueStatus = useQuery(
     api.reminders.getDueStatus,
     category === "feed" || category === "pump"
       ? { secretLink, actingCaregiverName: selectedCaregiver, now }
-      : "skip"
-  );
-
-  const todaySleep = useQuery(
-    api.stats.getDailyStats,
-    category === "nap"
-      ? {
-          secretLink,
-          actingCaregiverName: selectedCaregiver,
-          dateKey: todayKey,
-          now,
-        }
       : "skip"
   );
 
@@ -246,46 +225,6 @@ export function HomeCategoryDetail({
             )}
           </div>
         </div>
-
-        {category === "nap" && todaySleep?.day && (
-          <div
-            className={`rounded-2xl border border-border px-4 py-3 mb-4 ${meta.accent}`}
-          >
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-2">
-              {t("todaysSummary")}
-            </p>
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm font-semibold text-foreground">
-                {t("statsSleepBedtime")}
-              </span>
-              <span className={`text-sm font-semibold tabular-nums ${meta.text}`}>
-                {todaySleep.day.nightSleepMinutes > 0
-                  ? formatSleepTotal(todaySleep.day.nightSleepMinutes)
-                  : "—"}
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between gap-3 mt-1.5">
-              <span className="text-sm font-semibold text-foreground">
-                {t("statsSleepNaps")}
-              </span>
-              <span className={`text-sm font-semibold tabular-nums ${meta.text}`}>
-                {todaySleep.day.napSleepMinutes > 0
-                  ? formatSleepTotal(todaySleep.day.napSleepMinutes)
-                  : "—"}
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between gap-3 mt-2 pt-2 border-t border-border/60">
-              <span className="text-sm font-semibold text-foreground">
-                {t("sleep")}
-              </span>
-              <span className={`text-sm font-bold tabular-nums ${meta.text}`}>
-                {todaySleep.day.sleepMinutes > 0
-                  ? formatSleepTotal(todaySleep.day.sleepMinutes)
-                  : "—"}
-              </span>
-            </div>
-          </div>
-        )}
 
         {(category === "feed" || category === "pump") && (
           <div
