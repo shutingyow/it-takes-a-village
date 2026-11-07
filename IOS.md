@@ -97,8 +97,8 @@ The WebView loads production HTTPS. Convex realtime works the same as in Safari.
 The iOS app has **separate storage** from Safari, so it will not auto-open the tracker you used in the browser until you open it once:
 
 1. On the home screen, under **Open your tracker**, paste your full tracker URL  
-   (e.g. `https://it-takes-a-village.vercel.app/tracker/_qIvmhoCKkl31WB5`)  
-   or just the secret code (`_qIvmhoCKkl31WB5`).
+   (e.g. `https://it-takes-a-village.vercel.app/tracker/<your-code>`)  
+   or just the secret code (`<your-code>`).
 2. Tap **Open tracker** → pick your caregiver → you’re on the same live log.
 3. Next launches on this phone show **Continue with …** for that tracker.
 
@@ -235,19 +235,22 @@ You still need to create/configure these in [App Store Connect](https://appstore
 - [ ] Support URL (can be the production site or a GitHub/README contact)
 - [ ] Signing: distribution certificate + App Store provisioning profile (Xcode manages with automatic signing)
 
-### Privacy nutrition label guidance (starting point)
+### Privacy nutrition labels (App Store Connect — fill to match)
 
-This app stores caregiver-entered baby care data. Typical declarations:
+In **App Privacy**, declare data **linked to the user**, used for **App Functionality**, **not used for tracking**:
 
-| Category | Likely answer |
-|----------|----------------|
-| Health & Fitness / Other Health | Yes — linked to user / used for app functionality |
-| Photos or Videos | Yes if users attach entry photos |
-| Contact Info | Only if you later collect email/phone |
-| Analytics / Tracking | No unless you add analytics SDKs |
-| Advertising | No |
+| Data type | Collect? | Linked | Tracking | Notes |
+|-----------|----------|--------|----------|-------|
+| **Health & Fitness** | Yes | Yes | No | Feeds, sleep, diapers, pump, growth, health notes |
+| **Photos** | Yes | Yes | No | Optional entry / profile photos |
+| **User ID** | Yes | Yes | No | Apple/Google sign-in account id for owners |
+| **Device ID** | Yes | Yes | No | Local device id for APNs / Live Activities |
+| **Crash Data** | Yes (if Sentry DSN set) | Yes | No | Stack traces via Sentry; no care-log contents on purpose |
+| Contact Info / Location / Advertising / Other Analytics | No | — | — | Unless you add those features later |
 
-Review Apple’s labels against actual product behavior before submit.
+Also ship `ios/App/App/PrivacyInfo.xcprivacy` (manifest) with the same types and `NSPrivacyTracking = false`. Rebuild the iOS binary after changing it.
+
+Privacy policy URL: `https://it-takes-a-village.vercel.app/privacy`
 
 ## npm scripts
 

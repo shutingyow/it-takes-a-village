@@ -103,7 +103,23 @@ Public page for App Store Connect and users:
 
 **https://it-takes-a-village.vercel.app/privacy**
 
-Source: `app/privacy/page.tsx`. Update the contact email before review if `privacy@ittakesavillage.app` is not monitored.
+Source: `app/privacy/page.tsx`. Contact: `privacy@ittakesavillage.app` (Shuting Yow).
+
+### Convex backups (production)
+
+1. Dashboard → production deployment → **Data → Backup & Restore** (or Settings → Snapshot export):  
+   https://dashboard.convex.dev/t/shuting-yow/it-takes-a-village/zealous-hound-234  
+2. **Turn on “Backup automatically”** (daily, include file storage) if your plan is **Convex Pro**. Free/Starter only keeps a couple of short-lived manual backups.  
+3. Manual export anytime:  
+   `npx convex export --prod --include-file-storage --path ~/Downloads/ittav-prod.zip`  
+4. **Restore drill (do not restore over production):** create a disposable preview deployment, import the ZIP with `--replace`, confirm row counts, then delete/expire the preview.  
+   Example already verified Nov 6, 2026: export → `preview/restore-drill` (`uncommon-kookabura-150`) restored **2495** documents + **8** files.
+
+### Sentry
+
+1. Create a Next.js project at [sentry.io](https://sentry.io).  
+2. Set on Vercel (Production + Preview): `NEXT_PUBLIC_SENTRY_DSN`. Optional: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` for source maps.  
+3. Without a DSN, the SDK stays inactive so local/build still works.
 
 ## iOS App Store (Capacitor)
 

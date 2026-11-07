@@ -26,6 +26,7 @@
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4",
     "@convex-dev/auth": "^0.0.96",
+    "@sentry/nextjs": "^11.11.0",
     "convex": "^1.42.1",
     "nanoid": "^5.1.16",
     "next": "16.2.10",

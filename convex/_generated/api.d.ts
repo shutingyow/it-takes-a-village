@@ -31,6 +31,7 @@ import type * as lib_entryValidation from "../lib/entryValidation.js";
 import type * as lib_feedSchedule from "../lib/feedSchedule.js";
 import type * as lib_feeds from "../lib/feeds.js";
 import type * as lib_pumpSchedule from "../lib/pumpSchedule.js";
+import type * as lib_storageCleanup from "../lib/storageCleanup.js";
 import type * as milestones from "../milestones.js";
 import type * as milkStash from "../milkStash.js";
 import type * as momentEntries from "../momentEntries.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   "lib/feedSchedule": typeof lib_feedSchedule;
   "lib/feeds": typeof lib_feeds;
   "lib/pumpSchedule": typeof lib_pumpSchedule;
+  "lib/storageCleanup": typeof lib_storageCleanup;
   milestones: typeof milestones;
   milkStash: typeof milkStash;
   momentEntries: typeof momentEntries;
