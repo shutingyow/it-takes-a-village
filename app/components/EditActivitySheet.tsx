@@ -119,6 +119,17 @@ export function EditActivitySheet({
   }
 
   if (entry.entryType === "nap") {
+    // In-progress nap → Sleep modal so caregivers get End sleep now.
+    if (entry.endTime == null) {
+      return (
+        <SleepModal
+          secretLink={secretLink}
+          selectedCaregiver={selectedCaregiver}
+          editEntry={entry}
+          onClose={onClose}
+        />
+      );
+    }
     return (
       <NapModal
         secretLink={secretLink}

@@ -62,12 +62,26 @@ async function getActiveSleepForTracker(
   ctx: QueryCtx,
   trackerId: Id<"trackers">
 ) {
-  const recentSleep = await ctx.db
+  // Active sessions omit endTime. Prefer the dedicated index so we don't miss
+  // ongoing sleep once the village has more than a page of older rows.
+  const active = await ctx.db
     .query("sleepEntries")
-    .withIndex("by_tracker", (q) => q.eq("trackerId", trackerId))
-    .take(50);
+    .withIndex("by_tracker_active", (q) =>
+      q.eq("trackerId", trackerId).eq("endTime", undefined)
+    )
+    .collect();
+  if (active.length > 0) {
+    active.sort((a, b) => b.startTime - a.startTime);
+    return active[0]!;
+  }
 
-  return recentSleep.find((sleep) => sleep.endTime === undefined) ?? null;
+  // Fallback for any rows the index might miss during rollout.
+  const recent = await ctx.db
+    .query("sleepEntries")
+    .withIndex("by_tracker_and_start", (q) => q.eq("trackerId", trackerId))
+    .order("desc")
+    .take(100);
+  return recent.find((sleep) => sleep.endTime === undefined) ?? null;
 }
 
 // Start a sleep session
@@ -89,7 +103,9 @@ export const start = mutation({
     );
     const activeSleep = await getActiveSleepForTracker(ctx, tracker._id);
     if (activeSleep) {
-      throw new Error("A sleep session is already active");
+      throw new Error(
+        `A sleep session is already active (started by ${activeSleep.caregiverName}). End it before starting another.`
+      );
     }
 
     return await ctx.db.insert("sleepEntries", {
@@ -97,7 +113,7 @@ export const start = mutation({
       caregiverName: args.actingCaregiverName.trim(),
       type: args.type,
       startTime: args.startTime,
-      endTime: undefined, // Active sleep
+      // Omit endTime while live — indexed as undefined for getActive.
       notes: args.notes,
       photoIds: args.photoIds,
     });
@@ -312,7 +328,9 @@ export const logNap = mutation({
     if (resolved.endTime === undefined) {
       const activeSleep = await getActiveSleepForTracker(ctx, tracker._id);
       if (activeSleep) {
-        throw new Error("A sleep session is already active");
+        throw new Error(
+          `A sleep session is already active (started by ${activeSleep.caregiverName}). End it before starting another.`
+        );
       }
     }
     const notes = cleanNotes(args.notes);

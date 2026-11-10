@@ -12,7 +12,10 @@ import { EntryPhotoField } from "../EntryPhotoField";
 import type { ActivityEntry } from "../ActivityEntryCard";
 import { LoggedByHint } from "../LoggedByHint";
 
-type SleepEditEntry = Extract<ActivityEntry, { entryType: "sleep" }>;
+type SleepEditEntry = Extract<
+  ActivityEntry,
+  { entryType: "sleep" | "nap" }
+>;
 
 interface SleepModalProps {
   secretLink: string;
@@ -50,15 +53,30 @@ export function SleepModal({
   const endSleep = useMutation(api.sleepEntries.end);
   const createSleep = useMutation(api.sleepEntries.create);
   const updateSleep = useMutation(api.sleepEntries.update);
+  const isEditing = Boolean(editEntry);
+  const isEditingActive =
+    Boolean(editEntry) && editEntry != null && editEntry.endTime == null;
+  // Always load village-wide active sleep when logging new sleep, so we show
+  // End instead of Start if someone else's timer is already running.
   const activeSleep = useQuery(
     api.sleepEntries.getActive,
-    editEntry ? "skip" : { secretLink, actingCaregiverName: selectedCaregiver }
+    isEditing && !isEditingActive
+      ? "skip"
+      : { secretLink, actingCaregiverName: selectedCaregiver }
   );
   const lastSleep = useQuery(
     api.sleepEntries.getLast,
-    editEntry ? "skip" : { secretLink, actingCaregiverName: selectedCaregiver }
+    isEditing ? "skip" : { secretLink, actingCaregiverName: selectedCaregiver }
   );
-  const isEditing = Boolean(editEntry);
+  const liveSession =
+    isEditingActive && editEntry
+      ? {
+          _id: editEntry._id,
+          startTime: editEntry.startTime,
+          caregiverName: editEntry.caregiverName,
+          type: editEntry.type,
+        }
+      : activeSleep ?? null;
 
   const [mode, setMode] = useState<SleepMode>("live");
   const [sleepType, setSleepType] = useState<"nap" | "night">(
@@ -129,14 +147,14 @@ export function SleepModal({
   };
 
   const handleEndSleep = async () => {
-    if (!activeSleep) return;
+    if (!liveSession) return;
 
     setIsSubmitting(true);
     try {
       await endSleep({
         secretLink,
         actingCaregiverName: selectedCaregiver,
-        entryId: activeSleep._id,
+        entryId: liveSession._id,
         endTime: Date.now(),
         photoIds: photoIds.length > 0 ? photoIds : undefined,
       });
@@ -145,6 +163,7 @@ export function SleepModal({
       onClose();
     } catch (error) {
       console.error("Failed to end sleep:", error);
+      alert(error instanceof Error ? error.message : t("updateFailed"));
       setIsSubmitting(false);
     }
   };
@@ -224,6 +243,54 @@ export function SleepModal({
       onChange={setPhotoIds}
     />
   );
+
+  const liveTimerPanel = liveSession ? (
+    <>
+      <div className="text-center py-4">
+        <div className="w-16 h-16 rounded-full bg-accent-sleep-light flex items-center justify-center mx-auto mb-3">
+          <IconSleep size={32} className="text-accent-sleep" />
+        </div>
+        <p className="text-lg font-semibold text-foreground mb-3">
+          {t("babySleeping")}
+        </p>
+        <div className="bg-accent-sleep-light rounded-2xl p-5">
+          <p className="text-3xl font-bold text-accent-sleep">
+            {formatDuration(liveSession.startTime)}
+          </p>
+          <p className="text-sm text-muted mt-2">
+            {t("startedByName", { name: liveSession.caregiverName })}
+          </p>
+        </div>
+      </div>
+
+      {photoField}
+
+      <button
+        type="button"
+        onClick={handleEndSleep}
+        disabled={isSubmitting}
+        className="w-full bg-secondary hover:bg-secondary/90 text-white font-medium py-4 px-6 rounded-xl transition-colors disabled:opacity-50"
+      >
+        {isSubmitting ? t("ending") : t("endSleepNowButton")}
+      </button>
+    </>
+  ) : null;
+
+  // Editing an in-progress nap/sleep → same end-timer UI as Log Sleep.
+  if (isEditingActive && editEntry) {
+    return (
+      <BottomSheet
+        title={t("logSleep")}
+        icon={<IconSleep size={20} />}
+        onClose={onClose}
+      >
+        <div className="space-y-4 pt-2">
+          <LoggedByHint name={editEntry.caregiverName} />
+          {liveTimerPanel}
+        </div>
+      </BottomSheet>
+    );
+  }
 
   if (isEditing && editEntry) {
     const hasEnd = editEntry.endTime != null;
@@ -344,36 +411,12 @@ export function SleepModal({
         </div>
 
         {mode === "live" ? (
-          activeSleep ? (
-            <>
-              <div className="text-center py-4">
-                <div className="w-16 h-16 rounded-full bg-accent-sleep-light flex items-center justify-center mx-auto mb-3">
-                  <IconSleep size={32} className="text-accent-sleep" />
-                </div>
-                <p className="text-lg font-semibold text-foreground mb-3">
-                  {t("babySleeping")}
-                </p>
-                <div className="bg-accent-sleep-light rounded-2xl p-5">
-                  <p className="text-3xl font-bold text-accent-sleep">
-                    {formatDuration(activeSleep.startTime)}
-                  </p>
-                  <p className="text-sm text-muted mt-2">
-                    {t("startedByName", { name: activeSleep.caregiverName })}
-                  </p>
-                </div>
-              </div>
-
-              {photoField}
-
-              <button
-                type="button"
-                onClick={handleEndSleep}
-                disabled={isSubmitting}
-                className="w-full bg-secondary hover:bg-secondary/90 text-white font-medium py-4 px-6 rounded-xl transition-colors disabled:opacity-50"
-              >
-                {isSubmitting ? t("ending") : t("endSleepNowButton")}
-              </button>
-            </>
+          liveSession ? (
+            liveTimerPanel
+          ) : activeSleep === undefined ? (
+            <div className="text-center py-6">
+              <p className="text-sm text-muted">{t("loadingHistory")}</p>
+            </div>
           ) : (
             <>
               <div className="text-center py-2">

@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { useEffect, useMemo, useState } from "react";
 import {
   formatDate,
+  formatDuration,
   formatMinutesCompact,
   formatTime,
   formatTimeAgo,
@@ -101,6 +102,14 @@ export function HomeCategoryDetail({
     api.reminders.getDueStatus,
     category === "feed" || category === "pump"
       ? { secretLink, actingCaregiverName: selectedCaregiver, now }
+      : "skip"
+  );
+
+  // Village-wide live sleep — any caregiver can see/end it from Log Sleep.
+  const activeSleep = useQuery(
+    api.sleepEntries.getActive,
+    category === "nap"
+      ? { secretLink, actingCaregiverName: selectedCaregiver }
       : "skip"
   );
 
@@ -215,7 +224,12 @@ export function HomeCategoryDetail({
             <h2 className="text-xl font-bold text-foreground truncate">
               {t(meta.labelKey)}
             </h2>
-            {lastEntry ? (
+            {category === "nap" && activeSleep ? (
+              <p className="text-xs text-muted mt-0.5">
+                {t("currentlySleeping")} · {formatDuration(activeSleep.startTime)}{" "}
+                · {t("startedByName", { name: activeSleep.caregiverName })}
+              </p>
+            ) : lastEntry ? (
               <p className="text-xs text-muted mt-0.5">
                 {t("lastEntry")}: {formatTimeAgo(lastEntry.time)} ·{" "}
                 {formatTime(lastEntry.time)}
@@ -311,7 +325,9 @@ export function HomeCategoryDetail({
           onClick={() => onLog(category)}
           className="btn-primary w-full mb-5"
         >
-          {t("categoryLogCta", { type: t(meta.labelKey) })}
+          {category === "nap" && activeSleep
+            ? t("endSleepNowButton")
+            : t("categoryLogCta", { type: t(meta.labelKey) })}
         </button>
       </div>
 
