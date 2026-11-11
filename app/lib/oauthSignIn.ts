@@ -41,7 +41,7 @@ export async function signInWithOAuth(
       if (ownDesc) {
         Object.defineProperty(nav, "product", ownDesc);
       } else {
-        delete nav.product;
+        Reflect.deleteProperty(nav, "product");
       }
     } catch {
       // ignore
