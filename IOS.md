@@ -224,15 +224,17 @@ Web deploys update the WebView without a native rebuild, but **any change to the
 
 ## App Store Connect checklist
 
+Paste-ready copy, keywords, and screenshot shot list: **[STORE.md](./STORE.md)**.
+
 You still need to create/configure these in [App Store Connect](https://appstoreconnect.apple.com):
 
 - [ ] New app record with bundle ID `com.ittakesavillage.app`
-- [ ] App name, subtitle, description, keywords
+- [ ] App name, subtitle, description, keywords (from `STORE.md`)
 - [ ] Privacy Policy URL: `https://takesavillage.co/privacy`
-- [ ] **App Privacy** nutrition labels (baby care / health-related logs, photos if used)
+- [ ] Support URL: `https://takesavillage.co/support`
+- [ ] **App Privacy** nutrition labels (see `STORE.md` / table below — Crash Data **Yes** with Sentry live)
 - [ ] Age rating questionnaire
-- [ ] Screenshots for required device sizes (iPhone 6.7", etc.)
-- [ ] Support URL (can be the production site or a GitHub/README contact)
+- [ ] Screenshots for required device sizes (iPhone 6.7", etc. — shot list in `STORE.md`)
 - [ ] Signing: distribution certificate + App Store provisioning profile (Xcode manages with automatic signing)
 
 ### Privacy nutrition labels (App Store Connect — fill to match)
@@ -245,7 +247,7 @@ In **App Privacy**, declare data **linked to the user**, used for **App Function
 | **Photos** | Yes | Yes | No | Optional entry / profile photos |
 | **User ID** | Yes | Yes | No | Apple/Google sign-in account id for owners |
 | **Device ID** | Yes | Yes | No | Local device id for APNs / Live Activities |
-| **Crash Data** | Yes (if Sentry DSN set) | Yes | No | Stack traces via Sentry; no care-log contents on purpose |
+| **Crash Data** | Yes | Yes | No | Stack traces via Sentry; no care-log contents on purpose |
 | Contact Info / Location / Advertising / Other Analytics | No | — | — | Unless you add those features later |
 
 Also ship `ios/App/App/PrivacyInfo.xcprivacy` (manifest) with the same types and `NSPrivacyTracking = false`. Rebuild the iOS binary after changing it.

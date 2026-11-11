@@ -7,6 +7,8 @@ Production URLs and environment setup for **It Takes A Village**.
 | Service | URL |
 |---------|-----|
 | **App (custom domain)** | https://takesavillage.co |
+| **Support** | https://takesavillage.co/support |
+| **Privacy** | https://takesavillage.co/privacy |
 | **App (Vercel fallback)** | https://it-takes-a-village.vercel.app |
 | **Convex backend** | https://zealous-hound-234.convex.cloud |
 | **Convex dashboard** | https://dashboard.convex.dev/t/shuting-yow/it-takes-a-village/zealous-hound-234 |
@@ -106,6 +108,10 @@ Public page for App Store Connect and users:
 
 Source: `app/privacy/page.tsx`. Contact: `privacy@ittakesavillage.app` (Shuting Yow).
 
+**Support URL (App Store):** https://takesavillage.co/support — source `app/support/page.tsx`.
+
+**App Store listing pack:** see [STORE.md](./STORE.md) (description, keywords, privacy labels, screenshot shot list).
+
 Custom domain DNS (GoDaddy): apex `A` → `76.76.21.21`; `www` `CNAME` → `cname.vercel-dns.com` (301 redirect to apex on Vercel).
 
 ### Convex backups (production)
@@ -120,9 +126,9 @@ Custom domain DNS (GoDaddy): apex `A` → `76.76.21.21`; `www` `CNAME` → `cnam
 
 ### Sentry
 
-1. Create a Next.js project at [sentry.io](https://sentry.io).  
-2. Set on Vercel (Production + Preview): `NEXT_PUBLIC_SENTRY_DSN`. Optional: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` for source maps.  
-3. Without a DSN, the SDK stays inactive so local/build still works.
+1. Org `yow-shuting`, project `it-takes-a-village` (already wired for production).  
+2. Vercel (Production + Preview): `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`. Optional: `SENTRY_AUTH_TOKEN` for readable source maps.  
+3. Without a DSN, the SDK stays inactive so local/build still works. Crash Data is declared in App Privacy / `PrivacyInfo.xcprivacy`.
 
 ## iOS App Store (Capacitor)
 
