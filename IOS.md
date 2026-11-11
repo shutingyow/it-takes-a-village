@@ -2,7 +2,7 @@
 
 The iOS app is a **Capacitor WebView shell** that loads the production site:
 
-**https://it-takes-a-village.vercel.app**
+**https://takesavillage.co**
 
 Web + Convex deploys update the live app without rebuilding the native binary.
 
@@ -11,7 +11,7 @@ Web + Convex deploys update the live app without rebuilding the native binary.
 | **App name** | It Takes A Village |
 | **Bundle ID** | `com.ittakesavillage.app` |
 | **Xcode project** | `ios/App/App.xcodeproj` |
-| **Privacy policy** | https://it-takes-a-village.vercel.app/privacy |
+| **Privacy policy** | https://takesavillage.co/privacy |
 | **Config** | `capacitor.config.ts` |
 | **Minimum iOS** | **17.0+** (Live Activities needs 16+; project targets 17) |
 
@@ -25,7 +25,7 @@ Parents **sign in** to create a village. Caregivers still open the **secret link
 |-------|--------|
 | Backend | Convex Auth (`convex/auth.ts`) — Google + Apple OAuth |
 | Callbacks | `{CONVEX_SITE_URL}/api/auth/callback/google` and `…/apple` |
-| Site return (web) | `SITE_URL` = `https://it-takes-a-village.vercel.app` (prod) or `http://localhost:3000` (dev) |
+| Site return (web) | `SITE_URL` = `https://takesavillage.co` (prod) or `http://localhost:3000` (dev) |
 | App return (iOS) | Custom scheme `ittakesavillage://auth/callback` via `@capacitor/browser` + `App.appUrlOpen` |
 | Client | Home / Settings / lock-screen SSO; Capacitor loads the same web app |
 
@@ -48,7 +48,7 @@ On **iOS**, OAuth opens an in-app browser sheet and returns to the Capacitor app
 | Apple | `https://zealous-hound-234.convex.site/api/auth/callback/apple` |
 
 1. **Google Cloud** → create **Web application** OAuth client  
-   - Authorized JavaScript origins: `https://it-takes-a-village.vercel.app` (and `http://localhost:3000` for local)  
+   - Authorized JavaScript origins: `https://takesavillage.co` and `https://it-takes-a-village.vercel.app` (and `http://localhost:3000` for local)  
    - Authorized redirect URI: the Google row above (must be `.convex.site`, **not** `.cloud` and **not** your Vercel URL)  
    - Then:
      ```bash
@@ -60,7 +60,7 @@ On **iOS**, OAuth opens an in-app browser sheet and returns to the Capacitor app
      npx convex env set AUTH_APPLE_ID '<Services-ID>' --prod
      npx convex env set AUTH_APPLE_SECRET '<jwt-secret>' --prod
      ```
-3. **Convex** — also keep `SITE_URL=https://it-takes-a-village.vercel.app`, `JWT_PRIVATE_KEY`, `JWKS` (already set via `npx @convex-dev/auth --prod`).
+3. **Convex** — also keep `SITE_URL=https://takesavillage.co`, `JWT_PRIVATE_KEY`, `JWKS` (already set via `npx @convex-dev/auth --prod`).
 4. **Local testing** — repeat the same `AUTH_*` sets **without** `--prod` (or use separate Google/Apple clients with local Convex `.site` callback). Local `SITE_URL` should be `http://localhost:3000`.
 5. **Xcode** — App target → **Sign in with Apple** capability; rebuild after changing entitlements.
 
@@ -97,7 +97,7 @@ The WebView loads production HTTPS. Convex realtime works the same as in Safari.
 The iOS app has **separate storage** from Safari, so it will not auto-open the tracker you used in the browser until you open it once:
 
 1. On the home screen, under **Open your tracker**, paste your full tracker URL  
-   (e.g. `https://it-takes-a-village.vercel.app/tracker/<your-code>`)  
+   (e.g. `https://takesavillage.co/tracker/<your-code>`)  
    or just the secret code (`<your-code>`).
 2. Tap **Open tracker** → pick your caregiver → you’re on the same live log.
 3. Next launches on this phone show **Continue with …** for that tracker.
@@ -228,7 +228,7 @@ You still need to create/configure these in [App Store Connect](https://appstore
 
 - [ ] New app record with bundle ID `com.ittakesavillage.app`
 - [ ] App name, subtitle, description, keywords
-- [ ] Privacy Policy URL: `https://it-takes-a-village.vercel.app/privacy`
+- [ ] Privacy Policy URL: `https://takesavillage.co/privacy`
 - [ ] **App Privacy** nutrition labels (baby care / health-related logs, photos if used)
 - [ ] Age rating questionnaire
 - [ ] Screenshots for required device sizes (iPhone 6.7", etc.)
@@ -250,7 +250,7 @@ In **App Privacy**, declare data **linked to the user**, used for **App Function
 
 Also ship `ios/App/App/PrivacyInfo.xcprivacy` (manifest) with the same types and `NSPrivacyTracking = false`. Rebuild the iOS binary after changing it.
 
-Privacy policy URL: `https://it-takes-a-village.vercel.app/privacy`
+Privacy policy URL: `https://takesavillage.co/privacy`
 
 ## npm scripts
 

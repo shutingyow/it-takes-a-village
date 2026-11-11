@@ -9,7 +9,7 @@ import { convexAuth } from "@convex-dev/auth/server";
  * Env (Convex dashboard / `npx convex env set`):
  * - AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET
  * - AUTH_APPLE_ID (Services ID), AUTH_APPLE_SECRET (JWT, max 6 months)
- * - SITE_URL (e.g. https://it-takes-a-village.vercel.app)
+ * - SITE_URL (e.g. https://takesavillage.co)
  *
  * Callbacks:
  * - {CONVEX_SITE_URL}/api/auth/callback/google

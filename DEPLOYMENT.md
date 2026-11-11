@@ -6,7 +6,8 @@ Production URLs and environment setup for **It Takes A Village**.
 
 | Service | URL |
 |---------|-----|
-| **App (Vercel)** | https://it-takes-a-village.vercel.app |
+| **App (custom domain)** | https://takesavillage.co |
+| **App (Vercel fallback)** | https://it-takes-a-village.vercel.app |
 | **Convex backend** | https://zealous-hound-234.convex.cloud |
 | **Convex dashboard** | https://dashboard.convex.dev/t/shuting-yow/it-takes-a-village/zealous-hound-234 |
 
@@ -101,9 +102,11 @@ git push origin master
 
 Public page for App Store Connect and users:
 
-**https://it-takes-a-village.vercel.app/privacy**
+**https://takesavillage.co/privacy**
 
 Source: `app/privacy/page.tsx`. Contact: `privacy@ittakesavillage.app` (Shuting Yow).
+
+Custom domain DNS (GoDaddy): apex `A` → `76.76.21.21`; `www` `CNAME` → `cname.vercel-dns.com` (301 redirect to apex on Vercel).
 
 ### Convex backups (production)
 

@@ -16,11 +16,13 @@ const config: CapacitorConfig = {
   appName: "It Takes A Village",
   webDir: "www",
   server: {
-    url: "https://it-takes-a-village.vercel.app",
+    url: "https://takesavillage.co",
     cleartext: false,
     // Bundled page shown when the live URL cannot load (cold start offline).
     errorPath: "offline.html",
     allowNavigation: [
+      "takesavillage.co",
+      "www.takesavillage.co",
       "it-takes-a-village.vercel.app",
       "*.convex.cloud",
       "*.convex.site",

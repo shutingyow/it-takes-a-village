@@ -35,9 +35,10 @@ Open [http://localhost:3000](http://localhost:3000), create a tracker, and share
 
 ## Production
 
-- **Live app:** https://it-takes-a-village.vercel.app
+- **Live app:** https://takesavillage.co
 - **Convex:** https://zealous-hound-234.convex.cloud
-- **Privacy policy:** https://it-takes-a-village.vercel.app/privacy
+- **Privacy policy:** https://takesavillage.co/privacy
+- **Fallback:** https://it-takes-a-village.vercel.app
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for env vars, deploy commands, and Vercel/GitHub setup.
 

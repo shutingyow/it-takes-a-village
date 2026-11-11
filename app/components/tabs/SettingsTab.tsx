@@ -31,7 +31,7 @@ import {
 import { useRouter } from "next/navigation";
 import { rotateVillageLinkAfterRemove } from "@/app/lib/rotateVillageAfterRemove";
 
-const PRIVACY_POLICY_URL = "https://it-takes-a-village.vercel.app/privacy";
+const PRIVACY_POLICY_URL = "https://takesavillage.co/privacy";
 
 async function openPrivacyPolicy(): Promise<void> {
   if (Capacitor.isNativePlatform()) {

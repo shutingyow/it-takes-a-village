@@ -5,14 +5,20 @@ import { Capacitor } from "@capacitor/core";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { configureNativeChrome } from "@/app/lib/appShell";
 
-const LIVE_ORIGIN = "https://it-takes-a-village.vercel.app";
+const LIVE_ORIGIN = "https://takesavillage.co";
 
 function isAllowedHttpUrl(url: string): boolean {
   try {
     const u = new URL(url, window.location.href);
     if (u.protocol !== "http:" && u.protocol !== "https:") return false;
     const host = u.hostname;
-    if (host === "it-takes-a-village.vercel.app") return true;
+    if (
+      host === "takesavillage.co" ||
+      host === "www.takesavillage.co" ||
+      host === "it-takes-a-village.vercel.app"
+    ) {
+      return true;
+    }
     if (host.endsWith(".convex.cloud")) return true;
     if (host.endsWith(".convex.site")) return true;
     // Same-origin navigations inside the WebView are fine.
