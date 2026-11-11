@@ -19,8 +19,7 @@ function isAllowedHttpUrl(url: string): boolean {
     ) {
       return true;
     }
-    if (host.endsWith(".convex.cloud")) return true;
-    if (host.endsWith(".convex.site")) return true;
+    // Convex HTTP/WS are not top-level navigations; keep OAuth off the WebView.
     // Same-origin navigations inside the WebView are fine.
     if (host === window.location.hostname) return true;
     return false;

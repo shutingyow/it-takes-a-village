@@ -25,28 +25,76 @@ export async function signInWithOAuth(
   }
 
   const redirectTo = NATIVE_OAUTH_REDIRECT;
-  const productDesc = Object.getOwnPropertyDescriptor(Navigator.prototype, "product");
-  Object.defineProperty(Navigator.prototype, "product", {
-    configurable: true,
-    get: () => "ReactNative",
-  });
+
+  // Convex Auth only returns the OAuth URL (instead of assigning
+  // window.location) when navigator.product === "ReactNative". On iOS
+  // WKWebView, `product` is often an own non-writable property — patch the
+  // instance first, then the prototype, and verify before calling signIn.
+  const nav = navigator as Navigator & { product?: string };
+  const ownDesc = Object.getOwnPropertyDescriptor(nav, "product");
+  const protoDesc = Object.getOwnPropertyDescriptor(
+    Navigator.prototype,
+    "product"
+  );
+  const restoreProduct = () => {
+    try {
+      if (ownDesc) {
+        Object.defineProperty(nav, "product", ownDesc);
+      } else {
+        delete nav.product;
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      if (protoDesc) {
+        Object.defineProperty(Navigator.prototype, "product", protoDesc);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  try {
+    Object.defineProperty(nav, "product", {
+      configurable: true,
+      enumerable: true,
+      get: () => "ReactNative",
+    });
+  } catch {
+    // fall through to prototype patch
+  }
+  try {
+    Object.defineProperty(Navigator.prototype, "product", {
+      configurable: true,
+      enumerable: true,
+      get: () => "ReactNative",
+    });
+  } catch {
+    // ignore
+  }
+
+  if (navigator.product !== "ReactNative") {
+    restoreProduct();
+    throw new Error(
+      "Could not prepare native Google/Apple sign-in. Please update the app and try again."
+    );
+  }
 
   let redirect: URL | undefined;
   try {
     const result = await signIn(provider, { redirectTo });
     redirect = result.redirect;
   } finally {
-    if (productDesc) {
-      Object.defineProperty(Navigator.prototype, "product", productDesc);
-    } else {
-      delete (Navigator.prototype as { product?: string }).product;
-    }
+    restoreProduct();
   }
 
   if (!redirect) {
     throw new Error("OAuth did not return a redirect URL");
   }
 
+  // Keep OAuth in the system browser sheet so the main WebView never leaves
+  // takesavillage.co for zealous-hound-234.convex.site.
   const { Browser } = await import("@capacitor/browser");
   await Browser.open({ url: redirect.toString() });
 }

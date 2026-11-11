@@ -20,12 +20,13 @@ const config: CapacitorConfig = {
     cleartext: false,
     // Bundled page shown when the live URL cannot load (cold start offline).
     errorPath: "offline.html",
+    // Do NOT allow *.convex.site here — that lets a failed OAuth handoff
+    // navigate the main WebView onto zealous-hound and strand the user.
+    // OAuth runs in @capacitor/browser; Convex data uses fetch/WS only.
     allowNavigation: [
       "takesavillage.co",
       "www.takesavillage.co",
       "it-takes-a-village.vercel.app",
-      "*.convex.cloud",
-      "*.convex.site",
     ],
   },
   plugins: {
