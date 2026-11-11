@@ -39,13 +39,13 @@ On **iOS**, OAuth opens an in-app browser sheet and returns to the Capacitor app
 
 **`invalid_client` from Google/Apple** means Convex is missing or has the wrong `AUTH_*` env vars (or the OAuth redirect URI does not match). Production currently needs these set — JWT/`SITE_URL` alone is not enough.
 
-**Production HTTP Actions base (callbacks):**  
-`https://zealous-hound-234.convex.site`
+**Production HTTP Actions base (callbacks):** `https://api.takesavillage.co`  
+(`CONVEX_SITE_URL` overridden on Pro; legacy `*.convex.site` still exists as fallback host)
 
 | Provider | Redirect / Return URL |
 |----------|------------------------|
-| Google | `https://zealous-hound-234.convex.site/api/auth/callback/google` |
-| Apple | `https://zealous-hound-234.convex.site/api/auth/callback/apple` |
+| Google | `https://api.takesavillage.co/api/auth/callback/google` |
+| Apple | `https://api.takesavillage.co/api/auth/callback/apple` |
 
 1. **Google Cloud** → create **Web application** OAuth client  
    - Authorized JavaScript origins: `https://takesavillage.co` and `https://it-takes-a-village.vercel.app` (and `http://localhost:3000` for local)  

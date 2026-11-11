@@ -10,8 +10,29 @@ Production URLs and environment setup for **It Takes A Village**.
 | **Support** | https://takesavillage.co/support |
 | **Privacy** | https://takesavillage.co/privacy |
 | **App (Vercel fallback)** | https://it-takes-a-village.vercel.app |
+| **Convex HTTP / Auth (custom)** | https://api.takesavillage.co *(Pro custom domain; `CONVEX_SITE_URL` overridden)* |
 | **Convex backend** | https://zealous-hound-234.convex.cloud |
-| **Convex dashboard** | https://dashboard.convex.dev/t/shuting-yow/it-takes-a-village/zealous-hound-234 |
+| **Convex dashboard** | https://dashboard.convex.dev/d/zealous-hound-234 |
+
+### Convex Auth custom domain (`api.takesavillage.co`)
+
+**Live on production** for HTTP Actions / Convex Auth (`CONVEX_SITE_URL=https://api.takesavillage.co`). Frontend remains `SITE_URL=https://takesavillage.co`.
+
+**GoDaddy DNS** (keep apex/`www` on Vercel):
+
+| Type | Name | Value | TTL |
+|------|------|-------|-----|
+| CNAME | `api` | `convex.domains` | 1 hour |
+| TXT | `_convex_domains.api` | `zealous-hound-234` | 1 hour |
+
+**OAuth provider cutover (required once):**
+
+1. Google Cloud OAuth client → Authorized redirect URI add:  
+   `https://api.takesavillage.co/api/auth/callback/google`  
+   Keep the old `zealous-hound-234.convex.site` URI until you confirm sign-in works, then remove it.
+2. Apple Services ID → Return URL:  
+   `https://api.takesavillage.co/api/auth/callback/apple`  
+   Domains: `api.takesavillage.co`.
 
 ## Day boundary (summaries & Insights)
 
