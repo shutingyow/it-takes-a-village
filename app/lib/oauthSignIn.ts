@@ -1,7 +1,10 @@
 import { Capacitor } from "@capacitor/core";
 
 /** Custom scheme registered in ios/App/App/Info.plist — must stay in sync. */
-export const NATIVE_OAUTH_REDIRECT = "ittakesavillage://auth/callback";
+export const NATIVE_OAUTH_CALLBACK_SCHEME = "ittakesavillage://auth/callback";
+
+/** @deprecated use NATIVE_OAUTH_CALLBACK_SCHEME — kept for older imports */
+export const NATIVE_OAUTH_REDIRECT = NATIVE_OAUTH_CALLBACK_SCHEME;
 
 type SignInFn = (
   provider: string,
@@ -12,8 +15,11 @@ type SignInFn = (
  * Convex Auth treats Capacitor as a normal web client and assigns
  * window.location to the OAuth URL. That opens Safari and leaves the user
  * on SITE_URL after login. On native we briefly look like React Native so
- * we get the redirect URL back, then open it in @capacitor/browser so the
- * custom-scheme return can hand control back to the app.
+ * we get the redirect URL back, then open it in @capacitor/browser.
+ *
+ * Final return uses an HTTPS page on takesavillage.co (`/auth/native-return`)
+ * which then deep-links into the app — SFSafari often hangs on a blank
+ * zealous-hound.convex.site page if Convex redirects straight to the custom scheme.
  */
 export async function signInWithOAuth(
   signIn: SignInFn,
@@ -24,7 +30,7 @@ export async function signInWithOAuth(
     return;
   }
 
-  const redirectTo = NATIVE_OAUTH_REDIRECT;
+  const redirectTo = `${window.location.origin}/auth/native-return`;
 
   // Convex Auth only returns the OAuth URL (instead of assigning
   // window.location) when navigator.product === "ReactNative". On iOS

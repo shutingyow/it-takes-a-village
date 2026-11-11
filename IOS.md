@@ -26,7 +26,7 @@ Parents **sign in** to create a village. Caregivers still open the **secret link
 | Backend | Convex Auth (`convex/auth.ts`) — Google + Apple OAuth |
 | Callbacks | `{CONVEX_SITE_URL}/api/auth/callback/google` and `…/apple` |
 | Site return (web) | `SITE_URL` = `https://takesavillage.co` (prod) or `http://localhost:3000` (dev) |
-| App return (iOS) | Custom scheme `ittakesavillage://auth/callback` via `@capacitor/browser` + `App.appUrlOpen` |
+| App return (iOS) | Browser sheet → `https://takesavillage.co/auth/native-return` → `ittakesavillage://auth/callback` via `App.appUrlOpen` |
 | Client | Home / Settings / lock-screen SSO; Capacitor loads the same web app |
 
 On **iOS**, OAuth opens an in-app browser sheet and returns to the Capacitor app (not Safari). That needs:

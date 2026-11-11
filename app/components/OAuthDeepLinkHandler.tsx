@@ -5,11 +5,11 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
-import { NATIVE_OAUTH_REDIRECT } from "../lib/oauthSignIn";
+import { NATIVE_OAUTH_CALLBACK_SCHEME } from "../lib/oauthSignIn";
 
 /**
  * Completes OAuth when iOS opens ittakesavillage://auth/callback?code=…
- * after Apple/Google sign-in in the system browser sheet.
+ * after Apple/Google sign-in (via /auth/native-return HTTPS bridge).
  */
 export function OAuthDeepLinkHandler() {
   const { signIn } = useAuthActions();
@@ -22,7 +22,7 @@ export function OAuthDeepLinkHandler() {
 
     void App.addListener("appUrlOpen", async ({ url }) => {
       if (cancelled) return;
-      if (!url.startsWith(NATIVE_OAUTH_REDIRECT.split("?")[0])) return;
+      if (!url.startsWith(NATIVE_OAUTH_CALLBACK_SCHEME)) return;
 
       let code: string | null = null;
       try {
