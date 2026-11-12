@@ -8,7 +8,6 @@ import type { TranslationKey } from "@/app/lib/i18n/en";
 import {
   formatMinutesCompact,
   formatOngoingMinutes,
-  formatTime,
   formatTimeAgo,
   getTodayBoundsInZone,
 } from "@/app/lib/utils";
@@ -66,6 +65,8 @@ interface HomeCategoryGridProps {
   timezone?: string;
   /** When false, hide the pump tile (exclusive breastfeeding / no pumping). */
   showPump?: boolean;
+  /** Stretch tiles to fill remaining Today height. */
+  fillHeight?: boolean;
   onSelect: (category: HomeTileCategory) => void;
   onQuickLog?: (category: HomeTileCategory) => void;
 }
@@ -75,6 +76,7 @@ export function HomeCategoryGrid({
   selectedCaregiver,
   timezone,
   showPump = true,
+  fillHeight = false,
   onSelect,
   onQuickLog,
 }: HomeCategoryGridProps) {
@@ -111,9 +113,7 @@ export function HomeCategoryGrid({
           minutes: formatOngoingMinutes(summaries.feed.timestamp, now),
         });
       }
-      const bits = [
-        `${formatTimeAgo(summaries.feed.timestamp)} · ${formatTime(summaries.feed.timestamp)}`,
-      ];
+      const bits = [formatTimeAgo(summaries.feed.timestamp)];
       const amountMl =
         "amountMl" in summaries.feed ? summaries.feed.amountMl : undefined;
       if (amountMl !== undefined) {
@@ -140,12 +140,12 @@ export function HomeCategoryGrid({
           : summaries.diaper.type === "dirty"
             ? t("dirty")
             : t("wetDirty");
-      return `${formatTimeAgo(summaries.diaper.timestamp)} · ${formatTime(summaries.diaper.timestamp)} · ${typeLabel}`;
+      return `${formatTimeAgo(summaries.diaper.timestamp)} · ${typeLabel}`;
     }
 
     if (id === "pump") {
       if (!summaries.pump) return t("noLastEntryYet");
-      return `${formatTimeAgo(summaries.pump.timestamp)} · ${formatTime(summaries.pump.timestamp)}, ${t("amountMlShort", {
+      return `${formatTimeAgo(summaries.pump.timestamp)}, ${t("amountMlShort", {
         amount: summaries.pump.amountMl,
       })} · ${t("sessionsToday", { count: summaries.pump.sessionsToday })}`;
     }
@@ -157,7 +157,7 @@ export function HomeCategoryGrid({
         formatOngoingMinutes(summaries.nap.startTime, now);
       const label =
         summaries.nap.type === "night" ? t("sleeping") : t("nappingNow");
-      return `${label} · ${t("feedOngoingBanner", { minutes: mins })} · ${formatTime(summaries.nap.startTime)}`;
+      return `${label} · ${t("feedOngoingBanner", { minutes: mins })}`;
     }
     const ref = summaries.nap.endTime ?? summaries.nap.startTime;
     const lasted =
@@ -166,15 +166,25 @@ export function HomeCategoryGrid({
             time: formatMinutesCompact(summaries.nap.durationMinutes),
           })
         : "";
-    const when = `${formatTimeAgo(ref)} · ${formatTime(ref)}`;
+    const when = formatTimeAgo(ref);
     return lasted ? `${when}, ${lasted}` : when;
   };
 
   const visibleTiles = TILES.filter((cat) => showPump || cat.id !== "pump");
 
   return (
-    <div className="px-4 pb-2 min-w-0">
-      <div className="flex flex-col gap-2.5">
+    <div
+      className={cn(
+        "px-4 pb-2 min-w-0",
+        fillHeight && "flex-1 flex flex-col min-h-0"
+      )}
+    >
+      <div
+        className={cn(
+          "flex flex-col gap-2.5",
+          fillHeight && "flex-1 min-h-0"
+        )}
+      >
         {visibleTiles.map((cat) => {
           const summary = summaryFor(cat.id);
           return (
@@ -182,7 +192,8 @@ export function HomeCategoryGrid({
               key={cat.id}
               className={cn(
                 cat.fill,
-                "relative overflow-hidden rounded-[1.35rem] min-h-[5.75rem] w-full shadow-sm"
+                "relative overflow-hidden rounded-[1.35rem] w-full shadow-sm",
+                fillHeight ? "flex-1 min-h-[5.5rem]" : "min-h-[5.75rem]"
               )}
             >
               {/* Oversized line icon on the left (reference pattern) */}
@@ -211,7 +222,10 @@ export function HomeCategoryGrid({
               <button
                 type="button"
                 onClick={() => onSelect(cat.id)}
-                className="relative w-full pl-[4.75rem] pr-12 py-4 min-w-0 text-left touch-manipulation active:opacity-95 transition-opacity"
+                className={cn(
+                  "relative w-full pl-[4.75rem] pr-12 py-4 min-w-0 text-left touch-manipulation active:opacity-95 transition-opacity",
+                  fillHeight && "h-full flex flex-col justify-center"
+                )}
               >
                 <p className="text-[1.65rem] font-bold text-white leading-none tracking-tight truncate">
                   {t(cat.labelKey)}

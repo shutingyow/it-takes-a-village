@@ -9,7 +9,6 @@ import {
 } from "../HomeCategoryGrid";
 import { HomeCategoryDetail } from "../HomeCategoryDetail";
 import { DueSoonCard } from "../DueSoonCard";
-import { WellnessTipCard } from "../WellnessTipCard";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 
@@ -37,8 +36,6 @@ export function HomeTab({
   photoStorageId,
   timezone,
   pumpScheduleEnabled,
-  onOpenMilestones,
-  onOpenSettings,
   onQuickLog,
 }: HomeTabProps) {
   const { t } = useLanguage();
@@ -73,7 +70,7 @@ export function HomeTab({
   }
 
   return (
-    <div className="pb-2 min-w-0">
+    <div className="flex flex-col min-h-full min-w-0">
       <TodayHeader
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
@@ -83,30 +80,27 @@ export function HomeTab({
         villageFallback={villageFallback}
       />
 
-      <HomeCategoryGrid
-        secretLink={secretLink}
-        selectedCaregiver={selectedCaregiver}
-        timezone={timezone}
-        showPump={!!pumpScheduleEnabled}
-        onSelect={(cat: HomeTileCategory) => setCategory(cat)}
-        onQuickLog={
-          onQuickLog
-            ? (cat: HomeTileCategory) => onQuickLog(cat)
-            : undefined
-        }
-      />
+      <div className="flex-1 flex flex-col min-h-0">
+        <HomeCategoryGrid
+          secretLink={secretLink}
+          selectedCaregiver={selectedCaregiver}
+          timezone={timezone}
+          showPump={!!pumpScheduleEnabled}
+          fillHeight
+          onSelect={(cat: HomeTileCategory) => setCategory(cat)}
+          onQuickLog={
+            onQuickLog
+              ? (cat: HomeTileCategory) => onQuickLog(cat)
+              : undefined
+          }
+        />
+      </div>
 
       <DueSoonCard
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         pumpScheduleEnabled={pumpScheduleEnabled}
         onOpenDetail={() => setShowDueDetail(true)}
-      />
-
-      <WellnessTipCard
-        birthDate={birthDate}
-        onOpenMilestones={onOpenMilestones}
-        onOpenSettings={onOpenSettings}
       />
     </div>
   );

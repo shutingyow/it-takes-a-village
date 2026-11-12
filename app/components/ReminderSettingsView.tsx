@@ -13,21 +13,22 @@ import {
 } from "@/app/lib/pumpCalendar";
 import { DEFAULT_PUMP_INTERVAL_HOURS } from "@/convex/lib/pumpSchedule";
 import {
-  cancelAllDueNotifications,
   DEFAULT_NOTIFY_BEFORE_MINUTES,
-  getDeviceRemindersEnabled,
   getNotificationPermission,
   isNativePlatform,
   requestNotificationPermission,
-  setDeviceRemindersEnabled,
   type NotifPermission,
 } from "@/app/lib/deviceNotifications";
 import {
-  endAllLiveActivities,
   getLiveActivityKindEnabled,
   setLiveActivityKindEnabled,
   type LiveActivityKind,
 } from "@/app/lib/feedLiveActivity";
+import {
+  getReminderDeliveryMode,
+  setReminderDeliveryMode,
+  type ReminderDeliveryMode,
+} from "@/app/lib/reminderDelivery";
 import {
   DEFAULT_NIGHT_FEED_END,
   DEFAULT_NIGHT_FEED_INTERVAL_HOURS,
@@ -151,7 +152,8 @@ export function ReminderSettingsView({
     initialPump?.timezone ?? DEFAULT_PUMP_TIMEZONE
   );
 
-  const [deviceEnabled, setDeviceEnabled] = useState(false);
+  const [deliveryMode, setDeliveryMode] =
+    useState<ReminderDeliveryMode>("off");
   const [notifStatus, setNotifStatus] = useState<NotifPermission>("unsupported");
   const [notifBusy, setNotifBusy] = useState(false);
   const [liveFeed, setLiveFeed] = useState(true);
@@ -163,7 +165,12 @@ export function ReminderSettingsView({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDeviceEnabled(getDeviceRemindersEnabled());
+    let mode = getReminderDeliveryMode();
+    // Lock screen timers are native-only; fall back on web.
+    if (mode === "timer" && !isNativePlatform()) {
+      mode = "off";
+    }
+    setDeliveryMode(mode);
     setLiveFeed(getLiveActivityKindEnabled("last-feed"));
     setLivePump(getLiveActivityKindEnabled("last-pump"));
     setLiveNap(getLiveActivityKindEnabled("last-nap"));
@@ -178,39 +185,39 @@ export function ReminderSettingsView({
     notifyRemindersChanged();
   };
 
-  const handleToggleDeviceNotifications = async () => {
+  const handleSetDeliveryMode = async (mode: ReminderDeliveryMode) => {
     setNotifBusy(true);
     setError(null);
     setMessage(null);
     try {
-      if (deviceEnabled) {
-        setDeviceRemindersEnabled(false);
-        setDeviceEnabled(false);
-        await cancelAllDueNotifications();
-        await endAllLiveActivities();
-        notifyRemindersChanged();
-        setMessage(t("disableDeviceNotifications"));
-        return;
+      if (mode === "notifications") {
+        let permission = notifStatus;
+        if (permission !== "granted") {
+          permission = await requestNotificationPermission();
+          setNotifStatus(permission);
+        }
+        if (permission !== "granted") {
+          setError(
+            permission === "unsupported"
+              ? t("deviceNotificationsUnsupported")
+              : t("deviceNotificationsDenied")
+          );
+          return;
+        }
       }
 
-      let permission = notifStatus;
-      if (permission !== "granted") {
-        permission = await requestNotificationPermission();
-        setNotifStatus(permission);
-      }
-      if (permission !== "granted") {
-        setError(
-          permission === "unsupported"
-            ? t("deviceNotificationsUnsupported")
-            : t("deviceNotificationsDenied")
-        );
-        return;
-      }
-
-      setDeviceRemindersEnabled(true);
-      setDeviceEnabled(true);
-      notifyRemindersChanged();
-      setMessage(t("deviceNotificationsEnabled"));
+      await setReminderDeliveryMode(mode);
+      setDeliveryMode(mode);
+      setLiveFeed(getLiveActivityKindEnabled("last-feed"));
+      setLivePump(getLiveActivityKindEnabled("last-pump"));
+      setLiveNap(getLiveActivityKindEnabled("last-nap"));
+      setMessage(
+        mode === "timer"
+          ? t("reminderDeliveryTimerOn")
+          : mode === "notifications"
+            ? t("reminderDeliveryNotificationsOn")
+            : t("reminderDeliveryOff")
+      );
     } catch {
       setError(t("deviceNotificationsDenied"));
     } finally {
@@ -358,29 +365,60 @@ export function ReminderSettingsView({
       )}
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <p className="text-sm font-semibold text-foreground mb-3">
-          {t("deviceNotifications")}
+        <p className="text-sm font-semibold text-foreground mb-1">
+          {t("reminderDeliveryTitle")}
         </p>
-        {deviceEnabled && notifStatus === "granted" ? (
-          <p className="text-xs font-medium text-secondary mb-2">
-            {t("deviceNotificationsEnabled")}
-          </p>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => void handleToggleDeviceNotifications()}
-          disabled={notifBusy || notifStatus === "unsupported"}
-          className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary disabled:opacity-50"
-        >
-          {notifStatus === "unsupported"
-            ? t("deviceNotificationsUnsupported")
-            : deviceEnabled
-              ? t("disableDeviceNotifications")
-              : t("enableDeviceNotifications")}
-        </button>
+        <p className="text-xs text-muted mb-3 leading-snug">
+          {t("reminderDeliveryHint")}
+        </p>
+        <div className="grid grid-cols-1 gap-2">
+          {(
+            [
+              {
+                id: "timer" as const,
+                label: t("reminderDeliveryTimer"),
+                desc: t("reminderDeliveryTimerDesc"),
+                nativeOnly: true,
+              },
+              {
+                id: "notifications" as const,
+                label: t("reminderDeliveryNotifications"),
+                desc: t("reminderDeliveryNotificationsDesc"),
+                nativeOnly: false,
+              },
+              {
+                id: "off" as const,
+                label: t("reminderDeliveryOffLabel"),
+                desc: t("reminderDeliveryOffDesc"),
+                nativeOnly: false,
+              },
+            ] as const
+          )
+            .filter((opt) => !opt.nativeOnly || isNativePlatform())
+            .map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                disabled={notifBusy}
+                onClick={() => void handleSetDeliveryMode(opt.id)}
+                className={`w-full rounded-xl border px-3 py-3 text-left disabled:opacity-50 ${
+                  deliveryMode === opt.id
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-[#faf6f2]"
+                }`}
+              >
+                <p className="text-sm font-semibold text-foreground">
+                  {opt.label}
+                </p>
+                <p className="text-xs text-muted mt-0.5 leading-snug">
+                  {opt.desc}
+                </p>
+              </button>
+            ))}
+        </div>
       </div>
 
-      {deviceEnabled && isNativePlatform() && (
+      {deliveryMode === "timer" && isNativePlatform() && (
         <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
           <p className="text-sm font-semibold text-foreground mb-1">
             {t("liveActivityTimers")}

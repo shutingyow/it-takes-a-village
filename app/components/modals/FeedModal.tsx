@@ -10,6 +10,8 @@ import {
   clearFeedTimer,
   feedTimerStorageKey,
   isFeedTimerRecording,
+  loadFeedTimer,
+  saveFeedTimer,
 } from "@/app/lib/feedTimer";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconFeed } from "../icons";
@@ -145,11 +147,12 @@ export function FeedModal({
     editEntry?.type === "solids" || canLogSolids(resolvedBirthDate);
   const solidsFirst = solidsFirstInFeedPicker(resolvedBirthDate);
 
-  const [step, setStep] = useState<"type" | "details">(() => {
+  const [step, setStep] = useState<"live" | "type" | "details">(() => {
     if (editEntry) return "details";
     if (isFeedTimerRecording(secretLink)) return "details";
-    return "type";
+    return "live";
   });
+  const [feedMode, setFeedMode] = useState<"live" | "past">("live");
   const [feedType, setFeedType] = useState<FeedType>(
     editEntry?.type ?? "breast"
   );
@@ -189,13 +192,40 @@ export function FeedModal({
     return Date.now();
   });
   const [timeLive, setTimeLive] = useState(() =>
-    !editEntry && isFeedTimerRecording(secretLink)
+    !editEntry &&
+    (isFeedTimerRecording(secretLink) ||
+      loadFeedTimer(feedTimerStorageKey(secretLink)).status === "stopped")
   );
   const [timeTouched, setTimeTouched] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const timerKey = feedTimerStorageKey(secretLink, editEntry?._id);
   const shouldStampStart = !isEditing && !timeTouched;
+
+  const handleStartLiveFeed = async () => {
+    if (!selectedCaregiver) {
+      alert(t("selectCaregiver"));
+      return;
+    }
+    if (feedType === "solids") {
+      setFeedMode("past");
+      setStep("details");
+      setTimeLive(false);
+      return;
+    }
+    const startMs = Date.now();
+    saveFeedTimer(timerKey, {
+      status: "running",
+      accumulatedMs: 0,
+      segmentStartedAt: startMs,
+      feedStartedAt: startMs,
+    });
+    setFeedStartAt(startMs);
+    setTimeTouched(true);
+    setTimeLive(true);
+    void hapticSuccess();
+    onClose();
+  };
 
   const handleSubmit = async () => {
     if (!selectedCaregiver) {
@@ -321,22 +351,6 @@ export function FeedModal({
     </label>
   );
 
-  const liveTimerSection = timeLive ? (
-    <FeedTimer
-      storageKey={timerKey}
-      onDurationMinutes={setDurationMinutes}
-      shouldStampStart={shouldStampStart}
-      onStampStart={(startMs) => {
-        setFeedStartAt(startMs);
-        setTimeTouched(true);
-      }}
-      onStampEnd={(endMs) => {
-        setFeedEndAt(endMs);
-        setTimeTouched(true);
-      }}
-    />
-  ) : null;
-
   const photoField = (
     <EntryPhotoField
       secretLink={secretLink}
@@ -365,7 +379,18 @@ export function FeedModal({
   const pickType = (next: FeedType) => {
     setFeedType(next);
     setBottleMilk(undefined);
+    if (next === "solids") {
+      setTimeLive(false);
+      setStep("details");
+      return;
+    }
     setStep("details");
+  };
+
+  const goPastFeed = () => {
+    setFeedMode("past");
+    setTimeLive(false);
+    setStep("type");
   };
 
   return (
@@ -376,8 +401,98 @@ export function FeedModal({
     >
       <div className="space-y-4 pt-2 min-w-0 max-w-full overflow-x-clip">
         {isEditing && <LoggedByHint name={editEntry?.caregiverName} />}
+
+        {step === "live" && !isEditing && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFeedMode("live")}
+                className={cn(
+                  "btn-option flex-1",
+                  feedMode === "live"
+                    ? "btn-option-selected"
+                    : "btn-option-default"
+                )}
+              >
+                {t("feedModeLive")}
+              </button>
+              <button
+                type="button"
+                onClick={goPastFeed}
+                className={cn(
+                  "btn-option flex-1",
+                  feedMode === "past"
+                    ? "btn-option-selected"
+                    : "btn-option-default"
+                )}
+              >
+                {t("feedModePast")}
+              </button>
+            </div>
+
+            <p className="text-sm text-muted text-center leading-snug">
+              {t("feedLiveHint")}
+            </p>
+
+            <div>
+              <label className="label-field">{t("selectFeedType")}</label>
+              <div className="flex flex-col gap-2">
+                {typeButtons.map((btn) => (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    onClick={() => {
+                      setFeedType(btn.id);
+                      setBottleMilk(undefined);
+                      if (btn.id === "solids") {
+                        setTimeLive(false);
+                        setFeedMode("past");
+                        setStep("details");
+                      }
+                    }}
+                    className={cn(
+                      "btn-option w-full py-3.5",
+                      feedType === btn.id
+                        ? "btn-option-selected"
+                        : "btn-option-default",
+                      btn.id === "solids" &&
+                        feedType !== "solids" &&
+                        "border-accent-solids text-accent-solids"
+                    )}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {feedType !== "solids" && (
+              <button
+                type="button"
+                onClick={() => void handleStartLiveFeed()}
+                className="w-full bg-accent-feed hover:bg-accent-feed/90 text-white font-semibold py-4 px-6 rounded-xl transition-colors"
+              >
+                {t("startFeedTimer")}
+              </button>
+            )}
+          </div>
+        )}
+
         {step === "type" && (
           <div className="space-y-3">
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFeedMode("live");
+                  setStep("live");
+                }}
+                className="text-sm text-primary font-medium"
+              >
+                ← {t("feedModeLive")}
+              </button>
+            )}
             <p className="text-sm text-muted">{t("selectFeedType")}</p>
             {typeButtons.map((btn) => (
               <button
@@ -399,20 +514,37 @@ export function FeedModal({
           <div className="space-y-4 min-w-0 max-w-full">
             <button
               type="button"
-              onClick={() => setStep("type")}
+              onClick={() =>
+                setStep(isEditing ? "type" : timeLive ? "live" : "type")
+              }
               className="text-sm text-primary font-medium"
             >
               {t("changeType")}
             </button>
 
-            {whenFields}
-            {liveTimerToggle}
-            {liveTimerSection}
-            {!timeLive && (
-              <DurationMinutesField
-                value={durationMinutes}
-                onChange={setDurationMinutes}
+            {timeLive ? (
+              <FeedTimer
+                storageKey={timerKey}
+                onDurationMinutes={setDurationMinutes}
+                shouldStampStart={shouldStampStart}
+                onStampStart={(startMs) => {
+                  setFeedStartAt(startMs);
+                  setTimeTouched(true);
+                }}
+                onStampEnd={(endMs) => {
+                  setFeedEndAt(endMs);
+                  setTimeTouched(true);
+                }}
               />
+            ) : (
+              <>
+                {whenFields}
+                {liveTimerToggle}
+                <DurationMinutesField
+                  value={durationMinutes}
+                  onChange={setDurationMinutes}
+                />
+              </>
             )}
 
             <div>
@@ -462,15 +594,31 @@ export function FeedModal({
           <div className="space-y-4 min-w-0 max-w-full">
             <button
               type="button"
-              onClick={() => setStep("type")}
+              onClick={() =>
+                setStep(isEditing ? "type" : timeLive ? "live" : "type")
+              }
               className="text-sm text-primary font-medium"
             >
               {t("changeType")}
             </button>
 
-            {whenFields}
-            {liveTimerToggle}
-            {liveTimerSection}
+            {timeLive ? (
+              <FeedTimer
+                storageKey={timerKey}
+                onDurationMinutes={setDurationMinutes}
+                shouldStampStart={shouldStampStart}
+                onStampStart={(startMs) => {
+                  setFeedStartAt(startMs);
+                  setTimeTouched(true);
+                }}
+                onStampEnd={(endMs) => {
+                  setFeedEndAt(endMs);
+                  setTimeTouched(true);
+                }}
+              />
+            ) : (
+              whenFields
+            )}
 
             <div>
               <label className="label-field">{t("amountMl", { amount })}</label>

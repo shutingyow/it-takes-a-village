@@ -567,6 +567,25 @@ export const translations = {
   enableDeviceNotifications: "Enable feed & pump notifications",
   disableDeviceNotifications: "Turn off device reminders",
   deviceNotificationsEnabled: "Device reminders on",
+  reminderDeliveryTitle: "How should we remind you?",
+  reminderDeliveryHint:
+    "Choose one. Lock screen timers and notification banners together get noisy.",
+  reminderDeliveryTimer: "Lock screen timer",
+  reminderDeliveryTimerDesc:
+    "Live countdown on the Lock Screen since the last feed, sleep, or pump.",
+  reminderDeliveryNotifications: "Notifications",
+  reminderDeliveryNotificationsDesc:
+    "Alerts when a feed, nap, or pump is due.",
+  reminderDeliveryOffLabel: "Off",
+  reminderDeliveryOffDesc: "No lock screen timers or due alerts on this device.",
+  reminderDeliveryTimerOn: "Lock screen timers on",
+  reminderDeliveryNotificationsOn: "Notifications on",
+  reminderDeliveryOff: "Reminders off on this device",
+  feedModeLive: "Live timer",
+  feedModePast: "Log past feed",
+  startFeedTimer: "Start feed timer",
+  feedLiveHint: "Start when feeding begins. Add amount and notes when you stop.",
+  finishFeedDetails: "Add details & save",
   deviceNotificationsDenied:
     "Notifications blocked — enable them in system Settings for this app",
   deviceNotificationsUnsupported: "Notifications not supported on this browser",

@@ -9,7 +9,6 @@ import { formatTime } from "@/app/lib/utils";
 import { listUpcomingPumpDueAts } from "@/convex/lib/pumpSchedule";
 import {
   DEFAULT_NOTIFY_BEFORE_MINUTES,
-  getDeviceRemindersEnabled,
   syncDueNotifications,
 } from "@/app/lib/deviceNotifications";
 import { syncDevicePushRegistration } from "@/app/lib/devicePush";
@@ -19,6 +18,10 @@ import {
   setLiveActivityPushTokenHandler,
   syncLiveActivity,
 } from "@/app/lib/feedLiveActivity";
+import {
+  reminderNotificationsEnabled,
+  reminderTimersEnabled,
+} from "@/app/lib/reminderDelivery";
 import { isFeedTimerRecording } from "@/app/lib/feedTimer";
 
 interface ReminderSchedulerProps {
@@ -89,7 +92,7 @@ export function ReminderScheduler({
   // local feed alerts when another caregiver logs a feed.
   useEffect(() => {
     void syncDevicePushRegistration({
-      enabled: getDeviceRemindersEnabled(),
+      enabled: reminderNotificationsEnabled(),
       secretLink,
       actingCaregiverName: selectedCaregiver,
       upsert: upsertDevicePushToken,
@@ -168,14 +171,15 @@ export function ReminderScheduler({
     // alerts as if there were no pumps (that caused "in 10 min" vs UI 2h+).
     if (lastPump === undefined) return;
 
-    const enabled = getDeviceRemindersEnabled();
+    const notifOn = reminderNotificationsEnabled();
+    const timerOn = reminderTimersEnabled();
     const lead =
       notifyBeforeProp ??
       dueStatus.notifyBeforeMinutes ??
       DEFAULT_NOTIFY_BEFORE_MINUTES;
 
     let pumpDueAts: number[] = [];
-    if (enabled && pumpSchedule?.enabled) {
+    if (notifOn && pumpSchedule?.enabled) {
       const mode = pumpSchedule.mode ?? "fixed";
       if (mode === "interval") {
         // Exact same due the Due soon card shows.
@@ -213,13 +217,13 @@ export function ReminderScheduler({
     const recording =
       isFeedTimerRecording(secretLink) || activeFeed != null;
     const feedDueAt =
-      enabled && feedRemindersEnabled && feedItem && !recording && !activeSleep
+      notifOn && feedRemindersEnabled && feedItem && !recording && !activeSleep
         ? feedItem.dueAt
         : null;
 
     // Same source as What's due (wake window → pivot to bedtime/sleep).
     const napDueAt =
-      enabled && napRemindersEnabled && !activeSleep && sleepItem
+      notifOn && napRemindersEnabled && !activeSleep && sleepItem
         ? sleepItem.dueAt
         : null;
 
@@ -260,7 +264,7 @@ export function ReminderScheduler({
     if (feedStartedAt != null) {
       void syncLiveActivity({
         kind: "last-feed",
-        enabled: enabled && getLiveActivityKindEnabled("last-feed"),
+        enabled: timerOn && getLiveActivityKindEnabled("last-feed"),
         lastAt: feedStartedAt,
         title: t("liveActivityFeedOngoingTitle"),
         subtitle: t("liveActivityFeedOngoingSubtitle", {
@@ -281,7 +285,7 @@ export function ReminderScheduler({
       const lastMilkFeedAt = lastFeed?.timestamp ?? null;
       void syncLiveActivity({
         kind: "last-feed",
-        enabled: enabled && getLiveActivityKindEnabled("last-feed"),
+        enabled: timerOn && getLiveActivityKindEnabled("last-feed"),
         lastAt: lastMilkFeedAt,
         title: t("liveActivityLastFeedTitle"),
         subtitle: lastMilkFeedAt
@@ -295,7 +299,7 @@ export function ReminderScheduler({
     const lastPumpAt = lastPump?.timestamp ?? null;
     void syncLiveActivity({
       kind: "last-pump",
-      enabled: enabled && getLiveActivityKindEnabled("last-pump"),
+      enabled: timerOn && getLiveActivityKindEnabled("last-pump"),
       lastAt: lastPumpAt,
       title: t("liveActivityLastPumpTitle"),
       subtitle: lastPumpAt
@@ -312,7 +316,7 @@ export function ReminderScheduler({
           : t("liveActivitySleepingTitle");
       void syncLiveActivity({
         kind: "last-nap",
-        enabled: enabled && getLiveActivityKindEnabled("last-nap"),
+        enabled: timerOn && getLiveActivityKindEnabled("last-nap"),
         lastAt: activeSleep.startTime,
         title: sleepTitle,
         subtitle: t("liveActivitySleepOngoingSubtitle", {
@@ -327,7 +331,7 @@ export function ReminderScheduler({
         )?.endTime ?? null;
       void syncLiveActivity({
         kind: "last-nap",
-        enabled: enabled && getLiveActivityKindEnabled("last-nap"),
+        enabled: timerOn && getLiveActivityKindEnabled("last-nap"),
         lastAt: lastNapEnd,
         title: t("liveActivityLastNapTitle"),
         subtitle: lastNapEnd
