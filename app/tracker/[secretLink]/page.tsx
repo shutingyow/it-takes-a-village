@@ -463,7 +463,11 @@ export default function TrackerPage({
       />
 
       {showLogSheet && (
-        <LogSheet onSelect={handleLogSelect} onClose={() => setShowLogSheet(false)} />
+        <LogSheet
+          onSelect={handleLogSelect}
+          onClose={() => setShowLogSheet(false)}
+          showPump={!!tracker.pumpSchedule?.enabled}
+        />
       )}
 
       {activeLogModal === "feed" && (

@@ -479,8 +479,10 @@ export const translations = {
   whatsDueAllClear: "Nothing urgent right now",
   nextFeedDue: "Next feed",
   nextFeedDueNight: "Next feed (night)",
-  nextBedtimeDue: "Bedtime",
-  noSleepDueYet: "Log a nap or bedtime to start the wake window",
+  nextSleepDue: "Sleep",
+  noSleepDueYet: "Log a nap or sleep to start the wake window",
+  pumpRemindersOptionalHint:
+    "Optional. Leave off if you don’t pump (e.g. exclusive breastfeeding).",
   feedOverdueTitle: "Feed overdue",
   feedOverdueHint: "Log a feed to reset the schedule from now.",
   feedLateTimingPushed:

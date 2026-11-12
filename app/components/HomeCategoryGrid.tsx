@@ -64,6 +64,8 @@ interface HomeCategoryGridProps {
   selectedCaregiver: string;
   /** Village IANA timezone for “today” bounds. */
   timezone?: string;
+  /** When false, hide the pump tile (exclusive breastfeeding / no pumping). */
+  showPump?: boolean;
   onSelect: (category: HomeTileCategory) => void;
   onQuickLog?: (category: HomeTileCategory) => void;
 }
@@ -72,6 +74,7 @@ export function HomeCategoryGrid({
   secretLink,
   selectedCaregiver,
   timezone,
+  showPump = true,
   onSelect,
   onQuickLog,
 }: HomeCategoryGridProps) {
@@ -167,10 +170,12 @@ export function HomeCategoryGrid({
     return lasted ? `${when}, ${lasted}` : when;
   };
 
+  const visibleTiles = TILES.filter((cat) => showPump || cat.id !== "pump");
+
   return (
     <div className="px-4 pb-2 min-w-0">
       <div className="flex flex-col gap-2.5">
-        {TILES.map((cat) => {
+        {visibleTiles.map((cat) => {
           const summary = summaryFor(cat.id);
           return (
             <div

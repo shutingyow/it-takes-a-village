@@ -153,6 +153,7 @@ export function ReminderScheduler({
 
   const feedItem = dueStatus?.items.find((item) => item.type === "feed");
   const pumpItem = dueStatus?.items.find((item) => item.type === "pump");
+  const sleepItem = dueStatus?.items.find((item) => item.type === "sleep");
   const feedDueKey = feedItem
     ? `${feedItem.dueAt}:${feedItem.status}`
     : "none";
@@ -216,23 +217,11 @@ export function ReminderScheduler({
         ? feedItem.dueAt
         : null;
 
-    // Same idea as pausing feed alerts while a feed timer is running:
-    // don't nag "nap due" while a live nap/night sleep is already in progress.
-    let napDueAt: number | null = null;
-    if (
-      enabled &&
-      napRemindersEnabled &&
-      wakeWindowMinutes != null &&
-      wakeWindowMinutes > 0 &&
-      !activeSleep
-    ) {
-      const lastNap = recentSleep?.find(
-        (entry) => entry.type === "nap" && entry.endTime !== undefined
-      );
-      if (lastNap?.endTime !== undefined) {
-        napDueAt = lastNap.endTime + wakeWindowMinutes * 60_000;
-      }
-    }
+    // Same source as What's due (wake window → pivot to bedtime/sleep).
+    const napDueAt =
+      enabled && napRemindersEnabled && !activeSleep && sleepItem
+        ? sleepItem.dueAt
+        : null;
 
     void syncDueNotifications({
       feedDueAt,
@@ -352,6 +341,7 @@ export function ReminderScheduler({
     dueStatus,
     feedItem,
     pumpItem,
+    sleepItem,
     feedDueKey,
     pumpDueKey,
     hourBucket,

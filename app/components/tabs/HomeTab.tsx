@@ -87,6 +87,7 @@ export function HomeTab({
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         timezone={timezone}
+        showPump={!!pumpScheduleEnabled}
         onSelect={(cat: HomeTileCategory) => setCategory(cat)}
         onQuickLog={
           onQuickLog

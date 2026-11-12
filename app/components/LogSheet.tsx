@@ -9,9 +9,15 @@ type LogType = "feed" | "diaper" | "pump" | "nap";
 interface LogSheetProps {
   onSelect: (type: LogType) => void;
   onClose: () => void;
+  /** When false, hide pump (still loggable later if reminders are turned on). */
+  showPump?: boolean;
 }
 
-export function LogSheet({ onSelect, onClose }: LogSheetProps) {
+export function LogSheet({
+  onSelect,
+  onClose,
+  showPump = true,
+}: LogSheetProps) {
   const { t } = useLanguage();
 
   const actions: {
@@ -35,13 +41,17 @@ export function LogSheet({ onSelect, onClose }: LogSheetProps) {
       text: "text-[#8a6a00]",
       icon: "diaper",
     },
-    {
-      type: "pump",
-      label: t("pump"),
-      bg: "bg-[#e3f2fc]",
-      text: "text-[#1769a8]",
-      icon: "pump",
-    },
+    ...(showPump
+      ? [
+          {
+            type: "pump" as const,
+            label: t("pump"),
+            bg: "bg-[#e3f2fc]",
+            text: "text-[#1769a8]",
+            icon: "pump" as ActivityType,
+          },
+        ]
+      : []),
     {
       type: "nap",
       label: t("sleep"),

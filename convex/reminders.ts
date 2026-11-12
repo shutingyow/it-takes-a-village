@@ -5,12 +5,14 @@ import {
   clampFeedAtForSkew,
   computeFeedDueAt,
   DEFAULT_FEED_INTERVAL_HOURS,
+  parseHhMm,
   resolveNightFeedSettings,
 } from "./lib/feedSchedule";
 import {
   computeIntervalPumpDueAt,
   computeNextPumpDueAt,
   DEFAULT_PUMP_INTERVAL_HOURS,
+  zonedTimeToUtc,
 } from "./lib/pumpSchedule";
 import { resolveTrackerTimezone } from "./lib/dayBounds";
 
@@ -31,21 +33,59 @@ const dueItemValidator = v.object({
   minutesUntilDue: v.number(),
 });
 
-/** Local hour 0–23 in the village timezone. */
-function hourInZone(ms: number, timeZone: string): number {
+/** Today's bedtime clock (night window start) as UTC ms, or null if unset/invalid. */
+function todaysBedtimeMs(
+  now: number,
+  timeZone: string,
+  bedtimeHhMm: string
+): number | null {
+  const parsed = parseHhMm(bedtimeHhMm);
+  if (!parsed) return null;
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
-    hour: "numeric",
-    hourCycle: "h23",
-  }).formatToParts(new Date(ms));
-  return Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(now));
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value ?? "0");
+  return zonedTimeToUtc(
+    get("year"),
+    get("month"),
+    get("day"),
+    parsed.hour,
+    parsed.minute,
+    timeZone
+  );
 }
 
-/** Evening/overnight due → bedtime; daytime → next nap. */
-function sleepDueKind(dueAt: number, timeZone: string): "nap" | "bedtime" {
-  const hour = hourInZone(dueAt, timeZone);
-  if (hour >= 18 || hour < 6) return "bedtime";
-  return "nap";
+/**
+ * Next sleep target: daytime nap from wake window, then pivot to tonight's
+ * bedtime once the nap window is missed or would fall at/after bedtime.
+ * Never report a missed nap as "bedtime overdue".
+ */
+function resolveSleepDue(opts: {
+  now: number;
+  wakeDueAt: number;
+  bedtimeToday: number | null;
+}): { dueAt: number; kind: "nap" | "sleep" } | null {
+  const { now, wakeDueAt, bedtimeToday } = opts;
+
+  if (bedtimeToday == null) {
+    return { dueAt: wakeDueAt, kind: "nap" };
+  }
+
+  // Before bedtime: prefer an upcoming nap; if the wake window is already
+  // past (or lands at/after bedtime), show sleep approaching at bedtime.
+  if (now < bedtimeToday) {
+    if (wakeDueAt < bedtimeToday && now < wakeDueAt) {
+      return { dueAt: wakeDueAt, kind: "nap" };
+    }
+    return { dueAt: bedtimeToday, kind: "sleep" };
+  }
+
+  // Past bedtime → sleep due at tonight's bedtime (overdue until logged).
+  return { dueAt: bedtimeToday, kind: "sleep" };
 }
 
 const APPROACHING_THRESHOLD_MS = 30 * 60 * 1000;
@@ -252,15 +292,36 @@ export const getDueStatus = query({
           (entry) => entry.endTime !== undefined
         );
         if (lastEnded?.endTime !== undefined) {
-          const dueAt = lastEnded.endTime + wakeWindowMinutes * 60_000;
-          const kind = sleepDueKind(dueAt, timeZone);
-          const due = computeDueStatus(dueAt, args.now);
-          items.push({
-            type: "sleep",
-            label: kind,
-            dueAt,
-            ...due,
-          });
+          const wakeDueAt = lastEnded.endTime + wakeWindowMinutes * 60_000;
+          // Use night-window start as village bedtime (e.g. 19:30).
+          const bedtimeToday = todaysBedtimeMs(
+            args.now,
+            timeZone,
+            night.start
+          );
+          // Already logged tonight's sleep after bedtime → nothing due.
+          const sleptTonight =
+            bedtimeToday != null &&
+            recentSleep.some(
+              (entry) =>
+                entry.startTime >= bedtimeToday && entry.type === "night"
+            );
+          if (!sleptTonight) {
+            const resolved = resolveSleepDue({
+              now: args.now,
+              wakeDueAt,
+              bedtimeToday,
+            });
+            if (resolved) {
+              const due = computeDueStatus(resolved.dueAt, args.now);
+              items.push({
+                type: "sleep",
+                label: resolved.kind,
+                dueAt: resolved.dueAt,
+                ...due,
+              });
+            }
+          }
         }
       }
     }

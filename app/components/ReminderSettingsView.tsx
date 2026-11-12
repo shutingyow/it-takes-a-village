@@ -500,6 +500,9 @@ export function ReminderSettingsView({
           checked={pumpEnabled}
           onChange={setPumpEnabled}
         />
+        <p className="text-xs text-muted mb-3 leading-snug">
+          {t("pumpRemindersOptionalHint")}
+        </p>
         {pumpEnabled && (
           <>
             <p className="text-xs font-medium text-muted mb-2">

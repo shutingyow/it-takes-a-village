@@ -225,8 +225,8 @@ export function DueSoonCard({
       : urgent.type === "pump"
         ? t("nextPumpDue")
         : urgent.type === "sleep"
-          ? urgent.label === "bedtime"
-            ? t("nextBedtimeDue")
+          ? urgent.label === "sleep"
+            ? t("nextSleepDue")
             : t("nextNapDue")
           : urgent.label;
 
@@ -302,14 +302,12 @@ export function DueSoonCard({
           <DueRow
             kind="sleep"
             title={
-              sleepItem?.label === "bedtime"
-                ? t("nextBedtimeDue")
-                : t("nextNapDue")
+              sleepItem?.label === "sleep" ? t("nextSleepDue") : t("nextNapDue")
             }
             item={sleepItem}
             emptyHint={t("noSleepDueYet")}
           />
-          {showPump && (
+          {showPump ? (
             <>
               <div className="border-t border-border/70" />
               <DueRow
@@ -319,6 +317,10 @@ export function DueSoonCard({
                 emptyHint={t("noPumpDueYet")}
               />
             </>
+          ) : (
+            <p className="text-[11px] text-muted pt-1.5 border-t border-border/70 mt-1.5">
+              {t("pumpRemindersOptionalHint")}
+            </p>
           )}
 
           {lateLogged && lastFeed && feedItem && (
