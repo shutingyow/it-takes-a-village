@@ -36,6 +36,7 @@ import { saveLastVisitedTracker } from "@/app/lib/trackerStorage";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ReminderScheduler } from "@/app/components/ReminderScheduler";
 import { FeedTimerBanner } from "@/app/components/FeedTimerBanner";
+import { useSyncActiveFeedSession } from "@/app/lib/useSyncActiveFeedSession";
 import { useAppShell } from "@/app/lib/appShell";
 
 type LogType = "feed" | "diaper" | "pump" | "activity" | "nap" | "moment";
@@ -66,6 +67,7 @@ export default function TrackerPage({
 
   const ensureMigrated = useMutation(api.trackers.ensureMigrated);
   const claimTracker = useMutation(api.trackers.claim);
+  useSyncActiveFeedSession(secretLink, lockedCaregiver);
   const tracker = useQuery(api.trackers.getBySecret, { secretLink });
   const myVillages = useQuery(
     api.trackers.listMine,

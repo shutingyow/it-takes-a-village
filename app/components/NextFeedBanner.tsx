@@ -44,6 +44,14 @@ export function NextFeedBanner({ secretLink, selectedCaregiver }: NextFeedBanner
     limit: 2,
   });
   const lastPump = useQuery(api.pumpEntries.getLast, { secretLink, actingCaregiverName: selectedCaregiver });
+  const activeFeed = useQuery(api.feedSessions.getActive, {
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
+  });
+  const activeSleep = useQuery(api.sleepEntries.getActive, {
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
+  });
   const feed = dueStatus?.items.find((item) => item.type === "feed");
   const lastFeed = recentFeeds?.[0] ?? null;
   const previousFeed = recentFeeds?.[1] ?? null;
@@ -67,6 +75,8 @@ export function NextFeedBanner({ secretLink, selectedCaregiver }: NextFeedBanner
 
   const lateLogged =
     !overdue &&
+    !activeFeed &&
+    !activeSleep &&
     lastFeed != null &&
     previousFeed != null &&
     isLateFeed({
@@ -80,41 +90,74 @@ export function NextFeedBanner({ secretLink, selectedCaregiver }: NextFeedBanner
   // ackTick forces re-read after dismiss (localStorage).
   void ackTick;
 
-  const primary = !feed
-    ? t("logFeedForDue")
-    : overdue
-      ? t("overdueBy", { time: formatMinutesCompact(feed.minutesUntilDue) })
-      : t("dueIn", { time: formatMinutesCompact(feed.minutesUntilDue) });
+  const feedOngoing = activeFeed != null;
+  const sleepOngoing = activeSleep != null;
 
-  const sinceFeed = lastFeed
-    ? t("sinceLastFeed", { time: formatTimeAgo(lastFeed.timestamp) })
-    : null;
-  const sincePump = lastPump
-    ? t("sinceLastPump", { time: formatTimeAgo(lastPump.timestamp) })
-    : null;
+  const primary = feedOngoing
+    ? t("feedOngoingBanner", {
+        time: formatTimeAgo(activeFeed.startedAt),
+      })
+    : sleepOngoing
+      ? activeSleep.type === "nap"
+        ? t("nappingBanner", {
+            time: formatTimeAgo(activeSleep.startTime),
+          })
+        : t("sleepingBanner", {
+            time: formatTimeAgo(activeSleep.startTime),
+          })
+      : !feed
+        ? t("logFeedForDue")
+        : overdue
+          ? t("overdueBy", { time: formatMinutesCompact(feed.minutesUntilDue) })
+          : t("dueIn", { time: formatMinutesCompact(feed.minutesUntilDue) });
 
-  const eyebrow = overdue
-    ? t("feedOverdueTitle")
-    : dueStatus.usingNightInterval
-      ? t("nextFeedDueNight")
-      : t("nextFeedDue");
+  const sinceFeed =
+    !feedOngoing && !sleepOngoing && lastFeed
+      ? t("sinceLastFeed", { time: formatTimeAgo(lastFeed.timestamp) })
+      : feedOngoing
+        ? t("feedOngoingBy", { name: activeFeed.caregiverName })
+        : sleepOngoing
+          ? t("startedBy", { name: activeSleep.caregiverName })
+          : null;
+  const sincePump =
+    !feedOngoing && !sleepOngoing && lastPump
+      ? t("sinceLastPump", { time: formatTimeAgo(lastPump.timestamp) })
+      : null;
+
+  const eyebrow = feedOngoing
+    ? t("feedOngoingTitle")
+    : sleepOngoing
+      ? activeSleep.type === "nap"
+        ? t("nappingNow")
+        : t("sleeping")
+      : overdue
+        ? t("feedOverdueTitle")
+        : dueStatus.usingNightInterval
+          ? t("nextFeedDueNight")
+          : t("nextFeedDue");
+
+  const showOverdueStyle = overdue && !feedOngoing && !sleepOngoing;
 
   return (
     <div className="px-4 pb-2">
       <div
         className={cn(
           "rounded-2xl border-2 px-3.5 py-3 flex items-start gap-3 min-w-0",
-          overdue
+          showOverdueStyle
             ? "bg-[#fff5f5] border-[#b42318]"
-            : "bg-[#fffaf8] border-[#c45c5c]/70"
+            : sleepOngoing
+              ? "bg-[#f3faf4] border-[#5a8f6a]/70"
+              : "bg-[#fffaf8] border-[#c45c5c]/70"
         )}
       >
         <span
           className={cn(
             "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border-2",
-            overdue
+            showOverdueStyle
               ? "bg-white border-[#b42318] text-[#b42318]"
-              : "bg-white border-[#c45c5c] text-[#9b2c2c]"
+              : sleepOngoing
+                ? "bg-white border-[#5a8f6a] text-[#3d6b4a]"
+                : "bg-white border-[#c45c5c] text-[#9b2c2c]"
           )}
         >
           <IconFeed size={22} strokeWidth={2.4} />
@@ -123,7 +166,11 @@ export function NextFeedBanner({ secretLink, selectedCaregiver }: NextFeedBanner
           <p
             className={cn(
               "text-[11px] font-bold uppercase tracking-wide",
-              overdue ? "text-[#b42318]" : "text-[#9b2c2c]"
+              showOverdueStyle
+                ? "text-[#b42318]"
+                : sleepOngoing
+                  ? "text-[#3d6b4a]"
+                  : "text-[#9b2c2c]"
             )}
           >
             {eyebrow}
@@ -131,18 +178,18 @@ export function NextFeedBanner({ secretLink, selectedCaregiver }: NextFeedBanner
           <p
             className={cn(
               "text-lg font-bold tabular-nums leading-tight mt-0.5",
-              overdue ? "text-[#8a1c12]" : "text-[#2d2420]"
+              showOverdueStyle ? "text-[#8a1c12]" : "text-[#2d2420]"
             )}
           >
             {primary}
-            {feed && (
+            {!feedOngoing && !sleepOngoing && feed && (
               <span className="text-sm font-semibold text-[#5c4a42] ml-1.5">
                 · {formatTime(feed.dueAt)}
               </span>
             )}
           </p>
 
-          {overdue && (
+          {showOverdueStyle && (
             <p className="mt-1.5 text-xs font-medium text-[#8a1c12]/90">
               {t("feedOverdueHint")}
             </p>

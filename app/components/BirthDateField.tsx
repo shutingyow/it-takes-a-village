@@ -22,7 +22,7 @@ export function BirthDateField({
   compact = false,
   canEdit = false,
 }: BirthDateFieldProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const updateBirthDate = useMutation(api.trackers.updateBirthDate);
   const [value, setValue] = useState(birthDate ?? "");
   const [saving, setSaving] = useState(false);
@@ -34,7 +34,7 @@ export function BirthDateField({
   }, [birthDate]);
 
   const unchanged = value === (birthDate ?? "");
-  const ageLabel = birthDate ? formatBabyAge(birthDate) : null;
+  const ageLabel = birthDate ? formatBabyAge(birthDate, language) : null;
 
   if (!canEdit) {
     if (!birthDate) return null;

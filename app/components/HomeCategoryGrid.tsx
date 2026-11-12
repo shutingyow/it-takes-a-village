@@ -101,9 +101,16 @@ export function HomeCategoryGrid({
 
     if (id === "feed") {
       if (!summaries.feed) return t("noLastEntryYet");
+      if (summaries.feed.active) {
+        return t("feedOngoingBanner", {
+          time: formatTimeAgo(summaries.feed.timestamp),
+        });
+      }
       const bits = [formatTimeAgo(summaries.feed.timestamp)];
-      if (summaries.feed.amountMl !== undefined) {
-        bits.push(t("amountMlShort", { amount: summaries.feed.amountMl }));
+      const amountMl =
+        "amountMl" in summaries.feed ? summaries.feed.amountMl : undefined;
+      if (amountMl !== undefined) {
+        bits.push(t("amountMlShort", { amount: amountMl }));
       } else if (feedDue) {
         bits.push(
           feedDue.status === "overdue"
@@ -138,13 +145,15 @@ export function HomeCategoryGrid({
 
     if (!summaries.nap) return t("noLastEntryYet");
     if (summaries.nap.active) {
+      const label =
+        summaries.nap.type === "night" ? t("sleeping") : t("nappingNow");
       const dur =
         summaries.nap.durationMinutes !== undefined
           ? t("napDurationSoFar", {
               time: formatMinutesCompact(summaries.nap.durationMinutes),
             })
           : "";
-      return dur ? `${t("nappingNow")} · ${dur}` : t("nappingNow");
+      return dur ? `${label} · ${dur}` : label;
     }
     const ref = summaries.nap.endTime ?? summaries.nap.startTime;
     const lasted =

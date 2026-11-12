@@ -146,6 +146,10 @@ export function ReminderScheduler({
     limit: 10,
   });
   const activeSleep = useQuery(api.sleepEntries.getActive, { secretLink, actingCaregiverName: selectedCaregiver });
+  const activeFeed = useQuery(api.feedSessions.getActive, {
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
+  });
 
   const feedItem = dueStatus?.items.find((item) => item.type === "feed");
   const pumpItem = dueStatus?.items.find((item) => item.type === "pump");
@@ -205,9 +209,10 @@ export function ReminderScheduler({
       }
     }
 
-    const recording = isFeedTimerRecording(secretLink);
+    const recording =
+      isFeedTimerRecording(secretLink) || activeFeed != null;
     const feedDueAt =
-      enabled && feedRemindersEnabled && feedItem && !recording
+      enabled && feedRemindersEnabled && feedItem && !recording && !activeSleep
         ? feedItem.dueAt
         : null;
 
@@ -261,20 +266,42 @@ export function ReminderScheduler({
       formatClock: formatTime,
     });
 
-    // Lock screen timers: time since last feed / pump / nap (count up).
-    const lastMilkFeedAt = lastFeed?.timestamp ?? null;
-    void syncLiveActivity({
-      kind: "last-feed",
-      enabled:
-        enabled && !recording && getLiveActivityKindEnabled("last-feed"),
-      lastAt: lastMilkFeedAt,
-      title: t("liveActivityLastFeedTitle"),
-      subtitle: lastMilkFeedAt
-        ? t("liveActivityLastFeedSubtitle", {
-            time: formatTime(lastMilkFeedAt),
-          })
-        : t("liveActivityLastFeedSubtitleEmpty"),
-    });
+    // Lock screen: prefer live ongoing feed/sleep over "since last logged".
+    const feedStartedAt = activeFeed?.startedAt ?? null;
+    if (feedStartedAt != null) {
+      void syncLiveActivity({
+        kind: "last-feed",
+        enabled: enabled && getLiveActivityKindEnabled("last-feed"),
+        lastAt: feedStartedAt,
+        title: t("liveActivityFeedOngoingTitle"),
+        subtitle: t("liveActivityFeedOngoingSubtitle", {
+          time: formatTime(feedStartedAt),
+          name: activeFeed?.caregiverName ?? "",
+        }),
+      });
+    } else if (activeSleep) {
+      // Don't keep a stale "hours since last feed" while baby is asleep.
+      void syncLiveActivity({
+        kind: "last-feed",
+        enabled: false,
+        lastAt: null,
+        title: t("liveActivityLastFeedTitle"),
+        subtitle: t("liveActivityLastFeedSubtitleEmpty"),
+      });
+    } else {
+      const lastMilkFeedAt = lastFeed?.timestamp ?? null;
+      void syncLiveActivity({
+        kind: "last-feed",
+        enabled: enabled && getLiveActivityKindEnabled("last-feed"),
+        lastAt: lastMilkFeedAt,
+        title: t("liveActivityLastFeedTitle"),
+        subtitle: lastMilkFeedAt
+          ? t("liveActivityLastFeedSubtitle", {
+              time: formatTime(lastMilkFeedAt),
+            })
+          : t("liveActivityLastFeedSubtitleEmpty"),
+      });
+    }
 
     const lastPumpAt = lastPump?.timestamp ?? null;
     void syncLiveActivity({
@@ -289,22 +316,38 @@ export function ReminderScheduler({
         : t("liveActivityLastPumpSubtitleEmpty"),
     });
 
-    const lastNapEnd =
-      recentSleep?.find(
-        (entry) => entry.type === "nap" && entry.endTime !== undefined
-      )?.endTime ?? null;
-    void syncLiveActivity({
-      kind: "last-nap",
-      enabled:
-        enabled && !activeSleep && getLiveActivityKindEnabled("last-nap"),
-      lastAt: lastNapEnd,
-      title: t("liveActivityLastNapTitle"),
-      subtitle: lastNapEnd
-        ? t("liveActivityLastNapSubtitle", {
-            time: formatTime(lastNapEnd),
-          })
-        : t("liveActivityLastNapSubtitleEmpty"),
-    });
+    if (activeSleep) {
+      const sleepTitle =
+        activeSleep.type === "nap"
+          ? t("liveActivityNappingTitle")
+          : t("liveActivitySleepingTitle");
+      void syncLiveActivity({
+        kind: "last-nap",
+        enabled: enabled && getLiveActivityKindEnabled("last-nap"),
+        lastAt: activeSleep.startTime,
+        title: sleepTitle,
+        subtitle: t("liveActivitySleepOngoingSubtitle", {
+          time: formatTime(activeSleep.startTime),
+          name: activeSleep.caregiverName,
+        }),
+      });
+    } else {
+      const lastNapEnd =
+        recentSleep?.find(
+          (entry) => entry.type === "nap" && entry.endTime !== undefined
+        )?.endTime ?? null;
+      void syncLiveActivity({
+        kind: "last-nap",
+        enabled: enabled && getLiveActivityKindEnabled("last-nap"),
+        lastAt: lastNapEnd,
+        title: t("liveActivityLastNapTitle"),
+        subtitle: lastNapEnd
+          ? t("liveActivityLastNapSubtitle", {
+              time: formatTime(lastNapEnd),
+            })
+          : t("liveActivityLastNapSubtitleEmpty"),
+      });
+    }
   }, [
     dueStatus,
     feedItem,
@@ -316,6 +359,7 @@ export function ReminderScheduler({
     lastPump,
     recentSleep,
     activeSleep,
+    activeFeed,
     pumpSchedule,
     feedIntervalHours,
     notifyBeforeProp,

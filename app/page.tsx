@@ -118,6 +118,33 @@ export default function Home() {
     pendingOpenSecret ? { secretLink: pendingOpenSecret } : "skip"
   );
 
+  // Caregivers / guests: skip the chooser and open their village.
+  // Village owners keep this landing for share / create.
+  useEffect(() => {
+    if (authLoading) return;
+    if (createdTracker || shareUrl || showCreateForm || showSomethingElse) return;
+    if (pendingOpenSecret) return;
+    if (isAuthenticated && myVillages === undefined) return;
+    const ownsVillage =
+      isAuthenticated && myVillages !== undefined && myVillages.length > 0;
+    if (ownsVillage) return;
+    if (!lastVisited || savedTracker === undefined) return;
+    if (savedTracker === null) return;
+    router.replace(`/tracker/${lastVisited.secretLink}`);
+  }, [
+    authLoading,
+    createdTracker,
+    shareUrl,
+    showCreateForm,
+    showSomethingElse,
+    pendingOpenSecret,
+    isAuthenticated,
+    myVillages,
+    lastVisited,
+    savedTracker,
+    router,
+  ]);
+
   useEffect(() => {
     if (!pendingOpenSecret) return;
     if (pendingOpenTracker === undefined) return;

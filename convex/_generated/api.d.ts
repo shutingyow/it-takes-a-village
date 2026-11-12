@@ -19,6 +19,7 @@ import type * as diaperEntries from "../diaperEntries.js";
 import type * as diaryEntries from "../diaryEntries.js";
 import type * as export_ from "../export.js";
 import type * as feedEntries from "../feedEntries.js";
+import type * as feedSessions from "../feedSessions.js";
 import type * as growthEntries from "../growthEntries.js";
 import type * as healthEntries from "../healthEntries.js";
 import type * as history from "../history.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   diaryEntries: typeof diaryEntries;
   export: typeof export_;
   feedEntries: typeof feedEntries;
+  feedSessions: typeof feedSessions;
   growthEntries: typeof growthEntries;
   healthEntries: typeof healthEntries;
   history: typeof history;

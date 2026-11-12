@@ -93,6 +93,18 @@ export default defineSchema({
     napRemindersEnabled: v.optional(v.boolean()),
     medicationReminders: v.optional(v.array(medicationReminderValidator)),
     pumpSchedule: v.optional(pumpScheduleValidator),
+    /**
+     * Live feed timer shared across caregivers (Lock Screen + due banners).
+     * Cleared when the feed is saved or the timer is reset.
+     */
+    activeFeedSession: v.optional(
+      v.object({
+        caregiverName: v.string(),
+        startedAt: v.number(),
+        status: v.union(v.literal("running"), v.literal("paused")),
+        updatedAt: v.number(),
+      })
+    ),
     createdAt: v.number(),
   })
     .index("by_secret", ["secretLink"])

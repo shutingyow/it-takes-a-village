@@ -145,6 +145,9 @@ export const create = mutation({
       notes: args.notes,
       photoIds: args.photoIds,
     });
+    if (tracker.activeFeedSession) {
+      await ctx.db.patch(tracker._id, { activeFeedSession: undefined });
+    }
     if (isMilkFeed(args.type)) {
       await scheduleFeedPush(ctx, tracker._id);
     }

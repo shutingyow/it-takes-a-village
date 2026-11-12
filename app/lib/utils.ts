@@ -1,4 +1,5 @@
 import { getTodayBoundsInZone } from "../../convex/lib/dayBounds";
+import { formatAgeOnDate, type AgeLanguage } from "@/app/lib/babyAge";
 
 export function formatTimeAgo(timestamp: number): string {
   const now = Date.now();
@@ -140,31 +141,13 @@ export function formatHeaderDate(date: Date = new Date()): string {
 
 export function formatBabyAge(
   birthDate: string,
+  language: AgeLanguage = "en",
   now: Date = new Date()
 ): string | null {
-  const parts = birthDate.split("-").map(Number);
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
-
-  const [year, month, day] = parts as [number, number, number];
-  const birth = new Date(year, month - 1, day);
-  if (birth > now) return null;
-
-  let months =
-    (now.getFullYear() - birth.getFullYear()) * 12 +
-    (now.getMonth() - birth.getMonth());
-  let days = now.getDate() - birth.getDate();
-
-  if (days < 0) {
-    months -= 1;
-    const prevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-    days += prevMonth.getDate();
-  }
-
-  if (months < 0) return null;
-
-  const monthLabel = months === 1 ? "month" : "months";
-  const dayLabel = days === 1 ? "day" : "days";
-  return `${months} ${monthLabel} · ${days} ${dayLabel}`;
+  const onDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Singapore",
+  }).format(now);
+  return formatAgeOnDate(birthDate, onDate, language);
 }
 
 /**

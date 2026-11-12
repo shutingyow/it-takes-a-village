@@ -1,6 +1,6 @@
 /**
  * Age on a Singapore calendar date. Computed, never stored per entry.
- * Under 12 weeks: weeks and days. After that: months and days.
+ * Always weeks and days (matches Today header / caregiver default).
  */
 import {
   DEFAULT_TRACKER_TIMEZONE,
@@ -114,25 +114,11 @@ export function ageOnDate(birthDate: string, onDate: string): AgeParts | null {
   if (!isValidBirthDate(birthDate) || !isValidBirthDate(onDate)) return null;
   const totalDays = calendarDaysBetween(birthDate, onDate);
   if (totalDays < 0) return null;
-  if (totalDays < 12 * 7) {
-    return {
-      kind: "weeks",
-      weeks: Math.floor(totalDays / 7),
-      days: totalDays % 7,
-    };
-  }
-
-  const birth = parseDateKey(birthDate);
-  const on = parseDateKey(onDate);
-  let months = (on.year - birth.year) * 12 + (on.month - birth.month);
-  let days = on.day - birth.day;
-  if (days < 0) {
-    months -= 1;
-    const prevMonthLast = new Date(Date.UTC(on.year, on.month - 1, 0));
-    days += prevMonthLast.getUTCDate();
-  }
-  if (months < 0) return null;
-  return { kind: "months", months, days };
+  return {
+    kind: "weeks",
+    weeks: Math.floor(totalDays / 7),
+    days: totalDays % 7,
+  };
 }
 
 export function formatAgeParts(parts: AgeParts, language: AgeLanguage): string {

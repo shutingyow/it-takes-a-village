@@ -187,3 +187,74 @@ export const notifyFeedChanged = internalAction({
     return null;
   },
 });
+
+/** Update or end a Live Activity kind (feed ongoing, nap/sleep, etc.). */
+export const notifyLiveActivityUpdate = internalAction({
+  args: {
+    trackerId: v.id("trackers"),
+    kind: v.string(),
+    event: v.union(v.literal("update"), v.literal("end")),
+    title: v.string(),
+    subtitle: v.string(),
+    dueAtMs: v.number(),
+    silentWake: v.optional(v.boolean()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const config = readApnsConfig();
+    if (!config) return null;
+
+    const jwt = await createApnsJwt(config);
+    const regs = await ctx.runQuery(internal.apnsHelpers.listLiveActivities, {
+      trackerId: args.trackerId,
+      kind: args.kind,
+    });
+
+    const APPLE_REFERENCE_DATE = 978307200;
+    const contentState = {
+      title: args.title,
+      subtitle: args.subtitle,
+      dueAt: args.dueAtMs / 1000 - APPLE_REFERENCE_DATE,
+    };
+
+    for (const reg of regs) {
+      await sendApns({
+        config,
+        jwt,
+        deviceToken: reg.pushToken,
+        pushType: "liveactivity",
+        topicSuffix: "push-type.liveactivity",
+        payload: {
+          aps: {
+            timestamp: Math.floor(Date.now() / 1000),
+            event: args.event,
+            "content-state": contentState,
+            "attributes-type": "FeedCountdownAttributes",
+          },
+        },
+      });
+    }
+
+    if (args.silentWake) {
+      const devices = await ctx.runQuery(internal.apnsHelpers.listDeviceTokens, {
+        trackerId: args.trackerId,
+      });
+      for (const device of devices) {
+        await sendApns({
+          config,
+          jwt,
+          deviceToken: device.token,
+          pushType: "background",
+          payload: {
+            aps: { "content-available": 1 },
+            trackerId: args.trackerId,
+            reason: "live_activity_update",
+            kind: args.kind,
+          },
+        });
+      }
+    }
+
+    return null;
+  },
+});

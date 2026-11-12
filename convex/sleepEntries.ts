@@ -1,10 +1,75 @@
 import { v } from "convex/values";
 import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
 import { deleteStorageIds } from "./lib/storageCleanup";
+import { isMilkFeed } from "./lib/feeds";
 
 const MAX_DURATION_MINUTES = 24 * 60;
+
+async function scheduleSleepLivePush(
+  ctx: MutationCtx,
+  trackerId: Id<"trackers">,
+  opts: {
+    active: boolean;
+    type: "nap" | "night";
+    startTime: number;
+    endTime?: number;
+    caregiverName: string;
+  }
+) {
+  const tracker = await ctx.db.get(trackerId);
+  const baby = tracker?.babyName?.trim();
+  if (opts.active) {
+    const sleeping = opts.type === "nap" ? "Napping" : "Sleeping";
+    const title = baby ? `${baby} · ${sleeping}` : sleeping;
+    await ctx.scheduler.runAfter(0, internal.apns.notifyLiveActivityUpdate, {
+      trackerId,
+      kind: "last-nap",
+      event: "update",
+      title,
+      subtitle: `Started by ${opts.caregiverName}`,
+      dueAtMs: opts.startTime,
+      silentWake: true,
+    });
+    // Hide stale "hours since last feed" while baby is asleep.
+    await ctx.scheduler.runAfter(0, internal.apns.notifyLiveActivityUpdate, {
+      trackerId,
+      kind: "last-feed",
+      event: "end",
+      title: title,
+      subtitle: sleeping,
+      dueAtMs: opts.startTime,
+      silentWake: true,
+    });
+    return;
+  }
+
+  const endAt = opts.endTime ?? Date.now();
+  const title = baby ? `${baby} · Awake since` : "Awake since";
+  await ctx.scheduler.runAfter(0, internal.apns.notifyLiveActivityUpdate, {
+    trackerId,
+    kind: "last-nap",
+    event: "update",
+    title,
+    subtitle: `Nap ended`,
+    dueAtMs: endAt,
+    silentWake: true,
+  });
+
+  const recent = await ctx.db
+    .query("feedEntries")
+    .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", trackerId))
+    .order("desc")
+    .take(40);
+  const lastMilk = recent.find((f) => isMilkFeed(f.type));
+  await ctx.scheduler.runAfter(0, internal.apns.notifyFeedChanged, {
+    trackerId,
+    lastFeedAt: lastMilk?.timestamp ?? null,
+    babyName: tracker?.babyName,
+  });
+}
 
 function cleanNotes(notes: string | undefined): string | undefined {
   const trimmed = notes?.trim();
@@ -108,15 +173,23 @@ export const start = mutation({
       );
     }
 
-    return await ctx.db.insert("sleepEntries", {
+    const caregiverName = args.actingCaregiverName.trim();
+    const id = await ctx.db.insert("sleepEntries", {
       trackerId: tracker._id,
-      caregiverName: args.actingCaregiverName.trim(),
+      caregiverName,
       type: args.type,
       startTime: args.startTime,
       // Omit endTime while live — indexed as undefined for getActive.
       notes: args.notes,
       photoIds: args.photoIds,
     });
+    await scheduleSleepLivePush(ctx, tracker._id, {
+      active: true,
+      type: args.type,
+      startTime: args.startTime,
+      caregiverName,
+    });
+    return id;
   },
 });
 
@@ -131,7 +204,7 @@ export const end = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { entry: existing } = await requireOwnedEntry(
+    const { tracker, entry: existing } = await requireOwnedEntry(
       ctx,
       args.secretLink,
       args.actingCaregiverName,
@@ -149,6 +222,13 @@ export const end = mutation({
       patch.photoIds = merged;
     }
     await ctx.db.patch(args.entryId, patch);
+    await scheduleSleepLivePush(ctx, tracker._id, {
+      active: false,
+      type: existing.type,
+      startTime: existing.startTime,
+      endTime: args.endTime,
+      caregiverName: args.actingCaregiverName.trim(),
+    });
     return null;
   },
 });

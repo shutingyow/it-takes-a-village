@@ -26,7 +26,7 @@ export function TodayHeader({
   photoStorageId,
   villageFallback,
 }: TodayHeaderProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isUploading, setIsUploading] = useState(false);
 
   const generatePhotoUploadUrl = useMutation(api.trackers.generatePhotoUploadUrl);
@@ -34,7 +34,7 @@ export function TodayHeader({
 
   const trimmedBabyName = babyName?.trim();
   const mainTitle = trimmedBabyName || t("babyFallback");
-  const age = birthDate ? formatBabyAge(birthDate) : null;
+  const age = birthDate ? formatBabyAge(birthDate, language) : null;
   const subtitle = age ?? villageFallback;
 
   const uploadPhoto = async (file: File) => {

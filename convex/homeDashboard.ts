@@ -25,6 +25,8 @@ export const getTileSummaries = query({
       v.object({
         timestamp: v.number(),
         amountMl: v.optional(v.number()),
+        active: v.optional(v.boolean()),
+        caregiverName: v.optional(v.string()),
       })
     ),
     diaper: v.union(
@@ -50,6 +52,7 @@ export const getTileSummaries = query({
         endTime: v.optional(v.number()),
         active: v.boolean(),
         durationMinutes: v.optional(v.number()),
+        type: v.optional(v.union(v.literal("nap"), v.literal("night"))),
       })
     ),
   }),
@@ -69,6 +72,7 @@ export const getTileSummaries = query({
     const lastFeed = recentFeeds.find(
       (feed) => feed.type === "breast" || feed.type === "bottle"
     );
+    const activeFeed = tracker.activeFeedSession;
 
     const lastDiaper = await ctx.db
       .query("diaperEntries")
@@ -94,6 +98,15 @@ export const getTileSummaries = query({
       .order("desc")
       .first();
 
+    const activeSleepRows = await ctx.db
+      .query("sleepEntries")
+      .withIndex("by_tracker_active", (q) =>
+        q.eq("trackerId", tracker._id).eq("endTime", undefined)
+      )
+      .collect();
+    activeSleepRows.sort((a, b) => b.startTime - a.startTime);
+    const activeSleep = activeSleepRows[0] ?? null;
+
     const recentSleep = await ctx.db
       .query("sleepEntries")
       .withIndex("by_tracker_and_start", (q) =>
@@ -103,46 +116,59 @@ export const getTileSummaries = query({
       .take(40);
 
     const lastNap = recentSleep.find((entry) => entry.type === "nap");
+    const sleepForTile = activeSleep ?? lastNap;
 
     let nap: {
       startTime: number;
       endTime?: number;
       active: boolean;
       durationMinutes?: number;
+      type?: "nap" | "night";
     } | null = null;
 
-    if (lastNap) {
+    if (sleepForTile) {
       const active =
-        lastNap.endTime === undefined || lastNap.endTime > args.now;
+        sleepForTile.endTime === undefined || sleepForTile.endTime > args.now;
       const durationMinutes = active
         ? Math.max(
             0,
-            Math.round((args.now - lastNap.startTime) / 60_000)
+            Math.round((args.now - sleepForTile.startTime) / 60_000)
           )
-        : lastNap.durationMinutes ??
-          (lastNap.endTime !== undefined
+        : sleepForTile.durationMinutes ??
+          (sleepForTile.endTime !== undefined
             ? Math.max(
                 0,
-                Math.round((lastNap.endTime - lastNap.startTime) / 60_000)
+                Math.round(
+                  (sleepForTile.endTime - sleepForTile.startTime) / 60_000
+                )
               )
             : undefined);
       nap = {
-        startTime: lastNap.startTime,
-        ...(lastNap.endTime !== undefined ? { endTime: lastNap.endTime } : {}),
+        startTime: sleepForTile.startTime,
+        ...(sleepForTile.endTime !== undefined
+          ? { endTime: sleepForTile.endTime }
+          : {}),
         active,
+        type: sleepForTile.type,
         ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       };
     }
 
     return {
-      feed: lastFeed
+      feed: activeFeed
         ? {
-            timestamp: lastFeed.timestamp,
-            ...(lastFeed.amount !== undefined
-              ? { amountMl: lastFeed.amount }
-              : {}),
+            timestamp: activeFeed.startedAt,
+            active: true,
+            caregiverName: activeFeed.caregiverName,
           }
-        : null,
+        : lastFeed
+          ? {
+              timestamp: lastFeed.timestamp,
+              ...(lastFeed.amount !== undefined
+                ? { amountMl: lastFeed.amount }
+                : {}),
+            }
+          : null,
       diaper: lastDiaper
         ? { timestamp: lastDiaper.timestamp, type: lastDiaper.type }
         : null,
