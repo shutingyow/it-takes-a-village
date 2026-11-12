@@ -87,7 +87,7 @@ export function TodayHeader({
             {mainTitle}
           </h1>
           {subtitle && (
-            <p className="text-xs text-muted mt-0.5 leading-snug truncate">
+            <p className="text-base sm:text-lg font-medium text-muted mt-1.5 leading-snug truncate">
               {subtitle}
             </p>
           )}
@@ -97,17 +97,17 @@ export function TodayHeader({
           className={`relative shrink-0 cursor-pointer touch-manipulation ${isUploading ? "opacity-60 pointer-events-none" : ""}`}
           aria-label={photoStorageId ? t("changePhoto") : t("addPhoto")}
         >
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-beige-light border-[3px] border-beige flex items-center justify-center overflow-hidden shadow-sm">
+          <div className="w-20 h-20 sm:w-[5.25rem] sm:h-[5.25rem] rounded-full bg-beige-light border-[3px] border-beige flex items-center justify-center overflow-hidden shadow-sm">
             <BabyAvatar
               storageId={photoStorageId}
               secretLink={secretLink}
               actingCaregiverName={selectedCaregiver}
               alt={mainTitle}
-              size="md"
+              size="lg"
             />
           </div>
-          <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-terracotta text-white flex items-center justify-center border-[2px] border-background shadow-sm">
-            <IconPlus size={12} strokeWidth={2.5} />
+          <span className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-terracotta text-white flex items-center justify-center border-[2px] border-background shadow-sm">
+            <IconPlus size={14} strokeWidth={2.5} />
           </span>
           <input
             type="file"

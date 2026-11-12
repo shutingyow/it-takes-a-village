@@ -51,7 +51,7 @@ export default function TrackerPage({
   const router = useRouter();
   const appShell = useAppShell();
   const { isAuthenticated } = useConvexAuth();
-  const [activeTab, setActiveTab] = useState<TrackerTab>("today");
+  const [activeTab, setActiveTab] = useState<TrackerTab>("home");
   const [profileOpenView, setProfileOpenView] = useState<ProfileView | null>(
     null
   );
@@ -348,10 +348,11 @@ export default function TrackerPage({
 
       {claimBanner}
 
-      {activeTab !== "today" && (
+      {activeTab !== "home" && (
         <header className="px-4 pt-1.5 pb-2 shrink-0">
           <h1 className="text-[1.5rem] font-bold text-foreground tracking-tight truncate leading-tight">
-            {activeTab === "insights" && t("tabInsights")}
+            {activeTab === "today" && t("tabToday")}
+            {activeTab === "weekly" && t("tabWeekly")}
             {activeTab === "profile" && t("tabProfile")}
             {activeTab === "settings" && t("tabSettings")}
           </h1>
@@ -360,7 +361,7 @@ export default function TrackerPage({
 
       <LockedCaregiverBadge
         caregiver={lockedInfo}
-        onSwitch={handleSwitchCaregiver}
+        onOpenSettings={handleOpenSettings}
       />
 
       {activeAlerts && activeAlerts.length > 0 && (
@@ -375,7 +376,7 @@ export default function TrackerPage({
         ref={mainRef}
         className="flex-1 min-h-0 min-w-0 overflow-x-clip overflow-y-auto overscroll-y-contain pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))]"
       >
-        {activeTab === "today" && (
+        {activeTab === "home" && (
           <HomeTab
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
@@ -402,7 +403,7 @@ export default function TrackerPage({
           napRemindersEnabled={tracker.napRemindersEnabled}
           pumpSchedule={tracker.pumpSchedule}
         />
-        {activeTab === "insights" && (
+        {activeTab === "today" && (
           <InsightsTab
             babyName={tracker.babyName}
             birthDate={tracker.birthDate}
@@ -410,6 +411,18 @@ export default function TrackerPage({
             selectedCaregiver={lockedCaregiver}
             timezone={tracker.timezone}
             canEditBirthDate={tracker.viewerIsOwner}
+            range="daily"
+          />
+        )}
+        {activeTab === "weekly" && (
+          <InsightsTab
+            babyName={tracker.babyName}
+            birthDate={tracker.birthDate}
+            secretLink={secretLink}
+            selectedCaregiver={lockedCaregiver}
+            timezone={tracker.timezone}
+            canEditBirthDate={tracker.viewerIsOwner}
+            range="weekly"
           />
         )}
         {activeTab === "profile" && (
@@ -440,6 +453,7 @@ export default function TrackerPage({
             napRemindersEnabled={tracker.napRemindersEnabled}
             pumpSchedule={tracker.pumpSchedule}
             viewerIsOwner={tracker.viewerIsOwner}
+            onSwitchCaregiver={handleSwitchCaregiver}
             onScrollToTop={() =>
               mainRef.current?.scrollTo({ top: 0, behavior: "auto" })
             }

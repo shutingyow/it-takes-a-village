@@ -10,6 +10,8 @@ interface InsightsTabProps {
   selectedCaregiver: string;
   timezone?: string;
   canEditBirthDate?: boolean;
+  /** Daily or weekly reports tab. */
+  range: "daily" | "weekly";
 }
 
 export function InsightsTab({
@@ -19,6 +21,7 @@ export function InsightsTab({
   selectedCaregiver,
   timezone,
   canEditBirthDate = false,
+  range,
 }: InsightsTabProps) {
   const { t } = useLanguage();
 
@@ -31,7 +34,8 @@ export function InsightsTab({
       timezone={timezone}
       canEditBirthDate={canEditBirthDate}
       onBack={undefined}
-      title={t("tabInsights")}
+      title={t("stats")}
+      forcedRange={range}
     />
   );
 }

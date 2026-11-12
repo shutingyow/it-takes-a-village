@@ -3,19 +3,20 @@
 import { cn } from "@/app/lib/utils";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import {
-  IconInsights,
+  IconCalendar,
+  IconHome,
   IconLogPlus,
   IconProfile,
-  IconSettings,
   IconToday,
 } from "./icons";
 
 export type TrackerTab =
+  | "home"
   | "today"
-  | "insights"
-  | "log"
+  | "weekly"
   | "profile"
-  | "settings";
+  | "settings"
+  | "log";
 
 interface TrackerBottomNavProps {
   activeTab: TrackerTab;
@@ -31,29 +32,29 @@ export function TrackerBottomNav({
   const { t } = useLanguage();
 
   const sideTabs: {
-    id: Exclude<TrackerTab, "log">;
+    id: Exclude<TrackerTab, "log" | "settings">;
     label: string;
     icon: React.ReactNode;
   }[] = [
+    {
+      id: "home",
+      label: t("tabHome"),
+      icon: <IconHome size={22} />,
+    },
     {
       id: "today",
       label: t("tabToday"),
       icon: <IconToday size={22} />,
     },
     {
-      id: "insights",
-      label: t("tabInsights"), // "Reports"
-      icon: <IconInsights size={22} />,
+      id: "weekly",
+      label: t("tabWeekly"),
+      icon: <IconCalendar size={22} />,
     },
     {
       id: "profile",
       label: t("tabProfile"),
       icon: <IconProfile size={22} />,
-    },
-    {
-      id: "settings",
-      label: t("tabSettings"),
-      icon: <IconSettings size={22} />,
     },
   ];
 

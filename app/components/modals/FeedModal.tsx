@@ -149,7 +149,10 @@ export function FeedModal({
 
   const [step, setStep] = useState<"live" | "type" | "details">(() => {
     if (editEntry) return "details";
-    if (isFeedTimerRecording(secretLink)) return "details";
+    const timer = loadFeedTimer(feedTimerStorageKey(secretLink));
+    if (timer.status === "running" || timer.status === "paused") return "details";
+    // After stop: pick nursing / bottle / solids, then fill details.
+    if (timer.status === "stopped") return "type";
     return "live";
   });
   const [feedMode, setFeedMode] = useState<"live" | "past">("live");
@@ -207,12 +210,8 @@ export function FeedModal({
       alert(t("selectCaregiver"));
       return;
     }
-    if (feedType === "solids") {
-      setFeedMode("past");
-      setStep("details");
-      setTimeLive(false);
-      return;
-    }
+    // Type (breast/bottle) is chosen when saving details after the timer.
+    if (feedType === "solids") setFeedType("breast");
     const startMs = Date.now();
     saveFeedTimer(timerKey, {
       status: "running",
@@ -431,57 +430,25 @@ export function FeedModal({
               </button>
             </div>
 
-            <p className="text-sm text-muted text-center leading-snug">
-              {t("feedLiveHint")}
-            </p>
-
-            <div>
-              <label className="label-field">{t("selectFeedType")}</label>
-              <div className="flex flex-col gap-2">
-                {typeButtons.map((btn) => (
-                  <button
-                    key={btn.id}
-                    type="button"
-                    onClick={() => {
-                      setFeedType(btn.id);
-                      setBottleMilk(undefined);
-                      if (btn.id === "solids") {
-                        setTimeLive(false);
-                        setFeedMode("past");
-                        setStep("details");
-                      }
-                    }}
-                    className={cn(
-                      "btn-option w-full py-3.5",
-                      feedType === btn.id
-                        ? "btn-option-selected"
-                        : "btn-option-default",
-                      btn.id === "solids" &&
-                        feedType !== "solids" &&
-                        "border-accent-solids text-accent-solids"
-                    )}
-                  >
-                    {btn.label}
-                  </button>
-                ))}
-              </div>
+            <div className="text-center py-2">
+              <p className="text-sm text-muted leading-snug">
+                {t("feedLiveHint")}
+              </p>
             </div>
 
-            {feedType !== "solids" && (
-              <button
-                type="button"
-                onClick={() => void handleStartLiveFeed()}
-                className="w-full bg-accent-feed hover:bg-accent-feed/90 text-white font-semibold py-4 px-6 rounded-xl transition-colors"
-              >
-                {t("startFeedTimer")}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => void handleStartLiveFeed()}
+              className="w-full bg-accent-feed hover:bg-accent-feed/90 text-white font-medium py-4 px-6 rounded-xl transition-colors"
+            >
+              {t("startFeedTimer")}
+            </button>
           </div>
         )}
 
         {step === "type" && (
           <div className="space-y-3">
-            {!isEditing && (
+            {!isEditing && !timeLive && (
               <button
                 type="button"
                 onClick={() => {
@@ -514,9 +481,7 @@ export function FeedModal({
           <div className="space-y-4 min-w-0 max-w-full">
             <button
               type="button"
-              onClick={() =>
-                setStep(isEditing ? "type" : timeLive ? "live" : "type")
-              }
+              onClick={() => setStep("type")}
               className="text-sm text-primary font-medium"
             >
               {t("changeType")}
@@ -594,9 +559,7 @@ export function FeedModal({
           <div className="space-y-4 min-w-0 max-w-full">
             <button
               type="button"
-              onClick={() =>
-                setStep(isEditing ? "type" : timeLive ? "live" : "type")
-              }
+              onClick={() => setStep("type")}
               className="text-sm text-primary font-medium"
             >
               {t("changeType")}

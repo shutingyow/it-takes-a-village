@@ -159,6 +159,7 @@ export const translations = {
   tabUpcoming: "Upcoming",
   tabMore: "More",
   tabToday: "Today",
+  tabWeekly: "Weekly",
   tabInsights: "Reports",
   tabLog: "Log",
   tabProfile: "Profile",
@@ -258,7 +259,7 @@ export const translations = {
   healthGrowthHint: "Weight, height, and head circumference are under Growth in Profile.",
   supplyAlerts: "Supply alerts",
   supplyAlertsDesc: "Track low supplies",
-  backToMore: "‹ Back to More",
+  backToMore: "‹ Back",
   language: "Language",
   languageDesc: "Switch between English and 中文",
   english: "English",
@@ -481,8 +482,7 @@ export const translations = {
   nextFeedDueNight: "Next feed (night)",
   nextSleepDue: "Sleep",
   noSleepDueYet: "Log a nap or sleep to start the wake window",
-  pumpRemindersOptionalHint:
-    "Optional. Leave off if you don’t pump (e.g. exclusive breastfeeding).",
+  pumpRemindersOptionalHint: "Optional. Leave off if you don’t pump.",
   feedOverdueTitle: "Feed overdue",
   feedOverdueHint: "Log a feed to reset the schedule from now.",
   feedLateTimingPushed:
@@ -568,8 +568,7 @@ export const translations = {
   disableDeviceNotifications: "Turn off device reminders",
   deviceNotificationsEnabled: "Device reminders on",
   reminderDeliveryTitle: "How should we remind you?",
-  reminderDeliveryHint:
-    "Choose one. Lock screen timers and notification banners together get noisy.",
+  reminderDeliveryHint: "",
   reminderDeliveryTimer: "Lock screen timer",
   reminderDeliveryTimerDesc:
     "Live countdown on the Lock Screen since the last feed, sleep, or pump.",

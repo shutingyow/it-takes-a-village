@@ -365,11 +365,8 @@ export function ReminderSettingsView({
       )}
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <p className="text-sm font-semibold text-foreground mb-1">
+        <p className="text-sm font-semibold text-foreground mb-3">
           {t("reminderDeliveryTitle")}
-        </p>
-        <p className="text-xs text-muted mb-3 leading-snug">
-          {t("reminderDeliveryHint")}
         </p>
         <div className="grid grid-cols-1 gap-2">
           {(
@@ -538,9 +535,6 @@ export function ReminderSettingsView({
           checked={pumpEnabled}
           onChange={setPumpEnabled}
         />
-        <p className="text-xs text-muted mb-3 leading-snug">
-          {t("pumpRemindersOptionalHint")}
-        </p>
         {pumpEnabled && (
           <>
             <p className="text-xs font-medium text-muted mb-2">

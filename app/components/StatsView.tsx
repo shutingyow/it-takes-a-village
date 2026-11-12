@@ -22,6 +22,9 @@ import type { TranslationKey } from "@/app/lib/i18n/en";
 import { BirthDateField } from "./BirthDateField";
 import { TodayTimetable } from "./TodayTimetable";
 
+type ChartMetric = "feeds" | "milk" | "diapers" | "pumps";
+type RangeMode = "daily" | "weekly";
+
 interface StatsViewProps {
   babyName?: string;
   birthDate?: string;
@@ -32,10 +35,9 @@ interface StatsViewProps {
   canEditBirthDate?: boolean;
   onBack?: () => void;
   title?: string;
+  /** When set, lock to this range and hide the Daily/Weekly toggle. */
+  forcedRange?: RangeMode;
 }
-
-type ChartMetric = "feeds" | "milk" | "diapers" | "pumps";
-type RangeMode = "daily" | "weekly";
 
 const METRIC_COLOURS: Record<"feeds" | "diapers" | "pumps", string> = {
   feeds: "#c4846a",
@@ -349,12 +351,16 @@ export function StatsView({
   timezone,
   onBack,
   title,
+  forcedRange,
 }: StatsViewProps) {
   const { t, language } = useLanguage();
   const [now] = useState(Date.now());
   const [showExport, setShowExport] = useState(false);
   const [metric, setMetric] = useState<ChartMetric>("feeds");
-  const [rangeMode, setRangeMode] = useState<RangeMode>("daily");
+  const [rangeModeState, setRangeMode] = useState<RangeMode>(
+    forcedRange ?? "daily"
+  );
+  const rangeMode = forcedRange ?? rangeModeState;
   const todayKey = useMemo(
     () => getDateKeyInZone(now, timezone),
     [now, timezone]
@@ -558,29 +564,31 @@ export function StatsView({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5 mb-3">
-        {(
-          [
-            { id: "daily" as const, labelKey: "rangeDaily" as const },
-            { id: "weekly" as const, labelKey: "rangeWeekly" as const },
-          ] as const
-        ).map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            onClick={() => setRangeMode(opt.id)}
-            className={cn(
-              "py-2.5 rounded-xl text-xs font-semibold transition-colors touch-manipulation min-h-[44px]",
-              rangeMode === opt.id
-                ? "bg-terracotta text-white"
-                : "bg-beige-light text-muted hover:text-foreground"
-            )}
-            aria-pressed={rangeMode === opt.id}
-          >
-            {t(opt.labelKey)}
-          </button>
-        ))}
-      </div>
+      {!forcedRange && (
+        <div className="grid grid-cols-2 gap-1.5 mb-3">
+          {(
+            [
+              { id: "daily" as const, labelKey: "rangeDaily" as const },
+              { id: "weekly" as const, labelKey: "rangeWeekly" as const },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setRangeMode(opt.id)}
+              className={cn(
+                "py-2.5 rounded-xl text-xs font-semibold transition-colors touch-manipulation min-h-[44px]",
+                rangeMode === opt.id
+                  ? "bg-terracotta text-white"
+                  : "bg-beige-light text-muted hover:text-foreground"
+              )}
+              aria-pressed={rangeMode === opt.id}
+            >
+              {t(opt.labelKey)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {rangeMode === "daily" && (
         <div className="flex items-center justify-between mb-4 bg-surface border border-border rounded-2xl px-1.5 sm:px-2 py-2 card-shadow min-w-0">

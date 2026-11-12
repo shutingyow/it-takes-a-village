@@ -99,10 +99,14 @@ export function HomeCategoryGrid({
     dayEnd,
     now,
   });
-  const dueStatus = useQuery(api.reminders.getDueStatus, { secretLink, actingCaregiverName: selectedCaregiver, now });
+  const dueStatus = useQuery(api.reminders.getDueStatus, {
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
+    now,
+  });
   const feedDue = dueStatus?.items.find((item) => item.type === "feed");
 
-  /** Single compact line under the title (reference: "10 mins ago, 80ml"). */
+  /** Single compact line under the title. */
   const summaryFor = (id: HomeTileCategory): string => {
     if (!summaries) return "…";
 
@@ -196,44 +200,47 @@ export function HomeCategoryGrid({
                 fillHeight ? "flex-1 min-h-[5.5rem]" : "min-h-[5.75rem]"
               )}
             >
-              {/* Oversized line icon on the left (reference pattern) */}
-              <span
-                className="pointer-events-none absolute -left-1 top-1/2 -translate-y-1/2 opacity-[0.92]"
-                aria-hidden
-              >
-                <ActivityIcon
-                  type={cat.icon}
-                  size={72}
-                  className="text-white stroke-[1.35]"
-                />
-              </span>
-
-              {onQuickLog && (
-                <button
-                  type="button"
-                  aria-label={t("categoryLogCta", { type: t(cat.labelKey) })}
-                  onClick={() => onQuickLog(cat.id)}
-                  className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full border-2 border-white/90 flex items-center justify-center text-white touch-manipulation active:scale-95"
-                >
-                  <IconPlus size={16} className="text-white" />
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => onSelect(cat.id)}
+              <div
                 className={cn(
-                  "relative w-full pl-[4.75rem] pr-12 py-4 min-w-0 text-left touch-manipulation active:opacity-95 transition-opacity",
-                  fillHeight && "h-full flex flex-col justify-center"
+                  "relative flex items-center gap-3.5 w-full pl-4 pr-3.5 min-w-0",
+                  fillHeight ? "h-full py-3.5" : "py-3.5"
                 )}
               >
-                <p className="text-[1.65rem] font-bold text-white leading-none tracking-tight truncate">
-                  {t(cat.labelKey)}
-                </p>
-                <p className="mt-1.5 text-[15px] font-medium text-white/90 leading-snug line-clamp-2 tabular-nums">
-                  {summary}
-                </p>
-              </button>
+                <span
+                  className="shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/20 flex items-center justify-center self-center"
+                  aria-hidden
+                >
+                  <ActivityIcon
+                    type={cat.icon}
+                    size={28}
+                    className="text-white stroke-[1.75]"
+                  />
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => onSelect(cat.id)}
+                  className="flex-1 min-w-0 self-center text-left touch-manipulation active:opacity-95 transition-opacity"
+                >
+                  <p className="text-[1.45rem] sm:text-[1.55rem] font-bold text-white leading-none tracking-tight truncate">
+                    {t(cat.labelKey)}
+                  </p>
+                  <p className="mt-1.5 text-[14px] sm:text-[15px] font-medium text-white/90 leading-snug line-clamp-2 tabular-nums">
+                    {summary}
+                  </p>
+                </button>
+
+                {onQuickLog && (
+                  <button
+                    type="button"
+                    aria-label={t("categoryLogCta", { type: t(cat.labelKey) })}
+                    onClick={() => onQuickLog(cat.id)}
+                    className="shrink-0 self-center w-12 h-12 rounded-full border-2 border-white/90 flex items-center justify-center text-white touch-manipulation active:scale-95"
+                  >
+                    <IconPlus size={20} className="text-white" />
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}

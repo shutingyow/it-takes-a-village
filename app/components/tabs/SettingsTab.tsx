@@ -79,6 +79,7 @@ interface SettingsTabProps {
   openView?: SettingsView | null;
   /** SSO owner of this village — gates admin settings. */
   viewerIsOwner?: boolean;
+  onSwitchCaregiver?: () => void;
   onScrollToTop?: () => void;
 }
 
@@ -100,6 +101,7 @@ export function SettingsTab({
   pumpSchedule,
   openView,
   viewerIsOwner = false,
+  onSwitchCaregiver,
   onScrollToTop,
 }: SettingsTabProps) {
   const { t, language, setLanguage } = useLanguage();
@@ -616,6 +618,27 @@ export function SettingsTab({
             </button>
           ))}
       </div>
+
+      {onSwitchCaregiver && (
+        <button
+          type="button"
+          onClick={onSwitchCaregiver}
+          className="w-full mb-4 bg-surface hover:bg-beige-light/50 border border-border text-foreground font-medium py-4 px-4 rounded-2xl transition-colors text-left card-shadow active:scale-[0.99]"
+        >
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-xl bg-beige-light flex items-center justify-center shrink-0 text-sm font-bold text-terracotta">
+              {selectedCaregiver.trim().charAt(0).toUpperCase() || "?"}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold">{t("switchConfirmTitle")}</div>
+              <div className="text-sm text-muted truncate">
+                {selectedCaregiver}
+              </div>
+            </div>
+            <IconChevronRight size={18} className="text-muted shrink-0" />
+          </div>
+        </button>
+      )}
 
       <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
         <p className="text-sm font-semibold text-foreground mb-1">
