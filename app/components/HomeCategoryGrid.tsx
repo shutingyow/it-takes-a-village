@@ -7,6 +7,8 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import type { TranslationKey } from "@/app/lib/i18n/en";
 import {
   formatMinutesCompact,
+  formatOngoingMinutes,
+  formatTime,
   formatTimeAgo,
   getTodayBoundsInZone,
 } from "@/app/lib/utils";
@@ -103,10 +105,12 @@ export function HomeCategoryGrid({
       if (!summaries.feed) return t("noLastEntryYet");
       if (summaries.feed.active) {
         return t("feedOngoingBanner", {
-          time: formatTimeAgo(summaries.feed.timestamp),
+          minutes: formatOngoingMinutes(summaries.feed.timestamp, now),
         });
       }
-      const bits = [formatTimeAgo(summaries.feed.timestamp)];
+      const bits = [
+        `${formatTimeAgo(summaries.feed.timestamp)} · ${formatTime(summaries.feed.timestamp)}`,
+      ];
       const amountMl =
         "amountMl" in summaries.feed ? summaries.feed.amountMl : undefined;
       if (amountMl !== undefined) {
@@ -133,27 +137,24 @@ export function HomeCategoryGrid({
           : summaries.diaper.type === "dirty"
             ? t("dirty")
             : t("wetDirty");
-      return `${formatTimeAgo(summaries.diaper.timestamp)} · ${typeLabel}`;
+      return `${formatTimeAgo(summaries.diaper.timestamp)} · ${formatTime(summaries.diaper.timestamp)} · ${typeLabel}`;
     }
 
     if (id === "pump") {
       if (!summaries.pump) return t("noLastEntryYet");
-      return `${formatTimeAgo(summaries.pump.timestamp)}, ${t("amountMlShort", {
+      return `${formatTimeAgo(summaries.pump.timestamp)} · ${formatTime(summaries.pump.timestamp)}, ${t("amountMlShort", {
         amount: summaries.pump.amountMl,
       })} · ${t("sessionsToday", { count: summaries.pump.sessionsToday })}`;
     }
 
     if (!summaries.nap) return t("noLastEntryYet");
     if (summaries.nap.active) {
+      const mins =
+        summaries.nap.durationMinutes ??
+        formatOngoingMinutes(summaries.nap.startTime, now);
       const label =
         summaries.nap.type === "night" ? t("sleeping") : t("nappingNow");
-      const dur =
-        summaries.nap.durationMinutes !== undefined
-          ? t("napDurationSoFar", {
-              time: formatMinutesCompact(summaries.nap.durationMinutes),
-            })
-          : "";
-      return dur ? `${label} · ${dur}` : label;
+      return `${label} · ${t("feedOngoingBanner", { minutes: mins })} · ${formatTime(summaries.nap.startTime)}`;
     }
     const ref = summaries.nap.endTime ?? summaries.nap.startTime;
     const lasted =
@@ -162,9 +163,8 @@ export function HomeCategoryGrid({
             time: formatMinutesCompact(summaries.nap.durationMinutes),
           })
         : "";
-    return lasted
-      ? `${formatTimeAgo(ref)}, ${lasted}`
-      : formatTimeAgo(ref);
+    const when = `${formatTimeAgo(ref)} · ${formatTime(ref)}`;
+    return lasted ? `${when}, ${lasted}` : when;
   };
 
   return (

@@ -439,6 +439,9 @@ export const zh: Translations = {
 
   dueSoon: "即将到期",
   whatsDue: "到期提醒",
+  whatsDueAllClear: "暂时没有紧急事项",
+  nextBedtimeDue: "入睡",
+  noSleepDueYet: "记录小睡或夜间睡眠后开始清醒计时",
   nextFeedDue: "下次喂奶",
   nextFeedDueNight: "下次喂奶（夜间）",
   feedOverdueTitle: "喂奶已超时",
@@ -483,7 +486,7 @@ export const zh: Translations = {
   liveActivityLastNapSubtitle: "小睡结束于 {time}",
   liveActivityLastNapSubtitleEmpty: "记录一次小睡后开始",
   feedOngoingTitle: "喂奶中",
-  feedOngoingBanner: "已进行 {time}",
+  feedOngoingBanner: "进行中 · {minutes} 分钟",
   feedOngoingBy: "由 {name} 记录",
   nappingBanner: "小睡中 · {time}",
   sleepingBanner: "睡觉中 · {time}",

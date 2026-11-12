@@ -7,6 +7,7 @@ import {
   cn,
   formatMinutesCompact,
   formatTime,
+  formatOngoingMinutes,
   formatTimeAgo,
 } from "@/app/lib/utils";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
@@ -95,16 +96,12 @@ export function NextFeedBanner({ secretLink, selectedCaregiver }: NextFeedBanner
 
   const primary = feedOngoing
     ? t("feedOngoingBanner", {
-        time: formatTimeAgo(activeFeed.startedAt),
+        minutes: formatOngoingMinutes(activeFeed.startedAt, now),
       })
     : sleepOngoing
-      ? activeSleep.type === "nap"
-        ? t("nappingBanner", {
-            time: formatTimeAgo(activeSleep.startTime),
-          })
-        : t("sleepingBanner", {
-            time: formatTimeAgo(activeSleep.startTime),
-          })
+      ? t("feedOngoingBanner", {
+          minutes: formatOngoingMinutes(activeSleep.startTime, now),
+        })
       : !feed
         ? t("logFeedForDue")
         : overdue

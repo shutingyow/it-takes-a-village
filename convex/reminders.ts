@@ -18,7 +18,8 @@ const dueItemValidator = v.object({
   type: v.union(
     v.literal("feed"),
     v.literal("medication"),
-    v.literal("pump")
+    v.literal("pump"),
+    v.literal("sleep")
   ),
   label: v.string(),
   dueAt: v.number(),
@@ -29,6 +30,23 @@ const dueItemValidator = v.object({
   ),
   minutesUntilDue: v.number(),
 });
+
+/** Local hour 0–23 in the village timezone. */
+function hourInZone(ms: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    hourCycle: "h23",
+  }).formatToParts(new Date(ms));
+  return Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+}
+
+/** Evening/overnight due → bedtime; daytime → next nap. */
+function sleepDueKind(dueAt: number, timeZone: string): "nap" | "bedtime" {
+  const hour = hourInZone(dueAt, timeZone);
+  if (hour >= 18 || hour < 6) return "bedtime";
+  return "nap";
+}
 
 const APPROACHING_THRESHOLD_MS = 30 * 60 * 1000;
 const DEFAULT_NOTIFY_BEFORE_MINUTES = 10;
@@ -97,12 +115,13 @@ export const getDueStatus = query({
     const notifyBeforeMinutes =
       tracker.notifyBeforeMinutes ?? DEFAULT_NOTIFY_BEFORE_MINUTES;
     const items: Array<{
-      type: "feed" | "medication" | "pump";
+      type: "feed" | "medication" | "pump" | "sleep";
       label: string;
       dueAt: number;
       status: "ok" | "approaching" | "overdue";
       minutesUntilDue: number;
     }> = [];
+    const timeZone = resolveTrackerTimezone(tracker);
 
     let effectiveFeedIntervalHours = feedIntervalHours;
     let usingNightInterval = false;
@@ -123,7 +142,7 @@ export const getDueStatus = query({
         lastFeed.timestamp,
         feedIntervalHours,
         night,
-        { now: args.now, timeZone: resolveTrackerTimezone(tracker) }
+        { now: args.now, timeZone }
       );
       effectiveFeedIntervalHours = (dueAt - feedAt) / (60 * 60 * 1000);
       usingNightInterval =
@@ -208,6 +227,41 @@ export const getDueStatus = query({
           dueAt,
           ...due,
         });
+      }
+    }
+
+    const wakeWindowMinutes = tracker.wakeWindowMinutes;
+    const napRemindersEnabled = tracker.napRemindersEnabled !== false;
+    if (
+      wakeWindowMinutes != null &&
+      wakeWindowMinutes > 0 &&
+      napRemindersEnabled
+    ) {
+      const recentSleep = await ctx.db
+        .query("sleepEntries")
+        .withIndex("by_tracker_and_start", (q) =>
+          q.eq("trackerId", tracker._id)
+        )
+        .order("desc")
+        .take(40);
+      const activeSleep = recentSleep.find(
+        (entry) => entry.endTime === undefined
+      );
+      if (!activeSleep) {
+        const lastEnded = recentSleep.find(
+          (entry) => entry.endTime !== undefined
+        );
+        if (lastEnded?.endTime !== undefined) {
+          const dueAt = lastEnded.endTime + wakeWindowMinutes * 60_000;
+          const kind = sleepDueKind(dueAt, timeZone);
+          const due = computeDueStatus(dueAt, args.now);
+          items.push({
+            type: "sleep",
+            label: kind,
+            dueAt,
+            ...due,
+          });
+        }
       }
     }
 

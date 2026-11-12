@@ -12,20 +12,34 @@ export function formatTimeAgo(timestamp: number): string {
     if (minsAhead < 1) return "just now";
     if (minsAhead === 1) return "in 1m";
     if (minsAhead < 60) return `in ${minsAhead}m`;
+    const hoursAhead = Math.floor(minsAhead / 60);
+    const rem = minsAhead % 60;
+    if (hoursAhead < 24) {
+      return rem === 0 ? `in ${hoursAhead}h` : `in ${hoursAhead}h ${rem}m`;
+    }
     return formatTime(timestamp);
   }
 
   const minutes = Math.floor(diff / (1000 * 60));
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
 
   if (minutes < 1) return "just now";
   if (minutes === 1) return "1m ago";
   if (minutes < 60) return `${minutes}m ago`;
-  if (hours === 1) return "1h ago";
-  if (hours < 24) return `${hours}h ago`;
+  // Keep hours+minutes so caregivers see more than "1h ago" / "2h ago".
+  if (hours < 24) {
+    const rem = minutes % 60;
+    if (rem === 0) return hours === 1 ? "1h ago" : `${hours}h ago`;
+    return hours === 1 ? `1h ${rem}m ago` : `${hours}h ${rem}m ago`;
+  }
   if (days === 1) return "1d ago";
   return `${days}d ago`;
+}
+
+/** Whole minutes since `startedAt`, for “Ongoing for N minutes”. */
+export function formatOngoingMinutes(startedAt: number, now = Date.now()): number {
+  return Math.max(0, Math.floor((now - startedAt) / 60_000));
 }
 
 export function formatDuration(start: number, end?: number): string {

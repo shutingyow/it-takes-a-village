@@ -476,8 +476,11 @@ export const translations = {
   // Reminders
   dueSoon: "Due soon",
   whatsDue: "What's due",
+  whatsDueAllClear: "Nothing urgent right now",
   nextFeedDue: "Next feed",
   nextFeedDueNight: "Next feed (night)",
+  nextBedtimeDue: "Bedtime",
+  noSleepDueYet: "Log a nap or bedtime to start the wake window",
   feedOverdueTitle: "Feed overdue",
   feedOverdueHint: "Log a feed to reset the schedule from now.",
   feedLateTimingPushed:
@@ -521,7 +524,7 @@ export const translations = {
   liveActivityLastNapSubtitle: "Nap ended {time}",
   liveActivityLastNapSubtitleEmpty: "Log a nap to start",
   feedOngoingTitle: "Feed ongoing",
-  feedOngoingBanner: "Going for {time}",
+  feedOngoingBanner: "Ongoing for {minutes} minutes",
   feedOngoingBy: "Logged by {name}",
   nappingBanner: "Napping · {time}",
   sleepingBanner: "Sleeping · {time}",

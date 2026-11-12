@@ -43,9 +43,22 @@ export function HomeTab({
 }: HomeTabProps) {
   const { t } = useLanguage();
   const [category, setCategory] = useState<HomeCategory | null>(null);
+  const [showDueDetail, setShowDueDetail] = useState(false);
 
   const villageFallback =
     !birthDate && babyName ? t("babyVillage", { name: babyName }) : undefined;
+
+  if (showDueDetail) {
+    return (
+      <DueSoonCard
+        secretLink={secretLink}
+        selectedCaregiver={selectedCaregiver}
+        pumpScheduleEnabled={pumpScheduleEnabled}
+        detail
+        onBack={() => setShowDueDetail(false)}
+      />
+    );
+  }
 
   if (category) {
     return (
@@ -86,6 +99,7 @@ export function HomeTab({
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         pumpScheduleEnabled={pumpScheduleEnabled}
+        onOpenDetail={() => setShowDueDetail(true)}
       />
 
       <WellnessTipCard
