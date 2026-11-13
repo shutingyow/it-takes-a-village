@@ -46,10 +46,9 @@ export function LockedCaregiverBadge({
           type="button"
           onClick={onOpenSettings}
           aria-label={t("tabSettings")}
-          className="shrink-0 flex items-center gap-1.5 text-xs font-semibold text-foreground px-2.5 py-2 rounded-xl border border-border bg-background active:opacity-80 touch-manipulation min-h-[40px]"
+          className="shrink-0 flex items-center justify-center text-foreground w-10 h-10 rounded-xl active:opacity-80 touch-manipulation"
         >
-          <IconSettings size={16} />
-          <span>{t("tabSettings")}</span>
+          <IconSettings size={20} />
         </button>
       </div>
     </div>
