@@ -149,6 +149,9 @@ export const notifyFeedChanged = internalAction({
       dueAt: dueAtMs / 1000 - APPLE_REFERENCE_DATE,
     };
 
+    // Always end feed Live Activities on feed change. Perpetual "since last
+    // feed" islands cover the Dynamic Island / status bar; ongoing feed
+    // sessions are started/updated separately via notifyLiveActivityUpdate.
     for (const reg of regs) {
       await sendApns({
         config,
@@ -159,7 +162,7 @@ export const notifyFeedChanged = internalAction({
         payload: {
           aps: {
             timestamp: Math.floor(Date.now() / 1000),
-            event: args.lastFeedAt == null ? "end" : "update",
+            event: "end",
             "content-state": contentState,
             "attributes-type": "FeedCountdownAttributes",
           },

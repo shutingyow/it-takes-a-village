@@ -157,7 +157,6 @@ export function ReminderSettingsView({
   const [notifStatus, setNotifStatus] = useState<NotifPermission>("unsupported");
   const [notifBusy, setNotifBusy] = useState(false);
   const [liveFeed, setLiveFeed] = useState(true);
-  const [livePump, setLivePump] = useState(false);
   const [liveNap, setLiveNap] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -172,15 +171,16 @@ export function ReminderSettingsView({
     }
     setDeliveryMode(mode);
     setLiveFeed(getLiveActivityKindEnabled("last-feed"));
-    setLivePump(getLiveActivityKindEnabled("last-pump"));
     setLiveNap(getLiveActivityKindEnabled("last-nap"));
+    // Perpetual pump islands covered the status bar; keep the pref off.
+    setLiveActivityKindEnabled("last-pump", false);
     void getNotificationPermission().then(setNotifStatus);
   }, []);
 
   const setLiveKind = (kind: LiveActivityKind, next: boolean) => {
+    if (kind === "last-pump") return;
     setLiveActivityKindEnabled(kind, next);
     if (kind === "last-feed") setLiveFeed(next);
-    if (kind === "last-pump") setLivePump(next);
     if (kind === "last-nap") setLiveNap(next);
     notifyRemindersChanged();
   };
@@ -209,7 +209,6 @@ export function ReminderSettingsView({
       await setReminderDeliveryMode(mode);
       setDeliveryMode(mode);
       setLiveFeed(getLiveActivityKindEnabled("last-feed"));
-      setLivePump(getLiveActivityKindEnabled("last-pump"));
       setLiveNap(getLiveActivityKindEnabled("last-nap"));
       setMessage(
         mode === "timer"
@@ -425,11 +424,6 @@ export function ReminderSettingsView({
             label={t("liveActivityToggleFeed")}
             checked={liveFeed}
             onChange={(next) => setLiveKind("last-feed", next)}
-          />
-          <ReminderToggleRow
-            label={t("liveActivityTogglePump")}
-            checked={livePump}
-            onChange={(next) => setLiveKind("last-pump", next)}
           />
           <ReminderToggleRow
             label={t("liveActivityToggleNap")}

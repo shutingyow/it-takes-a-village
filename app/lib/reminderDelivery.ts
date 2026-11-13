@@ -74,8 +74,13 @@ export async function setReminderDeliveryMode(
   if (mode === "timer") {
     setDeviceRemindersEnabled(false);
     await cancelAllDueNotifications();
-    // Keep existing per-kind prefs; ensure feed timer is on if all were off.
-    if (!anyLiveEnabled()) {
+    // Pump has no ongoing-session Live Activity; never leave a perpetual island.
+    setLiveActivityKindEnabled("last-pump", false);
+    // Keep existing feed/nap prefs; ensure one is on if both were off.
+    if (
+      !getLiveActivityKindEnabled("last-feed") &&
+      !getLiveActivityKindEnabled("last-nap")
+    ) {
       setLiveActivityKindEnabled("last-feed", true);
     }
   } else if (mode === "notifications") {
