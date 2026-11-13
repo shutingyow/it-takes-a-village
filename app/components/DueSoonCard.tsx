@@ -351,14 +351,24 @@ export function DueSoonCard({
     ...medItems,
   ].filter((item): item is DueItem => item != null);
 
-  // Overdue / approaching beat ongoing for the Home strip; ongoing still wins over "ok".
-  const urgent =
+  // Home strip: real dues only (overdue → due soon → on track). Skip ongoing so
+  // an active nap never hides a feed overdue; calm empty if only ongoing exists.
+  // Detail page may still headline ongoing — rows always list it.
+  const stripHeadline =
+    headlineCandidates.find((item) => item.status === "overdue") ??
+    headlineCandidates.find((item) => item.status === "approaching") ??
+    headlineCandidates.find((item) => item.status === "ok") ??
+    null;
+
+  const detailHeadline =
     headlineCandidates.find((item) => item.status === "overdue") ??
     headlineCandidates.find((item) => item.status === "approaching") ??
     headlineCandidates.find((item) => item.status === "ongoing") ??
     headlineCandidates.find((item) => item.status === "ok") ??
     headlineCandidates[0] ??
     null;
+
+  const urgent = detail ? detailHeadline : stripHeadline;
 
   const urgentTitle = !urgent
     ? t("whatsDueAllClear")
@@ -397,7 +407,7 @@ export function DueSoonCard({
               )}
             >
               {urgentLine}
-              {urgent && urgent.status !== "ongoing" && (
+              {urgent && (
                 <span className="text-muted font-medium">
                   {" "}
                   · {formatTime(urgent.dueAt)}
