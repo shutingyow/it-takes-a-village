@@ -10,16 +10,12 @@ export interface SessionTimerBannerProps {
   icon: ReactNode;
   label: string;
   tapHint: string;
-  /** Soft accent for the pulse dot (feed / sleep / later pump). */
+  /** Soft accent for the pulse dot (feed / later pump). */
   pulseClassName?: string;
-  /** Stack above another banner (0 = default bottom slot). */
-  stackIndex?: number;
   ariaLabel?: string;
 }
 
-/**
- * Shared bottom timing chip for live feed / sleep (and later pump) sessions.
- */
+/** Shared bottom timing chip for live feed (and later pump) sessions. */
 export function SessionTimerBanner({
   hidden = false,
   onOpen,
@@ -27,18 +23,15 @@ export function SessionTimerBanner({
   label,
   tapHint,
   pulseClassName = "bg-[#f0a090] animate-pulse",
-  stackIndex = 0,
   ariaLabel,
 }: SessionTimerBannerProps) {
   if (hidden) return null;
-
-  const offsetRem = 4.75 + stackIndex * 4.25;
 
   return (
     <div
       className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3"
       style={{
-        bottom: `calc(${offsetRem}rem + env(safe-area-inset-bottom, 0px))`,
+        bottom: `calc(4.75rem + env(safe-area-inset-bottom, 0px))`,
       }}
     >
       <button

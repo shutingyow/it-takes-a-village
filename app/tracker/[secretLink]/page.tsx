@@ -36,7 +36,7 @@ import { saveLastVisitedTracker } from "@/app/lib/trackerStorage";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ReminderScheduler } from "@/app/components/ReminderScheduler";
 import { FeedTimerBanner } from "@/app/components/FeedTimerBanner";
-import { SleepTimerBanner } from "@/app/components/SleepTimerBanner";
+import { isFeedTimerRecording } from "@/app/lib/feedTimer";
 import { useSyncActiveFeedSession } from "@/app/lib/useSyncActiveFeedSession";
 import { useAppShell } from "@/app/lib/appShell";
 
@@ -65,6 +65,8 @@ export default function TrackerPage({
   const [claiming, setClaiming] = useState(false);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
+  /** Extra main scroll padding so What's due clears the feed timer banner. */
+  const [feedTimerActive, setFeedTimerActive] = useState(false);
 
   const ensureMigrated = useMutation(api.trackers.ensureMigrated);
   const claimTracker = useMutation(api.trackers.claim);
@@ -172,6 +174,17 @@ export default function TrackerPage({
   useEffect(() => {
     if (activeTab !== "profile") setProfileOpenView(null);
   }, [activeTab]);
+
+  useEffect(() => {
+    const refresh = () => setFeedTimerActive(isFeedTimerRecording(secretLink));
+    refresh();
+    window.addEventListener("feedTimerChanged", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("feedTimerChanged", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [secretLink]);
 
   // Always land at the top when switching tabs (shared scroll container).
   useEffect(() => {
@@ -369,7 +382,12 @@ export default function TrackerPage({
 
       <main
         ref={mainRef}
-        className="flex-1 min-h-0 min-w-0 overflow-x-clip overflow-y-auto overscroll-y-contain pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))]"
+        className={
+          feedTimerActive && activeLogModal !== "feed"
+            ? // Tab bar (~4.75rem) + feed banner stack slot (~4.25rem)
+              "flex-1 min-h-0 min-w-0 overflow-x-clip overflow-y-auto overscroll-y-contain pb-[calc(9rem+env(safe-area-inset-bottom,0px))]"
+            : "flex-1 min-h-0 min-w-0 overflow-x-clip overflow-y-auto overscroll-y-contain pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))]"
+        }
       >
         {activeTab === "home" && (
           <HomeTab
@@ -469,17 +487,6 @@ export default function TrackerPage({
           setActiveLogModal("feed");
         }}
       />
-      {lockedCaregiver && (
-        <SleepTimerBanner
-          secretLink={secretLink}
-          selectedCaregiver={lockedCaregiver}
-          hidden={activeLogModal === "nap"}
-          onOpen={() => {
-            setShowLogSheet(false);
-            setActiveLogModal("nap");
-          }}
-        />
-      )}
 
       {showLogSheet && (
         <LogSheet
