@@ -348,7 +348,6 @@ export function SettingsTab({
           </p>
           {isAuthenticated ? (
             <>
-              <p className="text-xs text-muted mb-3">{t("accountSignedIn")}</p>
               <button
                 type="button"
                 onClick={() => void signOut()}
@@ -379,7 +378,6 @@ export function SettingsTab({
               >
                 {deleteBusy ? t("deletingAccount") : t("deleteAccount")}
               </button>
-              <p className="text-xs text-muted mt-2">{t("deleteAccountHint")}</p>
             </>
           ) : (
             <>
@@ -420,10 +418,9 @@ export function SettingsTab({
 
         {isAdmin && (
           <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
-            <p className="text-sm font-semibold text-foreground mb-1">
+            <p className="text-sm font-semibold text-foreground mb-3">
               {t("villageTimezone")}
             </p>
-            <p className="text-xs text-muted mb-3">{t("villageTimezoneDesc")}</p>
             <select
               className="input-field"
               value={villageTimezone}

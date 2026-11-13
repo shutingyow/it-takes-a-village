@@ -80,17 +80,12 @@ export const translations = {
   deletingAccount: "Deleting…",
   deleteAccountConfirm:
     "Delete your account and every village you own? This cannot be undone.",
-  deleteAccountHint:
-    "Deletes your sign-in and villages you created. Shared caregivers keep their own accounts.",
   deleteAccountFailed: "Could not delete account. Try again.",
-  villageTimezone: "Village timezone",
-  villageTimezoneDesc:
-    "Used for “today”, night feed windows, and schedules for everyone in this village.",
+  villageTimezone: "Timezone",
   accountSection: "Account",
   accountSettings: "Account settings",
   accountSettingsDesc: "Sign in, language, appearance & timezone",
   babyDetails: "Baby details",
-  accountSignedIn: "You’re signed in. Admin settings use this account.",
   accountSignedOut:
     "Sign in to manage this village (caregivers). Caregivers don’t need an account.",
   adminPickLockedHint:
