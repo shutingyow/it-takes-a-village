@@ -214,12 +214,6 @@ export default function TrackerPage({
     setNeedsPick(false);
   };
 
-  const handleSwitchCaregiver = () => {
-    clearLockedCaregiver(secretLink);
-    setLockedCaregiver(null);
-    setNeedsPick(true);
-  };
-
   const handleClaimVillage = async () => {
     setClaiming(true);
     setClaimError(null);
@@ -453,7 +447,6 @@ export default function TrackerPage({
             napRemindersEnabled={tracker.napRemindersEnabled}
             pumpSchedule={tracker.pumpSchedule}
             viewerIsOwner={tracker.viewerIsOwner}
-            onSwitchCaregiver={handleSwitchCaregiver}
             onScrollToTop={() =>
               mainRef.current?.scrollTo({ top: 0, behavior: "auto" })
             }
