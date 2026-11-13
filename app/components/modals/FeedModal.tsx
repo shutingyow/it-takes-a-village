@@ -59,9 +59,10 @@ function initialFeedStep(
 ): FeedStep {
   if (editEntry) return "details";
   const timer = loadFeedTimer(feedTimerStorageKey(secretLink));
+  // Only an in-progress timer skips the Live start screen. A leftover
+  // "stopped" draft must not trap caregivers on details with no Start.
+  // In-session End still uses setStep("details"); remount offers continue.
   if (timer.status === "running" || timer.status === "paused") return "timing";
-  // After stop: type + details on one screen (no type-only sheet).
-  if (timer.status === "stopped") return "details";
   return "live";
 }
 
@@ -516,6 +517,37 @@ export function FeedModal({
     setStep("details");
   };
 
+  const goLiveFeed = () => {
+    clearFeedTimer(timerKey);
+    const idle: PersistedFeedTimer = {
+      status: "idle",
+      accumulatedMs: 0,
+      segmentStartedAt: null,
+      feedStartedAt: null,
+    };
+    setLiveTimer(idle);
+    setDurationMinutes(null);
+    setTimeLive(false);
+    setTimeTouched(false);
+    setFeedMode("live");
+    setStep("live");
+  };
+
+  const continueStoppedFeed = () => {
+    const timer = loadFeedTimer(timerKey);
+    if (timer.status !== "stopped") return;
+    setLiveTimer(timer);
+    setDurationMinutes(elapsedToDurationMinutes(timer.accumulatedMs));
+    if (timer.feedStartedAt != null) {
+      setFeedStartAt(timer.feedStartedAt);
+      setFeedEndAt(timer.feedStartedAt + timer.accumulatedMs);
+    }
+    setTimeTouched(true);
+    setTimeLive(false);
+    setFeedMode("live");
+    setStep("details");
+  };
+
   const liveElapsedMs = elapsedMs(liveTimer, liveNow);
   const liveElapsedLabel =
     liveElapsedMs >= 60_000
@@ -648,6 +680,16 @@ export function FeedModal({
             >
               {t("startFeedTimer")}
             </button>
+
+            {liveTimer.status === "stopped" && (
+              <button
+                type="button"
+                onClick={continueStoppedFeed}
+                className="btn-secondary w-full py-3"
+              >
+                {t("finishFeedDetails")}
+              </button>
+            )}
           </div>
         )}
 
@@ -657,13 +699,10 @@ export function FeedModal({
 
         {step === "details" && (
           <div className="space-y-4 min-w-0 max-w-full">
-            {!isEditing && feedMode === "past" && (
+            {!isEditing && (
               <button
                 type="button"
-                onClick={() => {
-                  setFeedMode("live");
-                  setStep("live");
-                }}
+                onClick={goLiveFeed}
                 className="text-sm text-primary font-medium"
               >
                 ← {t("feedModeLive")}
