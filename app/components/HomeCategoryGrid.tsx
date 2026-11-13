@@ -122,7 +122,7 @@ export function HomeCategoryGrid({
         "amountMl" in summaries.feed ? summaries.feed.amountMl : undefined;
       if (amountMl !== undefined) {
         bits.push(t("amountMlShort", { amount: amountMl }));
-      } else if (feedDue) {
+      } else if (feedDue && feedDue.status !== "ongoing") {
         bits.push(
           feedDue.status === "overdue"
             ? t("overdueBy", {

@@ -53,6 +53,16 @@ export function HomeTab({
         pumpScheduleEnabled={pumpScheduleEnabled}
         detail
         onBack={() => setShowDueDetail(false)}
+        onOpenKind={(kind, mode) => {
+          setShowDueDetail(false);
+          const categoryId: HomeCategory =
+            kind === "sleep" ? "nap" : kind;
+          if (mode === "log" && onQuickLog) {
+            onQuickLog(categoryId);
+            return;
+          }
+          setCategory(categoryId);
+        }}
       />
     );
   }

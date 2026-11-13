@@ -226,13 +226,22 @@ export function ReminderScheduler({
     const recording =
       isFeedTimerRecording(secretLink) || activeFeed != null;
     const feedDueAt =
-      notifOn && feedRemindersEnabled && feedItem && !recording && !activeSleep
+      notifOn &&
+      feedRemindersEnabled &&
+      feedItem &&
+      feedItem.status !== "ongoing" &&
+      !recording &&
+      !activeSleep
         ? feedItem.dueAt
         : null;
 
     // Same source as What's due (wake window → pivot to bedtime/sleep).
     const napDueAt =
-      notifOn && napRemindersEnabled && !activeSleep && sleepItem
+      notifOn &&
+      napRemindersEnabled &&
+      !activeSleep &&
+      sleepItem &&
+      sleepItem.status !== "ongoing"
         ? sleepItem.dueAt
         : null;
 

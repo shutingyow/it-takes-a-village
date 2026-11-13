@@ -28,9 +28,12 @@ const dueItemValidator = v.object({
   status: v.union(
     v.literal("ok"),
     v.literal("approaching"),
-    v.literal("overdue")
+    v.literal("overdue"),
+    v.literal("ongoing")
   ),
+  /** For due/approaching/overdue: minutes until (or past) due. For ongoing: minutes elapsed. */
   minutesUntilDue: v.number(),
+  caregiverName: v.optional(v.string()),
 });
 
 /** Today's bedtime clock (night window start) as UTC ms, or null if unset/invalid. */
@@ -158,42 +161,59 @@ export const getDueStatus = query({
       type: "feed" | "medication" | "pump" | "sleep";
       label: string;
       dueAt: number;
-      status: "ok" | "approaching" | "overdue";
+      status: "ok" | "approaching" | "overdue" | "ongoing";
       minutesUntilDue: number;
+      caregiverName?: string;
     }> = [];
     const timeZone = resolveTrackerTimezone(tracker);
 
     let effectiveFeedIntervalHours = feedIntervalHours;
     let usingNightInterval = false;
 
-    const recentFeeds = await ctx.db
-      .query("feedEntries")
-      .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", tracker._id))
-      .order("desc")
-      .take(40);
-    const lastFeed = recentFeeds.find(
-      (feed) => feed.type === "breast" || feed.type === "bottle"
-    );
-
-    if (lastFeed) {
-      // last feed + day or night interval (cutover may shorten night → day).
-      const feedAt = clampFeedAtForSkew(lastFeed.timestamp, args.now);
-      const dueAt = computeFeedDueAt(
-        lastFeed.timestamp,
-        feedIntervalHours,
-        night,
-        { now: args.now, timeZone }
-      );
-      effectiveFeedIntervalHours = (dueAt - feedAt) / (60 * 60 * 1000);
-      usingNightInterval =
-        night.enabled && effectiveFeedIntervalHours > feedIntervalHours + 1e-9;
-      const due = computeDueStatus(dueAt, args.now);
+    const activeFeed = tracker.activeFeedSession;
+    if (activeFeed) {
+      // Live feed timer replaces next-feed due until the session ends.
       items.push({
         type: "feed",
         label: "feed",
-        dueAt,
-        ...due,
+        dueAt: activeFeed.startedAt,
+        status: "ongoing",
+        minutesUntilDue: Math.max(
+          0,
+          Math.floor((args.now - activeFeed.startedAt) / 60_000)
+        ),
+        caregiverName: activeFeed.caregiverName,
       });
+    } else {
+      const recentFeeds = await ctx.db
+        .query("feedEntries")
+        .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", tracker._id))
+        .order("desc")
+        .take(40);
+      const lastFeed = recentFeeds.find(
+        (feed) => feed.type === "breast" || feed.type === "bottle"
+      );
+
+      if (lastFeed) {
+        // last feed + day or night interval (cutover may shorten night → day).
+        const feedAt = clampFeedAtForSkew(lastFeed.timestamp, args.now);
+        const dueAt = computeFeedDueAt(
+          lastFeed.timestamp,
+          feedIntervalHours,
+          night,
+          { now: args.now, timeZone }
+        );
+        effectiveFeedIntervalHours = (dueAt - feedAt) / (60 * 60 * 1000);
+        usingNightInterval =
+          night.enabled && effectiveFeedIntervalHours > feedIntervalHours + 1e-9;
+        const due = computeDueStatus(dueAt, args.now);
+        items.push({
+          type: "feed",
+          label: "feed",
+          dueAt,
+          ...due,
+        });
+      }
     }
 
     const medicationReminders = tracker.medicationReminders ?? [];
@@ -270,24 +290,36 @@ export const getDueStatus = query({
       }
     }
 
-    const wakeWindowMinutes = tracker.wakeWindowMinutes;
-    const napRemindersEnabled = tracker.napRemindersEnabled !== false;
-    if (
-      wakeWindowMinutes != null &&
-      wakeWindowMinutes > 0 &&
-      napRemindersEnabled
-    ) {
-      const recentSleep = await ctx.db
-        .query("sleepEntries")
-        .withIndex("by_tracker_and_start", (q) =>
-          q.eq("trackerId", tracker._id)
-        )
-        .order("desc")
-        .take(40);
-      const activeSleep = recentSleep.find(
-        (entry) => entry.endTime === undefined
-      );
-      if (!activeSleep) {
+    const recentSleep = await ctx.db
+      .query("sleepEntries")
+      .withIndex("by_tracker_and_start", (q) => q.eq("trackerId", tracker._id))
+      .order("desc")
+      .take(40);
+    const activeSleep = recentSleep.find(
+      (entry) => entry.endTime === undefined
+    );
+
+    if (activeSleep) {
+      // Live nap/sleep replaces wake-window due until the session ends.
+      items.push({
+        type: "sleep",
+        label: activeSleep.type === "night" ? "sleep" : "nap",
+        dueAt: activeSleep.startTime,
+        status: "ongoing",
+        minutesUntilDue: Math.max(
+          0,
+          Math.floor((args.now - activeSleep.startTime) / 60_000)
+        ),
+        caregiverName: activeSleep.caregiverName,
+      });
+    } else {
+      const wakeWindowMinutes = tracker.wakeWindowMinutes;
+      const napRemindersEnabled = tracker.napRemindersEnabled !== false;
+      if (
+        wakeWindowMinutes != null &&
+        wakeWindowMinutes > 0 &&
+        napRemindersEnabled
+      ) {
         const lastEnded = recentSleep.find(
           (entry) => entry.endTime !== undefined
         );
