@@ -46,14 +46,13 @@ async function scheduleSleepLivePush(
     return;
   }
 
-  // End the sleep island immediately — do not morph into a perpetual
-  // "Awake since" timer (that keeps Dynamic Island over the status bar).
+  // Replace in-progress sleep with since-last (awake) from the end timestamp.
   const endAt = opts.endTime ?? Date.now();
-  const title = baby ? `${baby} · Awake` : "Awake";
+  const title = baby ? `${baby} · Awake since` : "Awake since";
   await ctx.scheduler.runAfter(0, internal.apns.notifyLiveActivityUpdate, {
     trackerId,
     kind: "last-nap",
-    event: "end",
+    event: "update",
     title,
     subtitle: "Nap ended",
     dueAtMs: endAt,
@@ -66,7 +65,7 @@ async function scheduleSleepLivePush(
     .order("desc")
     .take(40);
   const lastMilk = recent.find((f) => isMilkFeed(f.type));
-  // Ends any feed Live Activity + silent-wakes devices to clear local alerts.
+  // Restore since-last feed + silent-wake devices to resync local state.
   await ctx.scheduler.runAfter(0, internal.apns.notifyFeedChanged, {
     trackerId,
     lastFeedAt: lastMilk?.timestamp ?? null,

@@ -493,10 +493,10 @@ export const zh: Translations = {
   sleepingBanner: "睡觉中 · {time}",
   liveActivityTimers: "锁屏计时",
   liveActivityTimersDesc:
-    "喂奶或睡觉进行中时在锁屏显示计时；结束后自动关闭，避免挡住电量和时间。",
-  liveActivityToggleFeed: "喂奶进行中",
+    "在锁屏显示距上次喂奶、吸奶或睡眠的计时。喂奶或睡觉进行中时，对应计时改为进行中。",
+  liveActivityToggleFeed: "喂奶计时",
   liveActivityTogglePump: "吸奶计时",
-  liveActivityToggleNap: "睡觉进行中",
+  liveActivityToggleNap: "小睡 / 清醒计时",
   feedStartTime: "开始时间",
   feedEndTime: "结束时间",
   feedEndBeforeStart: "结束时间须晚于开始时间",

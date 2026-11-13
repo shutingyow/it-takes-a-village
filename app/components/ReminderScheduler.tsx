@@ -141,8 +141,23 @@ export function ReminderScheduler({
     actingCaregiverName: selectedCaregiver,
     now,
   });
-  const lastPump = useQuery(api.pumpEntries.getLast, { secretLink, actingCaregiverName: selectedCaregiver });
-  const activeSleep = useQuery(api.sleepEntries.getActive, { secretLink, actingCaregiverName: selectedCaregiver });
+  const lastFeed = useQuery(api.feedEntries.getLast, {
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
+  });
+  const lastPump = useQuery(api.pumpEntries.getLast, {
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
+  });
+  const recentSleep = useQuery(api.sleepEntries.getRecent, {
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
+    limit: 10,
+  });
+  const activeSleep = useQuery(api.sleepEntries.getActive, {
+    secretLink,
+    actingCaregiverName: selectedCaregiver,
+  });
   const activeFeed = useQuery(api.feedSessions.getActive, {
     secretLink,
     actingCaregiverName: selectedCaregiver,
@@ -253,69 +268,98 @@ export function ReminderScheduler({
       formatClock: formatTime,
     });
 
-    // Live Activities own the Dynamic Island compact pill and cover the
-    // system status bar. Only keep one while a feed/sleep session is
-    // actively in progress; end "since last" timers so the island clears.
-    // Wait for session queries to settle so a loading undefined does not
-    // tear down a real ongoing activity.
-    if (activeFeed !== undefined) {
-      const feedStartedAt = activeFeed?.startedAt ?? null;
-      if (feedStartedAt != null) {
-        void syncLiveActivity({
-          kind: "last-feed",
-          enabled: timerOn && getLiveActivityKindEnabled("last-feed"),
-          lastAt: feedStartedAt,
-          title: t("liveActivityFeedOngoingTitle"),
-          subtitle: t("liveActivityFeedOngoingSubtitle", {
-            time: formatTime(feedStartedAt),
-            name: activeFeed?.caregiverName ?? "",
-          }),
-        });
-      } else {
-        void syncLiveActivity({
-          kind: "last-feed",
-          enabled: false,
-          lastAt: null,
-          title: t("liveActivityLastFeedTitle"),
-          subtitle: t("liveActivityLastFeedSubtitleEmpty"),
-        });
-      }
+    // Lock screen: for each kind, in-progress replaces "since last" (not both).
+    // Wait for session/last queries to settle so a loading undefined does not
+    // tear down a real activity, and ending a session can flip back to since-last.
+    if (
+      activeFeed === undefined ||
+      activeSleep === undefined ||
+      lastFeed === undefined ||
+      lastPump === undefined ||
+      recentSleep === undefined
+    ) {
+      return;
     }
 
-    // No active pump session model — never leave a perpetual pump island.
+    const feedStartedAt = activeFeed?.startedAt ?? null;
+    if (feedStartedAt != null) {
+      void syncLiveActivity({
+        kind: "last-feed",
+        enabled: timerOn && getLiveActivityKindEnabled("last-feed"),
+        lastAt: feedStartedAt,
+        title: t("liveActivityFeedOngoingTitle"),
+        subtitle: t("liveActivityFeedOngoingSubtitle", {
+          time: formatTime(feedStartedAt),
+          name: activeFeed?.caregiverName ?? "",
+        }),
+      });
+    } else if (activeSleep) {
+      // Don't keep a stale "hours since last feed" while baby is asleep.
+      void syncLiveActivity({
+        kind: "last-feed",
+        enabled: false,
+        lastAt: null,
+        title: t("liveActivityLastFeedTitle"),
+        subtitle: t("liveActivityLastFeedSubtitleEmpty"),
+      });
+    } else {
+      const lastMilkFeedAt = lastFeed?.timestamp ?? null;
+      void syncLiveActivity({
+        kind: "last-feed",
+        enabled: timerOn && getLiveActivityKindEnabled("last-feed"),
+        lastAt: lastMilkFeedAt,
+        title: t("liveActivityLastFeedTitle"),
+        subtitle: lastMilkFeedAt
+          ? t("liveActivityLastFeedSubtitle", {
+              time: formatTime(lastMilkFeedAt),
+            })
+          : t("liveActivityLastFeedSubtitleEmpty"),
+      });
+    }
+
+    const lastPumpAt = lastPump?.timestamp ?? null;
     void syncLiveActivity({
       kind: "last-pump",
-      enabled: false,
-      lastAt: null,
+      enabled: timerOn && getLiveActivityKindEnabled("last-pump"),
+      lastAt: lastPumpAt,
       title: t("liveActivityLastPumpTitle"),
-      subtitle: t("liveActivityLastPumpSubtitleEmpty"),
+      subtitle: lastPumpAt
+        ? t("liveActivityLastPumpSubtitle", {
+            time: formatTime(lastPumpAt),
+          })
+        : t("liveActivityLastPumpSubtitleEmpty"),
     });
 
-    if (activeSleep !== undefined) {
-      if (activeSleep) {
-        const sleepTitle =
-          activeSleep.type === "nap"
-            ? t("liveActivityNappingTitle")
-            : t("liveActivitySleepingTitle");
-        void syncLiveActivity({
-          kind: "last-nap",
-          enabled: timerOn && getLiveActivityKindEnabled("last-nap"),
-          lastAt: activeSleep.startTime,
-          title: sleepTitle,
-          subtitle: t("liveActivitySleepOngoingSubtitle", {
-            time: formatTime(activeSleep.startTime),
-            name: activeSleep.caregiverName,
-          }),
-        });
-      } else {
-        void syncLiveActivity({
-          kind: "last-nap",
-          enabled: false,
-          lastAt: null,
-          title: t("liveActivityLastNapTitle"),
-          subtitle: t("liveActivityLastNapSubtitleEmpty"),
-        });
-      }
+    if (activeSleep) {
+      const sleepTitle =
+        activeSleep.type === "nap"
+          ? t("liveActivityNappingTitle")
+          : t("liveActivitySleepingTitle");
+      void syncLiveActivity({
+        kind: "last-nap",
+        enabled: timerOn && getLiveActivityKindEnabled("last-nap"),
+        lastAt: activeSleep.startTime,
+        title: sleepTitle,
+        subtitle: t("liveActivitySleepOngoingSubtitle", {
+          time: formatTime(activeSleep.startTime),
+          name: activeSleep.caregiverName,
+        }),
+      });
+    } else {
+      const lastSleepEnd =
+        recentSleep.find((entry) => entry.endTime !== undefined)?.endTime ??
+        null;
+      void syncLiveActivity({
+        kind: "last-nap",
+        enabled: timerOn && getLiveActivityKindEnabled("last-nap"),
+        lastAt: lastSleepEnd,
+        title: t("liveActivityLastNapTitle"),
+        subtitle: lastSleepEnd
+          ? t("liveActivityLastNapSubtitle", {
+              time: formatTime(lastSleepEnd),
+            })
+          : t("liveActivityLastNapSubtitleEmpty"),
+      });
     }
   }, [
     dueStatus,
@@ -325,7 +369,9 @@ export function ReminderScheduler({
     feedDueKey,
     pumpDueKey,
     hourBucket,
+    lastFeed,
     lastPump,
+    recentSleep,
     activeSleep,
     activeFeed,
     pumpSchedule,

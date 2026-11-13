@@ -529,10 +529,10 @@ export const translations = {
   sleepingBanner: "Sleeping · {time}",
   liveActivityTimers: "Lock screen timers",
   liveActivityTimersDesc:
-    "While a feed or sleep is in progress, show it on the Lock Screen. Timers end when the session ends so they do not cover the status bar.",
-  liveActivityToggleFeed: "Feed in progress",
+    "Show time since the last feed, pump, or sleep on the Lock Screen. While a feed or sleep is in progress, that timer switches to in-progress instead.",
+  liveActivityToggleFeed: "Feed timer",
   liveActivityTogglePump: "Pump timer",
-  liveActivityToggleNap: "Sleep in progress",
+  liveActivityToggleNap: "Nap / awake timer",
   feedStartTime: "Start time",
   feedEndTime: "End time",
   feedEndBeforeStart: "End time must be after start time",
