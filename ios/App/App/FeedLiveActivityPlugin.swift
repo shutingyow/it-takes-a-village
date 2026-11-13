@@ -119,9 +119,11 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
+            // dueAt is the last-event time (often hours ago). Stale relative to
+            // that date would mark long gaps as immediately outdated.
             let content = ActivityContent(
                 state: state,
-                staleDate: state.dueAt.addingTimeInterval(24 * 60 * 60)
+                staleDate: Date().addingTimeInterval(24 * 60 * 60)
             )
             let keepId = matches.first?.id
             for activity in matches {
@@ -235,9 +237,10 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         state: FeedCountdownAttributes.ContentState
     ) throws -> Activity<FeedCountdownAttributes> {
         let attributes = FeedCountdownAttributes(kind: kind)
+        // Count-up from a past dueAt — keep the activity fresh for a day from now.
         let content = ActivityContent(
             state: state,
-            staleDate: state.dueAt.addingTimeInterval(24 * 60 * 60)
+            staleDate: Date().addingTimeInterval(24 * 60 * 60)
         )
         // .token enables ActivityKit APNs updates from Convex when another
         // caregiver logs while this device is backgrounded.

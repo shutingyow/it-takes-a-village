@@ -174,6 +174,8 @@ export function ReminderScheduler({
     : "none";
   const hourBucket = Math.floor(now / 3_600_000);
 
+  // Due alerts — independent of Live Activities so a slow dues query cannot
+  // block lock-screen timers.
   useEffect(() => {
     if (!dueStatus) return;
     // Wait until last pump query settles so we don't schedule fixed-slot
@@ -181,7 +183,6 @@ export function ReminderScheduler({
     if (lastPump === undefined) return;
 
     const notifOn = reminderNotificationsEnabled();
-    const timerOn = reminderTimersEnabled();
     const lead =
       notifyBeforeProp ??
       dueStatus.notifyBeforeMinutes ??
@@ -276,10 +277,32 @@ export function ReminderScheduler({
       napBodyAtDue: (clock) => t("deviceNotifNapBody", { time: clock }),
       formatClock: formatTime,
     });
+  }, [
+    dueStatus,
+    feedItem,
+    pumpItem,
+    sleepItem,
+    feedDueKey,
+    pumpDueKey,
+    hourBucket,
+    lastPump,
+    activeSleep,
+    activeFeed,
+    pumpSchedule,
+    feedIntervalHours,
+    notifyBeforeProp,
+    feedRemindersEnabled,
+    wakeWindowMinutes,
+    napRemindersEnabled,
+    secretLink,
+    t,
+    optInTick,
+  ]);
 
-    // Lock screen: for each kind, in-progress replaces "since last" (not both).
-    // Wait for session/last queries to settle so a loading undefined does not
-    // tear down a real activity, and ending a session can flip back to since-last.
+  // Lock screen: each kind shows time since last; an in-progress session of
+  // that kind replaces it (feed session → feed, sleep → nap). Sleep must not
+  // tear down the feed since-last timer.
+  useEffect(() => {
     if (
       activeFeed === undefined ||
       activeSleep === undefined ||
@@ -290,6 +313,7 @@ export function ReminderScheduler({
       return;
     }
 
+    const timerOn = reminderTimersEnabled();
     const feedStartedAt = activeFeed?.startedAt ?? null;
     if (feedStartedAt != null) {
       void syncLiveActivity({
@@ -301,15 +325,6 @@ export function ReminderScheduler({
           time: formatTime(feedStartedAt),
           name: activeFeed?.caregiverName ?? "",
         }),
-      });
-    } else if (activeSleep) {
-      // Don't keep a stale "hours since last feed" while baby is asleep.
-      void syncLiveActivity({
-        kind: "last-feed",
-        enabled: false,
-        lastAt: null,
-        title: t("liveActivityLastFeedTitle"),
-        subtitle: t("liveActivityLastFeedSubtitleEmpty"),
       });
     } else {
       const lastMilkFeedAt = lastFeed?.timestamp ?? null;
@@ -371,25 +386,11 @@ export function ReminderScheduler({
       });
     }
   }, [
-    dueStatus,
-    feedItem,
-    pumpItem,
-    sleepItem,
-    feedDueKey,
-    pumpDueKey,
-    hourBucket,
     lastFeed,
     lastPump,
     recentSleep,
     activeSleep,
     activeFeed,
-    pumpSchedule,
-    feedIntervalHours,
-    notifyBeforeProp,
-    feedRemindersEnabled,
-    wakeWindowMinutes,
-    napRemindersEnabled,
-    secretLink,
     t,
     optInTick,
   ]);

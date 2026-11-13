@@ -33,16 +33,8 @@ async function scheduleSleepLivePush(
       dueAtMs: opts.startTime,
       silentWake: true,
     });
-    // Hide stale "hours since last feed" while baby is asleep.
-    await ctx.scheduler.runAfter(0, internal.apns.notifyLiveActivityUpdate, {
-      trackerId,
-      kind: "last-feed",
-      event: "end",
-      title: title,
-      subtitle: sleeping,
-      dueAtMs: opts.startTime,
-      silentWake: true,
-    });
+    // Keep feed since-last on the lock screen while sleeping — only an
+    // active feed session replaces the feed timer (not nap/sleep).
     return;
   }
 
