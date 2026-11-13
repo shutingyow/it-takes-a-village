@@ -59,10 +59,10 @@ function initialFeedStep(
 ): FeedStep {
   if (editEntry) return "details";
   const timer = loadFeedTimer(feedTimerStorageKey(secretLink));
-  // Only an in-progress timer skips the Live start screen. A leftover
-  // "stopped" draft must not trap caregivers on details with no Start.
-  // In-session End still uses setStep("details"); remount offers continue.
+  // In-progress → timing panel. Stopped draft → same post-End details
+  // path (no separate "Add details" CTA on the Live start screen).
   if (timer.status === "running" || timer.status === "paused") return "timing";
+  if (timer.status === "stopped") return "details";
   return "live";
 }
 
@@ -533,21 +533,6 @@ export function FeedModal({
     setStep("live");
   };
 
-  const continueStoppedFeed = () => {
-    const timer = loadFeedTimer(timerKey);
-    if (timer.status !== "stopped") return;
-    setLiveTimer(timer);
-    setDurationMinutes(elapsedToDurationMinutes(timer.accumulatedMs));
-    if (timer.feedStartedAt != null) {
-      setFeedStartAt(timer.feedStartedAt);
-      setFeedEndAt(timer.feedStartedAt + timer.accumulatedMs);
-    }
-    setTimeTouched(true);
-    setTimeLive(false);
-    setFeedMode("live");
-    setStep("details");
-  };
-
   const liveElapsedMs = elapsedMs(liveTimer, liveNow);
   const liveElapsedLabel =
     liveElapsedMs >= 60_000
@@ -680,16 +665,6 @@ export function FeedModal({
             >
               {t("startFeedTimer")}
             </button>
-
-            {liveTimer.status === "stopped" && (
-              <button
-                type="button"
-                onClick={continueStoppedFeed}
-                className="btn-secondary w-full py-3"
-              >
-                {t("finishFeedDetails")}
-              </button>
-            )}
           </div>
         )}
 

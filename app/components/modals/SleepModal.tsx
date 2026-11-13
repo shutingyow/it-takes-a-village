@@ -2,13 +2,11 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn, formatDateTime, formatDuration } from "@/app/lib/utils";
 import { BottomSheet } from "../ui/BottomSheet";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { IconSleep } from "../icons";
-import { EntryPhotoField } from "../EntryPhotoField";
 import type { ActivityEntry } from "../ActivityEntryCard";
 import { LoggedByHint } from "../LoggedByHint";
 
@@ -93,10 +91,8 @@ export function SleepModal({
     )
   );
   const [notes, setNotes] = useState(editEntry?.notes ?? "");
-  const [photoIds, setPhotoIds] = useState<Id<"_storage">[]>(
-    editEntry?.photoIds ?? []
-  );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [liveNow, setLiveNow] = useState(() => Date.now());
 
   const pastStartTime = useMemo(
     () => new Date(startDateTime).getTime(),
@@ -113,6 +109,12 @@ export function SleepModal({
     }
     return formatDuration(pastStartTime, pastEndTime);
   }, [startDateTime, endDateTime, pastStartTime, pastEndTime]);
+
+  useEffect(() => {
+    if (!liveSession) return;
+    const id = window.setInterval(() => setLiveNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [liveSession?._id, liveSession]);
 
   const switchToPastMode = () => {
     const defaults = getDefaultPastTimes(lastSleep?.endTime);
@@ -134,7 +136,6 @@ export function SleepModal({
         actingCaregiverName: selectedCaregiver,
         type: sleepType,
         startTime: Date.now(),
-        photoIds: photoIds.length > 0 ? photoIds : undefined,
       });
       const { hapticSuccess } = await import("@/app/lib/haptics");
       void hapticSuccess();
@@ -156,7 +157,6 @@ export function SleepModal({
         actingCaregiverName: selectedCaregiver,
         entryId: liveSession._id,
         endTime: Date.now(),
-        photoIds: photoIds.length > 0 ? photoIds : undefined,
       });
       const { hapticSuccess } = await import("@/app/lib/haptics");
       void hapticSuccess();
@@ -193,7 +193,6 @@ export function SleepModal({
         startTime: pastStartTime,
         endTime: pastEndTime,
         notes: notes || undefined,
-        photoIds: photoIds.length > 0 ? photoIds : undefined,
       });
       const { hapticSuccess } = await import("@/app/lib/haptics");
       void hapticSuccess();
@@ -223,7 +222,6 @@ export function SleepModal({
         startTime: pastStartTime,
         endTime: editEntry.endTime != null ? pastEndTime : undefined,
         notes: notes || undefined,
-        photoIds: photoIds.length > 0 ? photoIds : undefined,
       });
       const { hapticSuccess } = await import("@/app/lib/haptics");
       void hapticSuccess();
@@ -235,14 +233,46 @@ export function SleepModal({
     }
   };
 
-  const photoField = (
-    <EntryPhotoField
-      secretLink={secretLink}
-      selectedCaregiver={selectedCaregiver}
-      photoIds={photoIds}
-      onChange={setPhotoIds}
-    />
+  const sleepTypePicker = (
+    <div>
+      <label className="label-field">{t("sleepType")}</label>
+      <div className="flex gap-2">
+        {(["nap", "night"] as const).map((type) => (
+          <button
+            key={type}
+            type="button"
+            onClick={() => setSleepType(type)}
+            className={cn(
+              "btn-option flex-1",
+              sleepType === type ? "btn-option-selected" : "btn-option-default"
+            )}
+          >
+            {type === "nap" ? t("nap") : t("night")}
+          </button>
+        ))}
+      </div>
+    </div>
   );
+
+  const notesField = (
+    <div>
+      <label className="label-field">{t("notesOptional")}</label>
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder={t("observationsPlaceholder")}
+        className="textarea-field"
+        rows={2}
+      />
+    </div>
+  );
+
+  const durationHint =
+    pastDurationPreview != null ? (
+      <p className="text-sm text-muted tabular-nums">
+        {t("durationPreview")}: {pastDurationPreview}
+      </p>
+    ) : null;
 
   const liveTimerPanel = liveSession ? (
     <>
@@ -254,16 +284,14 @@ export function SleepModal({
           {t("babySleeping")}
         </p>
         <div className="bg-accent-sleep-light rounded-2xl p-5">
-          <p className="text-3xl font-bold text-accent-sleep">
-            {formatDuration(liveSession.startTime)}
+          <p className="text-3xl font-bold text-accent-sleep tabular-nums">
+            {formatDuration(liveSession.startTime, liveNow)}
           </p>
           <p className="text-sm text-muted mt-2">
             {t("startedByName", { name: liveSession.caregiverName })}
           </p>
         </div>
       </div>
-
-      {photoField}
 
       <button
         type="button"
@@ -292,6 +320,7 @@ export function SleepModal({
     );
   }
 
+  // Completed nap and night share one bedtime-style edit layout.
   if (isEditing && editEntry) {
     const hasEnd = editEntry.endTime != null;
     return (
@@ -302,26 +331,7 @@ export function SleepModal({
       >
         <div className="space-y-4 pt-2">
           <LoggedByHint name={editEntry.caregiverName} />
-          <div>
-            <label className="label-field">{t("sleepType")}</label>
-            <div className="flex gap-2">
-              {(["nap", "night"] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setSleepType(type)}
-                  className={cn(
-                    "btn-option flex-1",
-                    sleepType === type
-                      ? "btn-option-selected"
-                      : "btn-option-default"
-                  )}
-                >
-                  {type === "nap" ? t("nap") : t("night")}
-                </button>
-              ))}
-            </div>
-          </div>
+          {sleepTypePicker}
 
           <div>
             <label className="label-field">{t("startTime")}</label>
@@ -345,27 +355,9 @@ export function SleepModal({
             </div>
           )}
 
-          {hasEnd && pastDurationPreview && (
-            <div className="bg-accent-sleep-light rounded-2xl p-4 text-center">
-              <p className="text-sm text-muted mb-1">{t("durationPreview")}</p>
-              <p className="text-2xl font-bold text-accent-sleep">
-                {pastDurationPreview}
-              </p>
-            </div>
-          )}
+          {hasEnd && durationHint}
 
-          <div>
-            <label className="label-field">{t("notesOptional")}</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder={t("observationsPlaceholder")}
-              className="textarea-field"
-              rows={2}
-            />
-          </div>
-
-          {photoField}
+          {notesField}
 
           <button
             type="button"
@@ -423,28 +415,7 @@ export function SleepModal({
                 <p className="text-sm text-muted">{t("currentlyAwake")}</p>
               </div>
 
-              <div>
-                <label className="label-field">{t("sleepType")}</label>
-                <div className="flex gap-2">
-                  {(["nap", "night"] as const).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setSleepType(type)}
-                      className={cn(
-                        "btn-option flex-1",
-                        sleepType === type
-                          ? "btn-option-selected"
-                          : "btn-option-default"
-                      )}
-                    >
-                      {type === "nap" ? t("nap") : t("night")}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {photoField}
+              {sleepTypePicker}
 
               <button
                 type="button"
@@ -458,26 +429,7 @@ export function SleepModal({
           )
         ) : (
           <>
-            <div>
-              <label className="label-field">{t("sleepType")}</label>
-              <div className="flex gap-2">
-                {(["nap", "night"] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setSleepType(type)}
-                    className={cn(
-                      "btn-option flex-1",
-                      sleepType === type
-                        ? "btn-option-selected"
-                        : "btn-option-default"
-                    )}
-                  >
-                    {type === "nap" ? t("nap") : t("night")}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {sleepTypePicker}
 
             <div>
               <label className="label-field">{t("startTime")}</label>
@@ -499,30 +451,14 @@ export function SleepModal({
               />
             </div>
 
+            {durationHint}
             {pastDurationPreview && (
-              <div className="bg-accent-sleep-light rounded-2xl p-4 text-center">
-                <p className="text-sm text-muted mb-1">{t("durationPreview")}</p>
-                <p className="text-2xl font-bold text-accent-sleep">
-                  {pastDurationPreview}
-                </p>
-                <p className="text-xs text-muted mt-2">
-                  {formatDateTime(pastStartTime)} → {formatDateTime(pastEndTime)}
-                </p>
-              </div>
+              <p className="text-xs text-muted">
+                {formatDateTime(pastStartTime)} → {formatDateTime(pastEndTime)}
+              </p>
             )}
 
-            <div>
-              <label className="label-field">{t("notesOptional")}</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={t("observationsPlaceholder")}
-                className="textarea-field"
-                rows={2}
-              />
-            </div>
-
-            {photoField}
+            {notesField}
 
             <button
               type="button"

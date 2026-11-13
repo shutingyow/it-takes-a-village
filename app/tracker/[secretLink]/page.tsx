@@ -36,6 +36,7 @@ import { saveLastVisitedTracker } from "@/app/lib/trackerStorage";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ReminderScheduler } from "@/app/components/ReminderScheduler";
 import { FeedTimerBanner } from "@/app/components/FeedTimerBanner";
+import { SleepTimerBanner } from "@/app/components/SleepTimerBanner";
 import { useSyncActiveFeedSession } from "@/app/lib/useSyncActiveFeedSession";
 import { useAppShell } from "@/app/lib/appShell";
 
@@ -468,6 +469,17 @@ export default function TrackerPage({
           setActiveLogModal("feed");
         }}
       />
+      {lockedCaregiver && (
+        <SleepTimerBanner
+          secretLink={secretLink}
+          selectedCaregiver={lockedCaregiver}
+          hidden={activeLogModal === "nap"}
+          onOpen={() => {
+            setShowLogSheet(false);
+            setActiveLogModal("nap");
+          }}
+        />
+      )}
 
       {showLogSheet && (
         <LogSheet

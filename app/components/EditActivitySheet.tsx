@@ -9,7 +9,6 @@ import { GrowthModal } from "./modals/GrowthModal";
 import { SleepModal } from "./modals/SleepModal";
 import { ActivityModal } from "./modals/ActivityModal";
 import { MomentModal } from "./modals/MomentModal";
-import { NapModal } from "./modals/NapModal";
 
 interface EditActivitySheetProps {
   entry: ActivityEntry;
@@ -119,19 +118,9 @@ export function EditActivitySheet({
   }
 
   if (entry.entryType === "nap") {
-    // In-progress nap → Sleep modal so caregivers get End sleep now.
-    if (entry.endTime == null) {
-      return (
-        <SleepModal
-          secretLink={secretLink}
-          selectedCaregiver={selectedCaregiver}
-          editEntry={entry}
-          onClose={onClose}
-        />
-      );
-    }
+    // Nap and night share SleepModal (bedtime-style) for edit and end.
     return (
-      <NapModal
+      <SleepModal
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
         editEntry={entry}

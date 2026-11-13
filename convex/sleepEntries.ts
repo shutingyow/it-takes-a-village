@@ -373,6 +373,8 @@ export const update = mutation({
     }
 
     const durationMinutes = existing.durationMinutes;
+    const nextPhotoIds =
+      args.photoIds !== undefined ? args.photoIds : existing.photoIds;
     await ctx.db.replace(args.entryId, {
       trackerId: existing.trackerId,
       caregiverName: existing.caregiverName,
@@ -381,7 +383,7 @@ export const update = mutation({
       endTime: args.endTime,
       ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       notes: args.notes,
-      photoIds: args.photoIds,
+      ...(nextPhotoIds !== undefined ? { photoIds: nextPhotoIds } : {}),
     });
     return null;
   },
