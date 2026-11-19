@@ -99,7 +99,7 @@ export function GrowthView({
                       className="flex-1 flex flex-col items-center gap-1"
                     >
                       <span className="text-[10px] font-medium text-muted">
-                        {w.weight} kg
+                        {w.weight.toFixed(1)} kg
                       </span>
                       <div className="w-full flex items-end justify-center h-16">
                         <div
