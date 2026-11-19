@@ -2,8 +2,12 @@
 
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { use, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, use, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  logDeepLinkToModal,
+  parseLogQueryParam,
+} from "@/app/lib/liveActivityDeepLink";
 import { CaregiverLockScreen } from "@/app/components/CaregiverLockScreen";
 import { LockedCaregiverBadge } from "@/app/components/LockedCaregiverBadge";
 import { HomeTab } from "@/app/components/tabs/HomeTab";
@@ -47,9 +51,28 @@ export default function TrackerPage({
 }: {
   params: Promise<{ secretLink: string }>;
 }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="w-8 h-8 rounded-full border-2 border-accent-diaper border-t-transparent animate-spin" />
+        </div>
+      }
+    >
+      <TrackerPageInner params={params} />
+    </Suspense>
+  );
+}
+
+function TrackerPageInner({
+  params,
+}: {
+  params: Promise<{ secretLink: string }>;
+}) {
   const { secretLink } = use(params);
   const { t } = useLanguage();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const appShell = useAppShell();
   const { isAuthenticated } = useConvexAuth();
   const [activeTab, setActiveTab] = useState<TrackerTab>("home");
@@ -59,6 +82,7 @@ export default function TrackerPage({
   const mainRef = useRef<HTMLElement>(null);
   const [showLogSheet, setShowLogSheet] = useState(false);
   const [activeLogModal, setActiveLogModal] = useState<LogType | null>(null);
+  const consumedLogQuery = useRef<string | null>(null);
   const [lockedCaregiver, setLockedCaregiver] = useState<string | null>(null);
   const [needsPick, setNeedsPick] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -174,6 +198,23 @@ export default function TrackerPage({
   useEffect(() => {
     if (activeTab !== "profile") setProfileOpenView(null);
   }, [activeTab]);
+
+  // Live Activity / Dynamic Island tap → `?log=feed|pump|sleep` (or nap).
+  // Wait until caregiver is locked so the modal can submit.
+  useEffect(() => {
+    if (!lockedCaregiver) return;
+    const path = parseLogQueryParam(searchParams);
+    if (!path) {
+      consumedLogQuery.current = null;
+      return;
+    }
+    const token = `${secretLink}:${path}`;
+    if (consumedLogQuery.current === token) return;
+    consumedLogQuery.current = token;
+    setShowLogSheet(false);
+    setActiveLogModal(logDeepLinkToModal(path));
+    router.replace(`/tracker/${secretLink}`, { scroll: false });
+  }, [lockedCaregiver, searchParams, secretLink, router]);
 
   useEffect(() => {
     const refresh = () => setFeedTimerActive(isFeedTimerRecording(secretLink));

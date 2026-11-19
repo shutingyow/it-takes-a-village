@@ -12,6 +12,7 @@ struct FeedLiveActivityLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: FeedCountdownAttributes.self) { context in
             lockScreenView(context: context)
+                .widgetURL(deepLink(for: context.attributes.kind))
                 .activityBackgroundTint(Color(red: 0.98, green: 0.93, blue: 0.91))
                 .activitySystemActionForegroundColor(Color(red: 0.55, green: 0.28, blue: 0.26))
         } dynamicIsland: { context in
@@ -22,7 +23,7 @@ struct FeedLiveActivityLiveActivity: Widget {
                         .font(.title2)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    sinceText(from: context.state.dueAt, font: .title3.weight(.semibold))
+                    sinceText(from: context.state.dueAtDate, font: .title3.weight(.semibold))
                 }
                 DynamicIslandExpandedRegion(.center) {
                     Text(context.state.title)
@@ -39,13 +40,26 @@ struct FeedLiveActivityLiveActivity: Widget {
                 Image(systemName: iconName(for: context.attributes.kind))
                     .foregroundStyle(accentColor(for: context.attributes.kind))
             } compactTrailing: {
-                sinceText(from: context.state.dueAt, font: .caption.weight(.semibold))
+                sinceText(from: context.state.dueAtDate, font: .caption.weight(.semibold))
             } minimal: {
                 Image(systemName: iconName(for: context.attributes.kind))
                     .foregroundStyle(accentColor(for: context.attributes.kind))
             }
-            .widgetURL(URL(string: "https://it-takes-a-village.vercel.app"))
+            .widgetURL(deepLink(for: context.attributes.kind))
             .keylineTint(accentColor(for: context.attributes.kind))
+        }
+    }
+
+    /// Opens the Capacitor app into the matching log modal.
+    /// Handled in JS via `App.appUrlOpen` → `/tracker/<secret>?log=…`.
+    private func deepLink(for kind: String) -> URL {
+        switch kind {
+        case "last-pump":
+            return URL(string: "ittakesavillage://log/pump")!
+        case "last-nap":
+            return URL(string: "ittakesavillage://log/sleep")!
+        default:
+            return URL(string: "ittakesavillage://log/feed")!
         }
     }
 
@@ -69,7 +83,7 @@ struct FeedLiveActivityLiveActivity: Widget {
 
             Spacer(minLength: 8)
 
-            sinceText(from: context.state.dueAt, font: .title2.monospacedDigit().weight(.bold))
+            sinceText(from: context.state.dueAtDate, font: .title2.monospacedDigit().weight(.bold))
                 .foregroundStyle(Color(red: 0.55, green: 0.22, blue: 0.20))
         }
         .padding(.horizontal, 16)

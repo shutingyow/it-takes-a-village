@@ -170,8 +170,23 @@ Native last-feed timer is implemented in-repo:
 | Widget / Dynamic Island UI | `ios/App/FeedLiveActivity/` |
 | Web caller | `app/lib/feedLiveActivity.ts` (when device reminders are on) |
 | Server push | `convex/apns.ts` + `liveActivityRegistrations` |
+| Tap → log modal | `widgetURL` + `LiveActivityDeepLinkHandler` |
 
 `Info.plist` has `NSSupportsLiveActivities = true`. Activities request `pushType: .token` so Convex can update them remotely.
+
+### Tap Live Activity → open log flow
+
+Lock Screen / Dynamic Island taps use ActivityKit `widgetURL` (custom scheme already in `Info.plist`):
+
+| Live Activity kind | `widgetURL` | Opens |
+|--------------------|-------------|--------|
+| `last-feed` (or feeding in progress) | `ittakesavillage://log/feed` | Log Feed |
+| `last-pump` | `ittakesavillage://log/pump` | Log Pump |
+| `last-nap` (awake since / sleeping) | `ittakesavillage://log/sleep` | Log Nap/Sleep |
+
+JS (`LiveActivityDeepLinkHandler`) listens for `App.appUrlOpen` / `getLaunchUrl`, navigates to the last-visited tracker with `?log=feed|pump|sleep`, and the tracker page opens the matching modal.
+
+**Native rebuild required** after changing `FeedLiveActivityLiveActivity.swift` (`widgetURL`). JS routing alone updates via Vercel; the widget extension does not.
 
 ### Build / run on your iPhone
 
