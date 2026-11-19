@@ -27,6 +27,7 @@ import type * as homeDashboard from "../homeDashboard.js";
 import type * as http from "../http.js";
 import type * as importBabyLog from "../importBabyLog.js";
 import type * as lib_caregivers from "../lib/caregivers.js";
+import type * as lib_clockSchedule from "../lib/clockSchedule.js";
 import type * as lib_dayBounds from "../lib/dayBounds.js";
 import type * as lib_entryValidation from "../lib/entryValidation.js";
 import type * as lib_feedSchedule from "../lib/feedSchedule.js";
@@ -72,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   importBabyLog: typeof importBabyLog;
   "lib/caregivers": typeof lib_caregivers;
+  "lib/clockSchedule": typeof lib_clockSchedule;
   "lib/dayBounds": typeof lib_dayBounds;
   "lib/entryValidation": typeof lib_entryValidation;
   "lib/feedSchedule": typeof lib_feedSchedule;
