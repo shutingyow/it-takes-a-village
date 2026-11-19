@@ -146,13 +146,43 @@ function ModeChoice({
   );
 }
 
-function ScheduleSlotList({
-  kind,
+/** Muted left-bar colors for the warm timetable (not home-tile accents). */
+const KIND_BAR: Record<ScheduleSlotKind, string> = {
+  feed: "bg-[#c4a574]",
+  nap: "bg-[#8fa4b8]",
+  pump: "bg-[#a89bb8]",
+};
+
+const KIND_DOT: Record<ScheduleSlotKind, string> = {
+  feed: "text-[#c4a574]",
+  nap: "text-[#8fa4b8]",
+  pump: "text-[#a89bb8]",
+};
+
+/** Day is 07:00 through 19:59; night is the rest (village wall clock). */
+function periodForTime(time: string): ScheduleSlotPeriod {
+  return time >= "07:00" && time < "20:00" ? "day" : "night";
+}
+
+function resolveSlotPeriod(slot: ScheduleSlot): ScheduleSlotPeriod {
+  if (slot.period === "day" || slot.period === "night") return slot.period;
+  return periodForTime(slot.time);
+}
+
+function sortSlots(slots: ScheduleSlot[]): ScheduleSlot[] {
+  return [...slots].sort((a, b) => {
+    const pa = resolveSlotPeriod(a) === "night" ? 1 : 0;
+    const pb = resolveSlotPeriod(b) === "night" ? 1 : 0;
+    if (pa !== pb) return pa - pb;
+    return a.time.localeCompare(b.time) || a.kind.localeCompare(b.kind);
+  });
+}
+
+function ScheduleTimetable({
   slots,
   onChange,
   labels,
 }: {
-  kind: ScheduleSlotKind;
   slots: ScheduleSlot[];
   onChange: (slots: ScheduleSlot[]) => void;
   labels: {
@@ -160,17 +190,33 @@ function ScheduleSlotList({
     add: string;
     time: string;
     windowEnd: string;
+    activity: string;
+    note: string;
+    notePlaceholder: string;
     period: string;
     periodDay: string;
     periodNight: string;
-    periodAny: string;
+    kindFeed: string;
+    kindNap: string;
+    kindPump: string;
     remove: string;
   };
 }) {
-  const kindSlots = slots.filter((s) => s.kind === kind);
+  const [draftPeriod, setDraftPeriod] = useState<ScheduleSlotPeriod>("day");
   const [newTime, setNewTime] = useState("");
   const [newEnd, setNewEnd] = useState("");
-  const [newPeriod, setNewPeriod] = useState<"" | ScheduleSlotPeriod>("");
+  const [newKind, setNewKind] = useState<ScheduleSlotKind>("feed");
+  const [newNote, setNewNote] = useState("");
+
+  const ordered = sortSlots(slots);
+  const daySlots = ordered.filter((s) => resolveSlotPeriod(s) === "day");
+  const nightSlots = ordered.filter((s) => resolveSlotPeriod(s) === "night");
+
+  const kindLabel = (kind: ScheduleSlotKind) => {
+    if (kind === "feed") return labels.kindFeed;
+    if (kind === "nap") return labels.kindNap;
+    return labels.kindPump;
+  };
 
   const updateSlot = (id: string, patch: Partial<ScheduleSlot>) => {
     onChange(
@@ -184,123 +230,200 @@ function ScheduleSlotList({
 
   const addSlot = () => {
     if (!newTime) return;
+    const note = newNote.trim().slice(0, 80);
     const next: ScheduleSlot = {
-      id: newSlotId(kind),
-      kind,
+      id: newSlotId(newKind),
+      kind: newKind,
       time: newTime,
+      period: draftPeriod,
       ...(newEnd ? { endTime: newEnd } : {}),
-      ...(newPeriod ? { period: newPeriod } : {}),
+      ...(note ? { note } : {}),
     };
-    onChange([...slots, next]);
+    onChange(sortSlots([...slots, next]));
     setNewTime("");
     setNewEnd("");
-    setNewPeriod("");
+    setNewNote("");
   };
 
-  return (
-    <div className="mt-2">
-      {kindSlots.length === 0 ? (
-        <p className="text-xs text-muted mb-2">{labels.empty}</p>
-      ) : (
-        <ul className="space-y-2 mb-3">
-          {kindSlots.map((slot) => (
-            <li
-              key={slot.id}
-              className="rounded-xl border border-border bg-[#faf6f2] px-3 py-2"
+  const renderRow = (slot: ScheduleSlot) => (
+    <li
+      key={slot.id}
+      className="rounded-xl border border-border bg-surface overflow-hidden"
+    >
+      <div className="flex min-w-0">
+        <span
+          className={`w-1.5 shrink-0 self-stretch ${KIND_BAR[slot.kind]}`}
+          aria-hidden
+        />
+        <div className="flex-1 min-w-0 px-2.5 py-2 space-y-1.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <input
+              type="time"
+              value={slot.time}
+              onChange={(e) => {
+                const time = e.target.value;
+                updateSlot(slot.id, { time, period: periodForTime(time) });
+              }}
+              className="input-field w-[6.5rem] shrink-0 font-semibold tabular-nums"
+              aria-label={labels.time}
+            />
+            {slot.kind === "nap" || slot.endTime ? (
+              <>
+                <span className="text-muted text-xs shrink-0">–</span>
+                <input
+                  type="time"
+                  value={slot.endTime ?? ""}
+                  onChange={(e) =>
+                    updateSlot(slot.id, {
+                      endTime: e.target.value || undefined,
+                    })
+                  }
+                  className="input-field w-[6.5rem] shrink-0 tabular-nums"
+                  aria-label={labels.windowEnd}
+                />
+              </>
+            ) : null}
+            <select
+              value={slot.kind}
+              onChange={(e) =>
+                updateSlot(slot.id, {
+                  kind: e.target.value as ScheduleSlotKind,
+                })
+              }
+              className="input-field min-w-0 flex-1 font-semibold"
+              aria-label={labels.activity}
             >
-              <div className="flex flex-wrap items-end gap-2 min-w-0">
-                <div className="min-w-0">
-                  <label className="label-field">{labels.time}</label>
-                  <input
-                    type="time"
-                    value={slot.time}
-                    onChange={(e) =>
-                      updateSlot(slot.id, { time: e.target.value })
-                    }
-                    className="input-field"
-                  />
-                </div>
-                <div className="min-w-0">
-                  <label className="label-field">{labels.windowEnd}</label>
-                  <input
-                    type="time"
-                    value={slot.endTime ?? ""}
-                    onChange={(e) =>
-                      updateSlot(slot.id, {
-                        endTime: e.target.value || undefined,
-                      })
-                    }
-                    className="input-field"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <label className="label-field">{labels.period}</label>
-                  <select
-                    value={slot.period ?? ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      updateSlot(slot.id, {
-                        period:
-                          value === "day" || value === "night"
-                            ? value
-                            : undefined,
-                      });
-                    }}
-                    className="input-field"
-                  >
-                    <option value="">{labels.periodAny}</option>
-                    <option value="day">{labels.periodDay}</option>
-                    <option value="night">{labels.periodNight}</option>
-                  </select>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeSlot(slot.id)}
-                  className="shrink-0 text-sm font-semibold text-muted px-2 py-2"
-                  title={labels.remove}
-                >
-                  ×
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+              <option value="feed">{labels.kindFeed}</option>
+              <option value="nap">{labels.kindNap}</option>
+              <option value="pump">{labels.kindPump}</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => removeSlot(slot.id)}
+              className="shrink-0 text-sm font-semibold text-muted px-1.5 py-1"
+              title={labels.remove}
+              aria-label={labels.remove}
+            >
+              ×
+            </button>
+          </div>
+          <input
+            type="text"
+            value={slot.note ?? ""}
+            onChange={(e) =>
+              updateSlot(slot.id, {
+                note: e.target.value === "" ? undefined : e.target.value,
+              })
+            }
+            maxLength={80}
+            placeholder={labels.notePlaceholder}
+            className="input-field w-full text-sm text-muted"
+            aria-label={labels.note}
+          />
+        </div>
+      </div>
+    </li>
+  );
 
-      <div className="flex flex-wrap gap-2 items-end min-w-0">
-        <input
-          type="time"
-          value={newTime}
-          onChange={(e) => setNewTime(e.target.value)}
-          className="input-field"
-        />
-        <input
-          type="time"
-          value={newEnd}
-          onChange={(e) => setNewEnd(e.target.value)}
-          className="input-field"
-          aria-label={labels.windowEnd}
-        />
-        <select
-          value={newPeriod}
-          onChange={(e) => {
-            const value = e.target.value;
-            setNewPeriod(value === "day" || value === "night" ? value : "");
-          }}
-          className="input-field min-w-0 flex-1"
-        >
-          <option value="">{labels.periodAny}</option>
-          <option value="day">{labels.periodDay}</option>
-          <option value="night">{labels.periodNight}</option>
-        </select>
-        <button
-          type="button"
-          onClick={addSlot}
-          disabled={!newTime}
-          className="shrink-0 px-3 py-2 rounded-xl bg-secondary text-white font-semibold text-sm disabled:opacity-50"
-        >
+  const renderSection = (sectionSlots: ScheduleSlot[], title: string) => (
+    <div className="mb-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted mb-2">
+        {title}
+      </p>
+      {sectionSlots.length === 0 ? (
+        <p className="text-xs text-muted">{labels.empty}</p>
+      ) : (
+        <ul className="space-y-2">{sectionSlots.map(renderRow)}</ul>
+      )}
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-3 mb-3 text-xs font-medium text-muted">
+        {(["feed", "nap", "pump"] as const).map((kind) => (
+          <span key={kind} className="inline-flex items-center gap-1.5">
+            <span className={KIND_DOT[kind]} aria-hidden>
+              ●
+            </span>
+            {kindLabel(kind)}
+          </span>
+        ))}
+      </div>
+
+      {renderSection(daySlots, labels.periodDay)}
+      {renderSection(nightSlots, labels.periodNight)}
+
+      <div className="rounded-xl border border-dashed border-border bg-[#faf6f2] px-3 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted mb-2">
           {labels.add}
-        </button>
+        </p>
+        <div className="flex flex-wrap gap-2 items-end min-w-0">
+          <div className="min-w-0">
+            <label className="label-field">{labels.time}</label>
+            <input
+              type="time"
+              value={newTime}
+              onChange={(e) => {
+                const time = e.target.value;
+                setNewTime(time);
+                if (time) setDraftPeriod(periodForTime(time));
+              }}
+              className="input-field w-[6.5rem]"
+            />
+          </div>
+          <div className="min-w-0">
+            <label className="label-field">{labels.windowEnd}</label>
+            <input
+              type="time"
+              value={newEnd}
+              onChange={(e) => setNewEnd(e.target.value)}
+              className="input-field w-[6.5rem]"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <label className="label-field">{labels.activity}</label>
+            <select
+              value={newKind}
+              onChange={(e) => setNewKind(e.target.value as ScheduleSlotKind)}
+              className="input-field"
+            >
+              <option value="feed">{labels.kindFeed}</option>
+              <option value="nap">{labels.kindNap}</option>
+              <option value="pump">{labels.kindPump}</option>
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="label-field">{labels.period}</label>
+            <select
+              value={draftPeriod}
+              onChange={(e) =>
+                setDraftPeriod(e.target.value === "night" ? "night" : "day")
+              }
+              className="input-field"
+            >
+              <option value="day">{labels.periodDay}</option>
+              <option value="night">{labels.periodNight}</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={addSlot}
+            disabled={!newTime}
+            className="shrink-0 px-3 py-2 rounded-xl bg-secondary text-white font-semibold text-sm disabled:opacity-50"
+          >
+            {labels.add}
+          </button>
+        </div>
+        <input
+          type="text"
+          value={newNote}
+          onChange={(e) => setNewNote(e.target.value)}
+          maxLength={80}
+          placeholder={labels.notePlaceholder}
+          className="input-field w-full text-sm mt-2"
+          aria-label={labels.note}
+        />
       </div>
     </div>
   );
@@ -467,10 +590,15 @@ export function ReminderSettingsView({
     add: t("reminderScheduleAdd"),
     time: t("reminderScheduleTime"),
     windowEnd: t("reminderScheduleWindowEnd"),
+    activity: t("reminderScheduleActivity"),
+    note: t("reminderScheduleNote"),
+    notePlaceholder: t("reminderScheduleNotePlaceholder"),
     period: t("reminderSchedulePeriod"),
     periodDay: t("reminderSchedulePeriodDay"),
     periodNight: t("reminderSchedulePeriodNight"),
-    periodAny: t("reminderSchedulePeriodAny"),
+    kindFeed: t("reminderScheduleKindFeed"),
+    kindNap: t("reminderScheduleKindNap"),
+    kindPump: t("reminderScheduleKindPump"),
     remove: t("remove"),
   };
 
@@ -748,12 +876,23 @@ export function ReminderSettingsView({
           intervalDesc={t("reminderModeIntervalDesc")}
           scheduleDesc={t("reminderModeScheduleDesc")}
         />
-        {reminderMode === "schedule" && (
-          <p className="text-xs text-muted mt-3 leading-snug">
+      </div>
+
+      {reminderMode === "schedule" && (
+        <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+          <p className="text-sm font-semibold text-foreground mb-1">
+            {t("reminderScheduleSlots")}
+          </p>
+          <p className="text-xs text-muted mb-3 leading-snug">
             {t("reminderScheduleHint")}
           </p>
-        )}
-      </div>
+          <ScheduleTimetable
+            slots={scheduleSlots}
+            onChange={setScheduleSlots}
+            labels={slotLabels}
+          />
+        </div>
+      )}
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
         <ReminderToggleRow
@@ -843,14 +982,6 @@ export function ReminderSettingsView({
             </div>
           </>
         )}
-        {feedEnabled && reminderMode === "schedule" && (
-          <ScheduleSlotList
-            kind="feed"
-            slots={scheduleSlots}
-            onChange={setScheduleSlots}
-            labels={slotLabels}
-          />
-        )}
       </div>
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
@@ -873,21 +1004,13 @@ export function ReminderSettingsView({
             />
 
             {reminderMode === "schedule" ? (
-              <>
-                <ScheduleSlotList
-                  kind="pump"
-                  slots={scheduleSlots}
-                  onChange={setScheduleSlots}
-                  labels={slotLabels}
-                />
-                <button
-                  type="button"
-                  onClick={handleDownloadCalendar}
-                  className="w-full mt-3 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
-                >
-                  {t("addPumpAlarmsToCalendar")}
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={handleDownloadCalendar}
+                className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
+              >
+                {t("addPumpAlarmsToCalendar")}
+              </button>
             ) : (
               <>
                 <p className="text-xs font-medium text-muted mb-2">
@@ -999,14 +1122,6 @@ export function ReminderSettingsView({
               className="input-field"
             />
           </>
-        )}
-        {napEnabled && reminderMode === "schedule" && (
-          <ScheduleSlotList
-            kind="nap"
-            slots={scheduleSlots}
-            onChange={setScheduleSlots}
-            labels={slotLabels}
-          />
         )}
       </div>
 
