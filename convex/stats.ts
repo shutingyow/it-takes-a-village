@@ -3,6 +3,7 @@ import { query } from "./_generated/server";
 import { verifyCaregiver } from "./lib/caregivers";
 import {
   formatWeekdayShortInZone,
+  getCalendarWeekBoundsForDateKey,
   getDayBoundsForDateKey,
   getTodayBoundsInZone,
   resolveTrackerTimezone,
@@ -304,20 +305,54 @@ function buildDayStat(
   };
 }
 
+function emptyDayStat(dateKey: string, timeZone: string): DayStat {
+  const { dayStart } = getDayBoundsForDateKey(dateKey, timeZone);
+  return {
+    date: dateKey,
+    label: formatWeekdayShortInZone(dayStart, timeZone),
+    feedCount: 0,
+    breastCount: 0,
+    bottleCount: 0,
+    solidsCount: 0,
+    solidsGrams: 0,
+    formulaMl: 0,
+    breastmilkMl: 0,
+    breastDurationMinutes: 0,
+    diaperCount: 0,
+    wetCount: 0,
+    dirtyCount: 0,
+    bothCount: 0,
+    pumpCount: 0,
+    pumpTotalMl: 0,
+    pumpSessions: [],
+    feedSessions: [],
+    sleepMinutes: 0,
+    nightSleepMinutes: 0,
+    napSleepMinutes: 0,
+    sleepSessions: [],
+  };
+}
+
 /**
- * Rolling 7-day window ending on endDateKey (clamped to today).
- * Pass today (or omit) for the current week; earlier end dates for history.
+ * Discrete Mon–Sun calendar week containing endDateKey (or today).
+ * Future days in the current week are empty placeholders.
  */
 export const getWeeklySummary = query({
   args: {
     secretLink: v.string(),
     actingCaregiverName: v.string(),
     now: v.number(),
-    /** Last day of the 7-day window (YYYY-MM-DD). Defaults to today. */
+    /**
+     * Any day in the desired Mon–Sun week (YYYY-MM-DD).
+     * Defaults to today (current calendar week).
+     */
     endDateKey: v.optional(v.string()),
   },
   returns: v.object({
     days: v.array(dayStatValidator),
+    weekStartKey: v.string(),
+    weekEndKey: v.string(),
+    /** Same as weekEndKey (Sunday); kept for callers that still pass endDateKey. */
     endDateKey: v.string(),
     avgSleepMinutesPerDay: v.number(),
     longestStretchMinutes: v.number(),
@@ -331,17 +366,22 @@ export const getWeeklySummary = query({
     );
     const timeZone = resolveTrackerTimezone(tracker);
     const { dateKey: todayKey } = getTodayBoundsInZone(args.now, timeZone);
-    const endDateKey =
+    const anchorKey =
       args.endDateKey && args.endDateKey <= todayKey
         ? args.endDateKey
         : todayKey;
-    // Oldest day in the 7-day window (end − 6)
-    const rangeStartKey = shiftDateKey(endDateKey, -6);
-    const { dayStart: rangeStart } = getDayBoundsForDateKey(
-      rangeStartKey,
+    const { weekStartKey, weekEndKey } = getCalendarWeekBoundsForDateKey(
+      anchorKey,
       timeZone
     );
-    const { dayEnd: rangeEnd } = getDayBoundsForDateKey(endDateKey, timeZone);
+    // Fetch through the later of week end or today so sleep spilling past
+    // midnight on the last logged day is still attributed correctly.
+    const fetchEndKey = weekEndKey < todayKey ? weekEndKey : todayKey;
+    const { dayStart: rangeStart } = getDayBoundsForDateKey(
+      weekStartKey,
+      timeZone
+    );
+    const { dayEnd: rangeEnd } = getDayBoundsForDateKey(fetchEndKey, timeZone);
 
     const feeds = await ctx.db
       .query("feedEntries")
@@ -385,8 +425,12 @@ export const getWeeklySummary = query({
 
     const days: DayStat[] = [];
 
-    for (let i = 6; i >= 0; i--) {
-      const dateKey = shiftDateKey(endDateKey, -i);
+    for (let i = 0; i < 7; i++) {
+      const dateKey = shiftDateKey(weekStartKey, i);
+      if (dateKey > todayKey) {
+        days.push(emptyDayStat(dateKey, timeZone));
+        continue;
+      }
       const { dayStart, dayEnd } = getDayBoundsForDateKey(dateKey, timeZone);
       days.push(
         buildDayStat(
@@ -403,8 +447,13 @@ export const getWeeklySummary = query({
       );
     }
 
-    const totalSleep = days.reduce((sum, d) => sum + d.sleepMinutes, 0);
-    const avgSleepMinutesPerDay = Math.round(totalSleep / 7);
+    // Average over days that have started (exclude future placeholders).
+    const daysForAvg = days.filter((d) => d.date <= todayKey);
+    const totalSleep = daysForAvg.reduce((sum, d) => sum + d.sleepMinutes, 0);
+    const avgSleepMinutesPerDay =
+      daysForAvg.length > 0
+        ? Math.round(totalSleep / daysForAvg.length)
+        : 0;
 
     let longestStretchMinutes = 0;
     for (const entry of sleepEntries) {
@@ -418,7 +467,9 @@ export const getWeeklySummary = query({
 
     return {
       days,
-      endDateKey,
+      weekStartKey,
+      weekEndKey,
+      endDateKey: weekEndKey,
       avgSleepMinutesPerDay,
       longestStretchMinutes,
       timezone: timeZone,

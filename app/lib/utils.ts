@@ -92,6 +92,7 @@ export function cn(...classes: (string | boolean | undefined)[]): string {
 export {
   DEFAULT_TRACKER_TIMEZONE,
   formatDisplayDateInZone,
+  getCalendarWeekBoundsForDateKey,
   getDateKeyInZone,
   getDayBoundsForDateKey,
   getTodayBoundsInZone,

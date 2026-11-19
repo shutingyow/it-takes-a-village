@@ -139,6 +139,47 @@ export function formatWeekdayShortInZone(
   }).format(new Date(ms));
 }
 
+/** Monday = 0 … Sunday = 6 for a calendar date in the given zone. */
+export function mondayBasedWeekdayForDateKey(
+  dateKey: string,
+  timeZone: string = DEFAULT_TRACKER_TIMEZONE
+): number {
+  const { dayStart } = getDayBoundsForDateKey(dateKey, timeZone);
+  const mid = dayStart + 12 * 60 * 60 * 1000;
+  const short = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  }).format(new Date(mid));
+  const map: Record<string, number> = {
+    Mon: 0,
+    Tue: 1,
+    Wed: 2,
+    Thu: 3,
+    Fri: 4,
+    Sat: 5,
+    Sun: 6,
+  };
+  const idx = map[short];
+  if (idx == null) {
+    throw new Error(`Unexpected weekday label: ${short}`);
+  }
+  return idx;
+}
+
+/**
+ * Discrete Mon–Sun calendar week containing dateKey (village timezone).
+ * Not a rolling last-7-days window.
+ */
+export function getCalendarWeekBoundsForDateKey(
+  dateKey: string,
+  timeZone: string = DEFAULT_TRACKER_TIMEZONE
+): { weekStartKey: string; weekEndKey: string } {
+  const weekday = mondayBasedWeekdayForDateKey(dateKey, timeZone);
+  const weekStartKey = shiftDateKey(dateKey, -weekday);
+  const weekEndKey = shiftDateKey(weekStartKey, 6);
+  return { weekStartKey, weekEndKey };
+}
+
 export function formatDisplayDateInZone(
   dateKey: string,
   timeZone: string = DEFAULT_TRACKER_TIMEZONE,

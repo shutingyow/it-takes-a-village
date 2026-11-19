@@ -8,6 +8,7 @@ import {
   cn,
   formatSleepTotal,
   formatTime,
+  getCalendarWeekBoundsForDateKey,
   getDateKeyInZone,
   shiftDateKey,
 } from "@/app/lib/utils";
@@ -439,9 +440,14 @@ export function StatsView({
     () => getDateKeyInZone(now, timezone),
     [now, timezone]
   );
+  const currentWeekEndKey = useMemo(
+    () => getCalendarWeekBoundsForDateKey(todayKey, timezone).weekEndKey,
+    [todayKey, timezone]
+  );
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
-  /** Last day of the rolling 7-day weekly window; defaults to today. */
-  const [selectedWeekEndKey, setSelectedWeekEndKey] = useState(todayKey);
+  /** Sunday of the selected Mon–Sun calendar week. */
+  const [selectedWeekEndKey, setSelectedWeekEndKey] =
+    useState(currentWeekEndKey);
 
   const weeklySummary = useQuery(
     api.stats.getWeeklySummary,
@@ -485,7 +491,7 @@ export function StatsView({
   ];
 
   const canGoNextDay = selectedDateKey < todayKey;
-  const canGoNextWeek = selectedWeekEndKey < todayKey;
+  const canGoNextWeek = selectedWeekEndKey < currentWeekEndKey;
 
   const getCountValue = (day: {
     feedCount: number;
@@ -501,7 +507,10 @@ export function StatsView({
   const day = dailyStats?.day;
   const days = weeklySummary?.days;
 
-  /** Complete days only — exclude today so a partial day doesn’t skew the average. */
+  /**
+   * Within the selected calendar week: exclude today (partial) and any
+   * future placeholders so averages describe finished days in that week.
+   */
   const daysForAverage =
     days?.filter((d) => d.date < todayKey) ?? [];
   const totalCount =
@@ -613,20 +622,22 @@ export function StatsView({
   const dayAge = birthDate
     ? formatAgeOnDate(birthDate, selectedDateKey, language)
     : null;
-  const weekStartKey = shiftDateKey(selectedWeekEndKey, -6);
+  const weekStartKey =
+    weeklySummary?.weekStartKey ?? shiftDateKey(selectedWeekEndKey, -6);
+  const weekEndKey = weeklySummary?.weekEndKey ?? selectedWeekEndKey;
   const weeklyRangeLine = formatInsightRange(
     weekStartKey,
-    selectedWeekEndKey,
+    weekEndKey,
     language
   );
   const weeklyAgeOnly = formatWeekAgeOnly(
     birthDate,
     weekStartKey,
-    selectedWeekEndKey,
+    weekEndKey,
     language
   );
   const weekEndAge = birthDate
-    ? formatAgeOnDate(birthDate, selectedWeekEndKey, language)
+    ? formatAgeOnDate(birthDate, weekEndKey, language)
     : null;
 
   const totalPumpMl =
@@ -773,7 +784,7 @@ export function StatsView({
               if (!canGoNextWeek) return;
               setSelectedWeekEndKey((k) => {
                 const next = shiftDateKey(k, 7);
-                return next > todayKey ? todayKey : next;
+                return next > currentWeekEndKey ? currentWeekEndKey : next;
               });
             }}
             disabled={!canGoNextWeek}
