@@ -40,7 +40,9 @@ import { saveLastVisitedTracker } from "@/app/lib/trackerStorage";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ReminderScheduler } from "@/app/components/ReminderScheduler";
 import { FeedTimerBanner } from "@/app/components/FeedTimerBanner";
+import { PumpTimerBanner } from "@/app/components/PumpTimerBanner";
 import { isFeedTimerRecording } from "@/app/lib/feedTimer";
+import { isPumpTimerRecording } from "@/app/lib/pumpTimer";
 import { useSyncActiveFeedSession } from "@/app/lib/useSyncActiveFeedSession";
 import { useAppShell } from "@/app/lib/appShell";
 
@@ -89,8 +91,9 @@ function TrackerPageInner({
   const [claiming, setClaiming] = useState(false);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
-  /** Extra main scroll padding so What's due clears the feed timer banner. */
-  const [feedTimerActive, setFeedTimerActive] = useState(false);
+  /** Extra main scroll padding so What's due clears the session timer banner. */
+  const [sessionTimerBannerActive, setSessionTimerBannerActive] =
+    useState(false);
 
   const ensureMigrated = useMutation(api.trackers.ensureMigrated);
   const claimTracker = useMutation(api.trackers.claim);
@@ -217,15 +220,23 @@ function TrackerPageInner({
   }, [lockedCaregiver, searchParams, secretLink, router]);
 
   useEffect(() => {
-    const refresh = () => setFeedTimerActive(isFeedTimerRecording(secretLink));
+    const refresh = () => {
+      const feedVisible =
+        isFeedTimerRecording(secretLink) && activeLogModal !== "feed";
+      const pumpVisible =
+        isPumpTimerRecording(secretLink) && activeLogModal !== "pump";
+      setSessionTimerBannerActive(feedVisible || pumpVisible);
+    };
     refresh();
     window.addEventListener("feedTimerChanged", refresh);
+    window.addEventListener("pumpTimerChanged", refresh);
     window.addEventListener("focus", refresh);
     return () => {
       window.removeEventListener("feedTimerChanged", refresh);
+      window.removeEventListener("pumpTimerChanged", refresh);
       window.removeEventListener("focus", refresh);
     };
-  }, [secretLink]);
+  }, [secretLink, activeLogModal]);
 
   // Always land at the top when switching tabs (shared scroll container).
   useEffect(() => {
@@ -424,8 +435,8 @@ function TrackerPageInner({
       <main
         ref={mainRef}
         className={
-          feedTimerActive && activeLogModal !== "feed"
-            ? // Tab bar (~4.75rem) + feed banner stack slot (~4.25rem)
+          sessionTimerBannerActive
+            ? // Tab bar (~4.75rem) + session banner stack slot (~4.25rem)
               "flex-1 min-h-0 min-w-0 overflow-x-clip overflow-y-auto overscroll-y-contain pb-[calc(9rem+env(safe-area-inset-bottom,0px))]"
             : "flex-1 min-h-0 min-w-0 overflow-x-clip overflow-y-auto overscroll-y-contain pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))]"
         }
@@ -526,6 +537,14 @@ function TrackerPageInner({
         onOpen={() => {
           setShowLogSheet(false);
           setActiveLogModal("feed");
+        }}
+      />
+      <PumpTimerBanner
+        secretLink={secretLink}
+        hidden={activeLogModal === "pump"}
+        onOpen={() => {
+          setShowLogSheet(false);
+          setActiveLogModal("pump");
         }}
       />
 
