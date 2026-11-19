@@ -13,9 +13,29 @@ import {
 export const SLEEP_NIGHT_COLOUR = "#8fa4b8";
 export const SLEEP_NAP_COLOUR = "#c4846a";
 
-const HOUR_PX = 14;
+/** Pixels per hour — taller chart so sleep blocks are easier to see. */
+const HOUR_PX = 22;
 const DAY_MINUTES = 24 * 60;
-const LABEL_HOURS = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22] as const;
+/** Chart Y=0 is 06:00 local (Huckleberry-style day-oriented axis). */
+const AXIS_START_HOUR = 6;
+const AXIS_START_MINUTES = AXIS_START_HOUR * 60;
+/** Labels along the 6am→6am axis (midnight wraps into the lower half). */
+const LABEL_HOURS = [6, 8, 10, 12, 14, 16, 18, 20, 22, 0, 2, 4] as const;
+
+function minutesFromMidnight(ms: number, dayStart: number): number {
+  return Math.max(0, Math.min(DAY_MINUTES, (ms - dayStart) / 60_000));
+}
+
+/** Minutes past 06:00 on the chart axis (wraps overnight). */
+function minutesOnAxis(minutesFromMidnightValue: number): number {
+  return (
+    (minutesFromMidnightValue - AXIS_START_MINUTES + DAY_MINUTES) % DAY_MINUTES
+  );
+}
+
+function hourLabelTop(hour: number, chartHeight: number): number {
+  return (minutesOnAxis(hour * 60) / DAY_MINUTES) * chartHeight;
+}
 
 type SleepSession = {
   type: "nap" | "night";
@@ -54,8 +74,22 @@ function clipToDay(
   return { start, end };
 }
 
-function minutesFromMidnight(ms: number, dayStart: number): number {
-  return Math.max(0, Math.min(DAY_MINUTES, (ms - dayStart) / 60_000));
+/**
+ * Split a calendar-day segment at 06:00 so each piece is contiguous on the
+ * 6am-based Y axis (e.g. 04:00–08:00 → bottom 04–06 + top 06–08).
+ */
+function segmentsOnAxis(
+  startMin: number,
+  endMin: number
+): { startMin: number; endMin: number }[] {
+  if (endMin <= startMin) return [];
+  if (startMin < AXIS_START_MINUTES && endMin > AXIS_START_MINUTES) {
+    return [
+      { startMin, endMin: AXIS_START_MINUTES },
+      { startMin: AXIS_START_MINUTES, endMin },
+    ];
+  }
+  return [{ startMin, endMin }];
 }
 
 function placeBlocks(
@@ -63,6 +97,7 @@ function placeBlocks(
   timezone: string | undefined,
   now: number
 ): PlacedBlock[] {
+  const chartHeight = 24 * HOUR_PX;
   const placed: PlacedBlock[] = [];
   for (const day of days) {
     const { dayStart, dayEnd } = getDayBoundsForDateKey(day.date, timezone);
@@ -77,18 +112,23 @@ function placeBlocks(
       if (!clipped) continue;
       const startMin = minutesFromMidnight(clipped.start, dayStart);
       const endMin = minutesFromMidnight(clipped.end, dayStart);
-      const span = endMin - startMin;
-      if (span <= 0) continue;
-      placed.push({
-        id: `${day.date}-${session.type}-${session.startTime}`,
-        dayDate: day.date,
-        type: session.type,
-        startMs: clipped.start,
-        endMs: clipped.end,
-        minutes: session.minutes,
-        active: session.endTime == null && clipped.end >= now,
-        top: (startMin / DAY_MINUTES) * (24 * HOUR_PX),
-        height: Math.max(3, (span / DAY_MINUTES) * (24 * HOUR_PX) - 1),
+      const segments = segmentsOnAxis(startMin, endMin);
+      segments.forEach((seg, segIndex) => {
+        const span = seg.endMin - seg.startMin;
+        if (span <= 0) return;
+        const axisStart = minutesOnAxis(seg.startMin);
+        placed.push({
+          id: `${day.date}-${session.type}-${session.startTime}-${segIndex}`,
+          dayDate: day.date,
+          type: session.type,
+          // Detail panel uses the day-clipped session, not the visual split piece.
+          startMs: clipped.start,
+          endMs: clipped.end,
+          minutes: session.minutes,
+          active: session.endTime == null && clipped.end >= now,
+          top: (axisStart / DAY_MINUTES) * chartHeight,
+          height: Math.max(3, (span / DAY_MINUTES) * chartHeight - 1),
+        });
       });
     }
   }
@@ -130,7 +170,8 @@ export function SleepWeekTimetable({
       ? (() => {
           const { dayStart } = getDayBoundsForDateKey(todayKey, timezone);
           return (
-            (minutesFromMidnight(now, dayStart) / DAY_MINUTES) * chartHeight
+            (minutesOnAxis(minutesFromMidnight(now, dayStart)) / DAY_MINUTES) *
+            chartHeight
           );
         })()
       : null;
@@ -176,7 +217,7 @@ export function SleepWeekTimetable({
             <span
               key={hour}
               className="absolute right-0 text-[9px] text-muted tabular-nums leading-none -translate-y-1/2"
-              style={{ top: (hour / 24) * chartHeight }}
+              style={{ top: hourLabelTop(hour, chartHeight) }}
             >
               {hour}
             </span>
@@ -188,7 +229,7 @@ export function SleepWeekTimetable({
             <div
               key={`g-${hour}`}
               className="absolute left-0 right-0 border-t border-border/50 pointer-events-none"
-              style={{ top: (hour / 24) * chartHeight }}
+              style={{ top: hourLabelTop(hour, chartHeight) }}
               aria-hidden
             />
           ))}
