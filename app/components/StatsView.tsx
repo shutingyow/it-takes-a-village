@@ -927,18 +927,6 @@ export function StatsView({
               return parts.length > 0 ? parts.join(" · ") : null;
             })()}
           >
-            {(day.formulaMl > 0 || day.breastmilkMl > 0) && (
-              <>
-                <StatLine
-                  label={t("statsBreastMilkMl")}
-                  value={day.breastmilkMl > 0 ? `${day.breastmilkMl} ml` : "—"}
-                />
-                <StatLine
-                  label={t("statsFormulaMl")}
-                  value={day.formulaMl > 0 ? `${day.formulaMl} ml` : "—"}
-                />
-              </>
-            )}
             {day.breastDurationMinutes > 0 && (
               <StatLine
                 label={t("statsBreastMinutes")}
