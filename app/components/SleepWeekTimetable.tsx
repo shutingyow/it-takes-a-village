@@ -75,21 +75,73 @@ function clipToDay(
 }
 
 /**
- * Split a calendar-day segment at 06:00 so each piece is contiguous on the
- * 6am-based Y axis (e.g. 04:00–08:00 → bottom 04–06 + top 06–08).
+ * Split a same-calendar-day segment at 06:00 so each piece is contiguous on
+ * the 6am-based Y axis (e.g. 04:00–08:00 → bottom 04–06 + top 06–08).
+ * Used for naps, which stay on calendar-day columns.
  */
 function segmentsOnAxis(
   startMin: number,
   endMin: number
-): { startMin: number; endMin: number }[] {
+): { axisStart: number; span: number }[] {
   if (endMin <= startMin) return [];
   if (startMin < AXIS_START_MINUTES && endMin > AXIS_START_MINUTES) {
     return [
-      { startMin, endMin: AXIS_START_MINUTES },
-      { startMin: AXIS_START_MINUTES, endMin },
+      {
+        axisStart: minutesOnAxis(startMin),
+        span: AXIS_START_MINUTES - startMin,
+      },
+      {
+        axisStart: 0,
+        span: endMin - AXIS_START_MINUTES,
+      },
     ];
   }
-  return [{ startMin, endMin }];
+  return [
+    {
+      axisStart: minutesOnAxis(startMin),
+      span: endMin - startMin,
+    },
+  ];
+}
+
+/**
+ * Place a night session on its evening start day. `startMin`/`endMin` are
+ * minutes from that day's midnight; `endMin` may exceed 1440 when sleep
+ * continues past midnight. Splits only at the 6am axis wrap — never at 00:00.
+ */
+function nightSegmentsOnAxis(
+  startMin: number,
+  endMin: number
+): { axisStart: number; span: number }[] {
+  if (endMin <= startMin) return [];
+  const axisStart = startMin - AXIS_START_MINUTES;
+  const axisEnd = endMin - AXIS_START_MINUTES;
+  const pieces: { axisStart: number; span: number }[] = [];
+
+  // Early-morning start (before 6am): bottom of this column through 6am.
+  if (axisStart < 0) {
+    const s = DAY_MINUTES + axisStart;
+    const e = axisEnd <= 0 ? DAY_MINUTES + axisEnd : DAY_MINUTES;
+    if (e > s && s < DAY_MINUTES) {
+      pieces.push({ axisStart: Math.max(0, s), span: e - Math.max(0, s) });
+    }
+  }
+
+  // Contiguous stretch from max(start, 6am) through next 6am (includes midnight).
+  {
+    const s = Math.max(0, axisStart);
+    const e = Math.min(DAY_MINUTES, axisEnd);
+    if (e > s) pieces.push({ axisStart: s, span: e - s });
+  }
+
+  // Past next 6am → remnant at top of the same evening column.
+  if (axisEnd > DAY_MINUTES) {
+    const s = Math.max(0, axisStart - DAY_MINUTES);
+    const e = axisEnd - DAY_MINUTES;
+    if (e > s) pieces.push({ axisStart: s, span: e - s });
+  }
+
+  return pieces;
 }
 
 function placeBlocks(
@@ -103,6 +155,39 @@ function placeBlocks(
     const { dayStart, dayEnd } = getDayBoundsForDateKey(day.date, timezone);
     for (const session of day.sleepSessions) {
       const effectiveEnd = session.endTime ?? now;
+
+      if (session.type === "night") {
+        // Night belongs to the evening it started — skip the morning-day copy
+        // that stats still attribute for minute totals.
+        if (session.startTime < dayStart || session.startTime >= dayEnd) {
+          continue;
+        }
+        const startMin = (session.startTime - dayStart) / 60_000;
+        const endMin = (effectiveEnd - dayStart) / 60_000;
+        const fullMinutes = Math.max(
+          1,
+          Math.round((effectiveEnd - session.startTime) / 60_000)
+        );
+        const segments = nightSegmentsOnAxis(startMin, endMin);
+        segments.forEach((seg, segIndex) => {
+          if (seg.span <= 0) return;
+          placed.push({
+            id: `${day.date}-${session.type}-${session.startTime}-${segIndex}`,
+            dayDate: day.date,
+            type: session.type,
+            startMs: session.startTime,
+            endMs: effectiveEnd,
+            minutes: fullMinutes,
+            active: session.endTime == null && effectiveEnd >= now,
+            top: (seg.axisStart / DAY_MINUTES) * chartHeight,
+            // No -1 gap: overnight pieces must meet seamlessly on the axis.
+            height: Math.max(3, (seg.span / DAY_MINUTES) * chartHeight),
+          });
+        });
+        continue;
+      }
+
+      // Naps: calendar-day clip (unchanged).
       const clipped = clipToDay(
         session.startTime,
         effectiveEnd,
@@ -114,20 +199,17 @@ function placeBlocks(
       const endMin = minutesFromMidnight(clipped.end, dayStart);
       const segments = segmentsOnAxis(startMin, endMin);
       segments.forEach((seg, segIndex) => {
-        const span = seg.endMin - seg.startMin;
-        if (span <= 0) return;
-        const axisStart = minutesOnAxis(seg.startMin);
+        if (seg.span <= 0) return;
         placed.push({
           id: `${day.date}-${session.type}-${session.startTime}-${segIndex}`,
           dayDate: day.date,
           type: session.type,
-          // Detail panel uses the day-clipped session, not the visual split piece.
           startMs: clipped.start,
           endMs: clipped.end,
           minutes: session.minutes,
           active: session.endTime == null && clipped.end >= now,
-          top: (axisStart / DAY_MINUTES) * chartHeight,
-          height: Math.max(3, (span / DAY_MINUTES) * chartHeight - 1),
+          top: (seg.axisStart / DAY_MINUTES) * chartHeight,
+          height: Math.max(3, (seg.span / DAY_MINUTES) * chartHeight),
         });
       });
     }
