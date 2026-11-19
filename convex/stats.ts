@@ -355,7 +355,6 @@ export const getWeeklySummary = query({
     /** Same as weekEndKey (Sunday); kept for callers that still pass endDateKey. */
     endDateKey: v.string(),
     avgSleepMinutesPerDay: v.number(),
-    longestStretchMinutes: v.number(),
     timezone: v.string(),
   }),
   handler: async (ctx, args) => {
@@ -455,15 +454,6 @@ export const getWeeklySummary = query({
         ? Math.round(totalSleep / daysForAvg.length)
         : 0;
 
-    let longestStretchMinutes = 0;
-    for (const entry of sleepEntries) {
-      if (entry.endTime) {
-        const duration = Math.floor((entry.endTime - entry.startTime) / 60000);
-        if (duration > longestStretchMinutes) {
-          longestStretchMinutes = duration;
-        }
-      }
-    }
 
     return {
       days,
@@ -471,7 +461,6 @@ export const getWeeklySummary = query({
       weekEndKey,
       endDateKey: weekEndKey,
       avgSleepMinutesPerDay,
-      longestStretchMinutes,
       timezone: timeZone,
     };
   },

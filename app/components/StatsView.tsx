@@ -22,6 +22,11 @@ import { ExportView } from "./ExportView";
 import type { TranslationKey } from "@/app/lib/i18n/en";
 import { BirthDateField } from "./BirthDateField";
 import { TodayTimetable } from "./TodayTimetable";
+import {
+  SleepWeekTimetable,
+  SLEEP_NAP_COLOUR,
+  SLEEP_NIGHT_COLOUR,
+} from "./SleepWeekTimetable";
 
 type ChartMetric = "feeds" | "sleep" | "diapers" | "pumps";
 type RangeMode = "daily" | "weekly";
@@ -54,8 +59,6 @@ const METRIC_COLOURS: Record<"feeds" | "diapers" | "pumps", string> = {
   pumps: "#a89b8a",
 };
 
-const SLEEP_NIGHT_COLOUR = "#8fa4b8";
-const SLEEP_NAP_COLOUR = "#c4846a";
 const MILK_FORMULA_COLOUR = "#c4846a";
 const MILK_BREAST_COLOUR = "#8fa4b8";
 
@@ -431,6 +434,7 @@ export function StatsView({
   const { t, language } = useLanguage();
   const [now] = useState(Date.now());
   const [showExport, setShowExport] = useState(false);
+  const [showSleepPattern, setShowSleepPattern] = useState(false);
   const [metric, setMetric] = useState<ChartMetric>("feeds");
   const [rangeModeState, setRangeMode] = useState<RangeMode>(
     forcedRange ?? "daily"
@@ -655,6 +659,78 @@ export function StatsView({
 
   const wetOnly = day ? day.wetCount - day.bothCount : 0;
   const dirtyOnly = day ? day.dirtyCount - day.bothCount : 0;
+
+  if (showSleepPattern && rangeMode === "weekly") {
+    return (
+      <div className="p-3 sm:p-4 min-w-0">
+        <button
+          type="button"
+          onClick={() => setShowSleepPattern(false)}
+          className="mb-3 text-sm font-semibold text-terracotta flex items-center gap-1"
+        >
+          {t("backToSleepSummary")}
+        </button>
+
+        <p className="section-label mb-3">{t("sleepPattern")}</p>
+
+        <div className="flex items-center justify-between mb-4 bg-surface border border-border rounded-2xl px-1.5 sm:px-2 py-2 card-shadow min-w-0">
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedWeekEndKey((k) => shiftDateKey(k, -7))
+            }
+            className="px-3 py-2 text-sm font-semibold text-terracotta rounded-xl hover:bg-beige-light min-h-[44px] min-w-[44px] touch-manipulation"
+            aria-label={t("previousWeek")}
+          >
+            ‹
+          </button>
+          <div className="text-center min-w-0 flex-1 px-1">
+            <p className="text-sm font-semibold text-foreground break-words leading-snug">
+              {weeklyRangeLine}
+            </p>
+            {weeklyAgeOnly ? (
+              <p className="text-xs text-muted mt-1 break-words leading-snug">
+                {weeklyAgeOnly}
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (!canGoNextWeek) return;
+              setSelectedWeekEndKey((k) => {
+                const next = shiftDateKey(k, 7);
+                return next > currentWeekEndKey ? currentWeekEndKey : next;
+              });
+            }}
+            disabled={!canGoNextWeek}
+            className={cn(
+              "px-3 py-2 text-sm font-semibold rounded-xl min-h-[44px] min-w-[44px] touch-manipulation",
+              canGoNextWeek
+                ? "text-terracotta hover:bg-beige-light"
+                : "text-muted/40 cursor-not-allowed"
+            )}
+            aria-label={t("nextWeek")}
+          >
+            ›
+          </button>
+        </div>
+
+        <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+          {loading || !days ? (
+            <p className="text-sm text-muted text-center py-8">{t("loading")}</p>
+          ) : (
+            <SleepWeekTimetable
+              days={days}
+              timezone={timezone ?? weeklySummary?.timezone}
+              now={now}
+              babyName={babyName}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-3 sm:p-4 min-w-0">
@@ -1077,18 +1153,26 @@ export function StatsView({
                         />
                       </>
                     )}
-                    {weeklySummary &&
-                      weeklySummary.longestStretchMinutes > 0 && (
-                        <p className="text-xs text-muted mt-3">
-                          {t("longestStretch")}:{" "}
-                          {formatSleepTotal(
-                            weeklySummary.longestStretchMinutes
-                          )}
-                        </p>
-                      )}
                   </>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => setShowSleepPattern(true)}
+                className="w-full flex items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-3 mb-4 text-left touch-manipulation min-h-[48px] card-shadow active:bg-beige-light/40"
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-foreground">
+                    {t("sleepPattern")}
+                  </span>
+                  <span className="block text-xs text-muted mt-0.5">
+                    {t("sleepPatternHint")}
+                  </span>
+                </span>
+                <span className="text-muted text-sm shrink-0" aria-hidden>
+                  ›
+                </span>
+              </button>
             </>
           ) : metric === "feeds" ? (
             <>
