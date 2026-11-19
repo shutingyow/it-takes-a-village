@@ -50,8 +50,11 @@ const pumpScheduleValidator = v.object({
 
 const scheduleSlotValidator = v.object({
   id: v.string(),
-  kind: v.union(v.literal("feed"), v.literal("nap"), v.literal("pump")),
   time: v.string(),
+  label: v.optional(v.string()),
+  kind: v.optional(
+    v.union(v.literal("feed"), v.literal("nap"), v.literal("pump"))
+  ),
   endTime: v.optional(v.string()),
   period: v.optional(v.union(v.literal("day"), v.literal("night"))),
   note: v.optional(v.string()),
@@ -517,11 +520,9 @@ export const updateReminderSettings = mutation({
     }
 
     if (args.reminderSchedule !== undefined) {
-      const normalized = normalizeReminderSchedule(args.reminderSchedule);
-      if (normalized.slots.length === 0) {
-        throw new Error("Add at least one schedule slot");
-      }
-      updates.reminderSchedule = normalized;
+      updates.reminderSchedule = normalizeReminderSchedule(
+        args.reminderSchedule
+      );
     }
 
     if (args.medicationReminders !== undefined) {
@@ -551,13 +552,16 @@ export const updateReminderSettings = mutation({
         const fromSlots = timesForKind(schedule?.slots, "pump");
         if (fromSlots.length > 0) times = fromSlots;
       }
-      if (mode === "fixed" || effectiveMode === "schedule") {
-        if (args.pumpSchedule.enabled && times.length === 0) {
-          throw new Error("Add at least one pump time (HH:mm)");
-        }
-        if (times.length > 24) {
-          throw new Error("Too many pump times (max 24)");
-        }
+      if (
+        mode === "fixed" &&
+        effectiveMode !== "schedule" &&
+        args.pumpSchedule.enabled &&
+        times.length === 0
+      ) {
+        throw new Error("Add at least one pump time (HH:mm)");
+      }
+      if (times.length > 24) {
+        throw new Error("Too many pump times (max 24)");
       }
       const intervalHours =
         args.pumpSchedule.intervalHours ?? DEFAULT_PUMP_INTERVAL_HOURS;

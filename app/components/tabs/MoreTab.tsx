@@ -63,8 +63,9 @@ interface MoreTabProps {
   reminderSchedule?: {
     slots: Array<{
       id: string;
-      kind: "feed" | "nap" | "pump";
       time: string;
+      label?: string;
+      kind?: "feed" | "nap" | "pump";
       endTime?: string;
       period?: "day" | "night";
       note?: string;

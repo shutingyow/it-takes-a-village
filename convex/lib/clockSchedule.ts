@@ -1,44 +1,41 @@
 /**
- * Shared wall-clock reminder slots (feed / nap / pump timetable mode).
+ * Shared wall-clock reminder slots (timetable mode).
  * Times are HH:mm in the village timezone.
  * Self-contained (no imports from pumpSchedule/dayBounds) to avoid cycles.
+ *
+ * Slots are freeform for display (time + activity label + notes).
+ * Optional `kind` soft-links a row to feed/nap/pump for What's due.
  */
 
 export type ReminderMode = "interval" | "schedule";
 
 export type ScheduleSlotKind = "feed" | "nap" | "pump";
 
+/** Kept for stored legacy rows; UI no longer splits day/night. */
 export type ScheduleSlotPeriod = "day" | "night";
 
 export type ScheduleSlot = {
   id: string;
-  kind: ScheduleSlotKind;
   time: string;
-  endTime?: string;
-  period?: ScheduleSlotPeriod;
+  /** Free-text activity name. Optional on legacy rows that only had kind. */
+  label?: string;
   note?: string;
+  endTime?: string;
+  /**
+   * Soft link for What's due / notifications.
+   * Unset = display-only (don't remind).
+   */
+  kind?: ScheduleSlotKind;
+  /** @deprecated stored legacy only; not used in the editor */
+  period?: ScheduleSlotPeriod;
 };
 
 export type ReminderSchedule = {
   slots: ScheduleSlot[];
 };
 
-export const DEFAULT_SCHEDULE_SLOTS: ScheduleSlot[] = [
-  { id: "feed-0700", kind: "feed", time: "07:00", period: "day" },
-  { id: "nap-0830", kind: "nap", time: "08:30", endTime: "09:30", period: "day" },
-  { id: "feed-0945", kind: "feed", time: "09:45", period: "day" },
-  { id: "nap-1100", kind: "nap", time: "11:00", endTime: "12:30", period: "day" },
-  { id: "feed-1245", kind: "feed", time: "12:45", period: "day" },
-  { id: "nap-1415", kind: "nap", time: "14:15", endTime: "15:30", period: "day" },
-  { id: "feed-1545", kind: "feed", time: "15:45", period: "day" },
-  { id: "nap-1715", kind: "nap", time: "17:15", endTime: "17:45", period: "day" },
-  { id: "feed-1915", kind: "feed", time: "19:15", period: "day" },
-  { id: "feed-2230", kind: "feed", time: "22:30", period: "night" },
-  { id: "pump-0800", kind: "pump", time: "08:00", period: "day" },
-  { id: "pump-1200", kind: "pump", time: "12:00", period: "day" },
-  { id: "pump-1600", kind: "pump", time: "16:00", period: "day" },
-  { id: "pump-2000", kind: "pump", time: "20:00", period: "day" },
-];
+/** Empty by default — caregivers build their own list. */
+export const DEFAULT_SCHEDULE_SLOTS: ScheduleSlot[] = [];
 
 const TIME_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
@@ -193,19 +190,40 @@ export function timesForKind(
   );
 }
 
+function parseKind(raw: unknown): ScheduleSlotKind | undefined {
+  if (raw === "feed" || raw === "nap" || raw === "pump") return raw;
+  return undefined;
+}
+
+/** Loose input shape for stored / client schedules (legacy rows may omit label). */
+export type RawReminderSchedule = {
+  slots: Array<{
+    id?: string;
+    time?: string;
+    label?: string;
+    kind?: string;
+    note?: string;
+    endTime?: string;
+    period?: string;
+  }>;
+};
+
 export function normalizeReminderSchedule(
-  schedule: ReminderSchedule | undefined
+  schedule: ReminderSchedule | RawReminderSchedule | undefined
 ): ReminderSchedule {
   if (!schedule?.slots?.length) {
-    return { slots: DEFAULT_SCHEDULE_SLOTS.map((s) => ({ ...s })) };
+    return { slots: [] };
   }
   const slots: ScheduleSlot[] = [];
   const seenIds = new Set<string>();
   for (const raw of schedule.slots) {
-    const time = normalizeHhMm(raw.time);
+    const time = typeof raw.time === "string" ? normalizeHhMm(raw.time) : null;
     if (!time) continue;
-    const kind = raw.kind;
-    if (kind !== "feed" && kind !== "nap" && kind !== "pump") continue;
+    const kind = parseKind(raw.kind);
+    const label =
+      typeof raw.label === "string" && raw.label.trim()
+        ? raw.label.trim().slice(0, 80)
+        : "";
     let endTime: string | undefined;
     if (raw.endTime) {
       const end = normalizeHhMm(raw.endTime);
@@ -220,24 +238,22 @@ export function normalizeReminderSchedule(
     let id =
       typeof raw.id === "string" && raw.id.trim()
         ? raw.id.trim().slice(0, 64)
-        : `${kind}-${time}`;
+        : `slot-${time}-${slots.length}`;
     if (seenIds.has(id)) id = `${id}-${slots.length}`;
     seenIds.add(id);
     slots.push({
       id,
-      kind,
       time,
+      ...(label ? { label } : {}),
+      ...(kind ? { kind } : {}),
       ...(endTime ? { endTime } : {}),
       ...(period ? { period } : {}),
       ...(note ? { note } : {}),
     });
   }
-  slots.sort((a, b) => {
-    const periodRank = (p?: ScheduleSlotPeriod) => (p === "night" ? 1 : 0);
-    const pr = periodRank(a.period) - periodRank(b.period);
-    if (pr !== 0) return pr;
-    return a.time.localeCompare(b.time) || a.kind.localeCompare(b.kind);
-  });
+  slots.sort(
+    (a, b) => a.time.localeCompare(b.time) || a.id.localeCompare(b.id)
+  );
   return { slots: slots.slice(0, 48) };
 }
 

@@ -21,8 +21,13 @@ const pumpScheduleValidator = v.object({
 
 const scheduleSlotValidator = v.object({
   id: v.string(),
-  kind: v.union(v.literal("feed"), v.literal("nap"), v.literal("pump")),
   time: v.string(),
+  /** Free-text activity; optional for legacy rows that only had kind. */
+  label: v.optional(v.string()),
+  /** Soft link for What's due. Unset = don't remind. */
+  kind: v.optional(
+    v.union(v.literal("feed"), v.literal("nap"), v.literal("pump"))
+  ),
   endTime: v.optional(v.string()),
   period: v.optional(v.union(v.literal("day"), v.literal("night"))),
   note: v.optional(v.string()),
