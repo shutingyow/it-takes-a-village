@@ -21,6 +21,11 @@ import {
   dismissLateFeedAck,
   isLateFeedAckDismissed,
 } from "@/app/lib/feedScheduleAck";
+import {
+  dismissOverdueAck,
+  isOverdueAckDismissed,
+  overdueAckKindForItem,
+} from "@/app/lib/overdueAck";
 
 type DueKind = "feed" | "pump" | "sleep";
 
@@ -118,6 +123,8 @@ function DueRow({
   emptyHint,
   detail,
   onOpen,
+  overdueDismissed,
+  onGotIt,
 }: {
   kind: DueKind;
   title: string;
@@ -125,13 +132,23 @@ function DueRow({
   emptyHint: string;
   detail?: boolean;
   onOpen?: () => void;
+  overdueDismissed?: boolean;
+  onGotIt?: () => void;
 }) {
   const { t } = useLanguage();
-  const isOverdue = item?.status === "overdue";
+  const isOverdue = item?.status === "overdue" && !overdueDismissed;
   const isOngoing = item?.status === "ongoing";
-  const primary = duePrimary(item, emptyHint, t);
-  const chipKey = statusChipKey(item);
+  const primary =
+    overdueDismissed && item?.status === "overdue"
+      ? t("overdueDismissHint")
+      : duePrimary(item, emptyHint, t);
+  const chipKey =
+    overdueDismissed && item?.status === "overdue"
+      ? "dueStatusOk"
+      : statusChipKey(item);
   const actionLabel = isOngoing ? t("whatsDueTapToOpen") : t("whatsDueTapToLog");
+  const showGotIt =
+    detail && item?.status === "overdue" && !overdueDismissed && onGotIt;
 
   const iconWrap = cn(
     "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
@@ -216,7 +233,7 @@ function DueRow({
           )}
         >
           {primary}
-          {item && item.status !== "ongoing" && (
+          {item && item.status !== "ongoing" && !overdueDismissed && (
             <span className="text-muted font-medium ml-1.5">
               · {formatTime(item.dueAt)}
             </span>
@@ -239,20 +256,36 @@ function DueRow({
     </>
   );
 
-  if (detail && onOpen) {
-    return (
-      <button
-        type="button"
-        onClick={onOpen}
-        className="w-full flex items-center gap-3 min-w-0 py-3 text-left"
-      >
-        {body}
-      </button>
-    );
-  }
+  const row = detail && onOpen ? (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full flex items-center gap-3 min-w-0 py-3 text-left"
+    >
+      {body}
+    </button>
+  ) : (
+    <div className="flex items-center gap-2.5 min-w-0 py-1.5">{body}</div>
+  );
 
   return (
-    <div className="flex items-center gap-2.5 min-w-0 py-1.5">{body}</div>
+    <div className="min-w-0">
+      {row}
+      {showGotIt && (
+        <div className="mx-3 mb-2 flex items-start justify-between gap-2 rounded-lg bg-beige-light/80 px-2.5 py-2">
+          <p className="text-[11px] font-medium text-muted leading-snug min-w-0">
+            {t("overdueDismissHint")}
+          </p>
+          <button
+            type="button"
+            onClick={onGotIt}
+            className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-primary px-1"
+          >
+            {t("gotIt")}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -315,7 +348,28 @@ export function DueSoonCard({
   const showPump = !!pumpScheduleEnabled;
   const lastFeed = recentFeeds?.[0] ?? null;
   const previousFeed = recentFeeds?.[1] ?? null;
-  const overdue = feedItem?.status === "overdue";
+  void ackTick;
+
+  const isItemOverdueDismissed = (item: DueItem | null): boolean => {
+    if (!item || item.status !== "overdue") return false;
+    const ackKind = overdueAckKindForItem(item);
+    if (!ackKind) return false;
+    return isOverdueAckDismissed(ackKind, item.dueAt);
+  };
+
+  const dismissItem = (item: DueItem) => {
+    const ackKind = overdueAckKindForItem(item);
+    if (!ackKind) return;
+    dismissOverdueAck(ackKind, item.dueAt);
+    setAckTick((n) => n + 1);
+  };
+
+  const feedDismissed = isItemOverdueDismissed(feedItem);
+  const pumpDismissed = isItemOverdueDismissed(pumpItem);
+  const sleepDismissed = isItemOverdueDismissed(sleepItem);
+
+  const overdue =
+    feedItem?.status === "overdue" && !feedDismissed;
   const night = resolveNightFeedSettings({
     nightFeedIntervalEnabled: dueStatus.nightFeedIntervalEnabled,
     nightFeedIntervalHours: dueStatus.nightFeedIntervalHours,
@@ -337,7 +391,6 @@ export function DueSoonCard({
       night,
     }) &&
     !isLateFeedAckDismissed(lastFeed._id);
-  void ackTick;
 
   const medItems = dueStatus.items.filter(
     (item) =>
@@ -352,17 +405,21 @@ export function DueSoonCard({
     ...medItems,
   ].filter((item): item is DueItem => item != null);
 
+  const activeOverdue = (item: DueItem) =>
+    item.status === "overdue" && !isItemOverdueDismissed(item);
+
   // Home strip: real dues only (overdue → due soon → on track). Skip ongoing so
   // an active nap never hides a feed overdue; calm empty if only ongoing exists.
   // Detail page may still headline ongoing — rows always list it.
+  // Dismissed overdue (“Got it”) drops out of the strip until dueAt changes.
   const stripHeadline =
-    headlineCandidates.find((item) => item.status === "overdue") ??
+    headlineCandidates.find(activeOverdue) ??
     headlineCandidates.find((item) => item.status === "approaching") ??
     headlineCandidates.find((item) => item.status === "ok") ??
     null;
 
   const detailHeadline =
-    headlineCandidates.find((item) => item.status === "overdue") ??
+    headlineCandidates.find(activeOverdue) ??
     headlineCandidates.find((item) => item.status === "approaching") ??
     headlineCandidates.find((item) => item.status === "ongoing") ??
     headlineCandidates.find((item) => item.status === "ok") ??
@@ -446,9 +503,62 @@ export function DueSoonCard({
               {urgentLine}
             </h2>
             <p className="text-xs text-muted mt-1 leading-snug">
-              {t("whatsDueSubtitle")}
+              {dueStatus.reminderMode === "schedule"
+                ? t("whatsDueSubtitleSchedule")
+                : t("whatsDueSubtitle")}
             </p>
           </div>
+
+          {dueStatus.reminderMode === "schedule" && (
+            <div className="mx-3 mb-2 mt-1 rounded-lg bg-beige-light/60 px-2.5 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted mb-1.5">
+                {t("whatsDueGuideTitle")}
+              </p>
+              {dueStatus.scheduleSlots.length === 0 ? (
+                <p className="text-[11px] text-muted leading-snug">
+                  {t("whatsDueGuideEmpty")}
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {[...dueStatus.scheduleSlots]
+                    .sort((a, b) => a.time.localeCompare(b.time))
+                    .map((slot) => {
+                      const kindLabel =
+                        slot.kind === "feed"
+                          ? t("reminderScheduleKindFeed")
+                          : slot.kind === "nap"
+                            ? t("reminderScheduleKindNap")
+                            : slot.kind === "pump"
+                              ? t("reminderScheduleKindPump")
+                              : null;
+                      const name =
+                        slot.label?.trim() ||
+                        kindLabel ||
+                        t("reminderScheduleActivity");
+                      return (
+                        <li
+                          key={slot.id}
+                          className="flex items-baseline gap-2 min-w-0 text-[12px]"
+                        >
+                          <span className="tabular-nums font-semibold text-foreground shrink-0">
+                            {slot.time}
+                            {slot.endTime ? `–${slot.endTime}` : ""}
+                          </span>
+                          <span className="text-foreground truncate min-w-0">
+                            {name}
+                          </span>
+                          {slot.note ? (
+                            <span className="text-muted truncate shrink min-w-0">
+                              · {slot.note}
+                            </span>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                </ul>
+              )}
+            </div>
+          )}
 
           <DueRow
             kind="feed"
@@ -460,6 +570,12 @@ export function DueSoonCard({
             item={feedItem}
             emptyHint={t("logFeedForDue")}
             detail
+            overdueDismissed={feedDismissed}
+            onGotIt={
+              feedItem?.status === "overdue"
+                ? () => dismissItem(feedItem)
+                : undefined
+            }
             onOpen={
               onOpenKind
                 ? () =>
@@ -477,6 +593,12 @@ export function DueSoonCard({
             item={sleepItem}
             emptyHint={t("noSleepDueYet")}
             detail
+            overdueDismissed={sleepDismissed}
+            onGotIt={
+              sleepItem?.status === "overdue"
+                ? () => dismissItem(sleepItem)
+                : undefined
+            }
             onOpen={
               onOpenKind
                 ? () =>
@@ -496,6 +618,12 @@ export function DueSoonCard({
                 item={pumpItem}
                 emptyHint={t("noPumpDueYet")}
                 detail
+                overdueDismissed={pumpDismissed}
+                onGotIt={
+                  pumpItem?.status === "overdue"
+                    ? () => dismissItem(pumpItem)
+                    : undefined
+                }
                 onOpen={
                   onOpenKind
                     ? () =>

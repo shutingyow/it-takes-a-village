@@ -8,13 +8,10 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { formatTime } from "@/app/lib/utils";
 import { listUpcomingPumpDueAts } from "@/convex/lib/pumpSchedule";
 import {
-  listUpcomingClockDueAts,
   resolveReminderMode,
-  timesForKind,
   type ReminderMode,
   type ScheduleSlot,
 } from "@/convex/lib/clockSchedule";
-import { DEFAULT_TRACKER_TIMEZONE } from "@/convex/lib/dayBounds";
 import {
   DEFAULT_NOTIFY_BEFORE_MINUTES,
   syncDueNotifications,
@@ -54,11 +51,12 @@ interface ReminderSchedulerProps {
 }
 
 /**
- * Keeps local/device notifications in sync with last feed + pump schedule + nap wake window.
- * Mount once on the open tracker (caregiver unlocked). Opt-in is localStorage.
+ * Keeps local/device notifications in sync with last-log intervals (and fixed
+ * pump slots only when reminderMode is interval). Mount once on the open
+ * tracker (caregiver unlocked). Opt-in is localStorage.
  *
- * Pump due times come from the same `getDueStatus` row the UI shows, so a
- * notification never targets a different clock than Due soon.
+ * Uses `getDueStatus.delivery` — not What's due guide clock slots — so lock-
+ * screen alerts never stick to a missed timetable time.
  *
  * Resyncs when due timestamps / status / settings change — not every clock tick —
  * so cancel+reschedule does not eat an overdue ASAP alert. Also resyncs when the
@@ -180,21 +178,19 @@ export function ReminderScheduler({
     actingCaregiverName: selectedCaregiver,
   });
 
-  const feedItem = dueStatus?.items.find((item) => item.type === "feed");
-  const pumpItem = dueStatus?.items.find((item) => item.type === "pump");
-  const sleepItem = dueStatus?.items.find((item) => item.type === "sleep");
-  const feedDueKey = feedItem
-    ? `${feedItem.dueAt}:${feedItem.status}`
-    : "none";
-  const pumpDueKey = pumpItem
-    ? `${pumpItem.dueAt}:${pumpItem.status}`
+  const delivery = dueStatus?.delivery;
+  const deliveryKey = delivery
+    ? `${delivery.feedDueAt}:${delivery.pumpDueAt}:${delivery.napDueAt}`
     : "none";
   const hourBucket = Math.floor(now / 3_600_000);
+  const feedOngoing = dueStatus?.items.some(
+    (item) => item.type === "feed" && item.status === "ongoing"
+  );
 
   // Due alerts — independent of Live Activities so a slow dues query cannot
-  // block lock-screen timers.
+  // block lock-screen timers. Always driven by interval delivery, not guide slots.
   useEffect(() => {
-    if (!dueStatus) return;
+    if (!dueStatus || !delivery) return;
     // Wait until last pump query settles so we don't schedule fixed-slot
     // alerts as if there were no pumps (that caused "in 10 min" vs UI 2h+).
     if (lastPump === undefined) return;
@@ -204,39 +200,20 @@ export function ReminderScheduler({
       notifyBeforeProp ??
       dueStatus.notifyBeforeMinutes ??
       DEFAULT_NOTIFY_BEFORE_MINUTES;
+    const reminderMode = resolveReminderMode(
+      dueStatus.reminderMode ?? reminderModeProp
+    );
 
     let pumpDueAts: number[] = [];
     if (notifOn && pumpSchedule?.enabled) {
-      const reminderMode = resolveReminderMode(
-        dueStatus.reminderMode ?? reminderModeProp
-      );
-      const villageTz =
-        timezone?.trim() ||
-        pumpSchedule.timezone ||
-        DEFAULT_TRACKER_TIMEZONE;
-
       if (reminderMode === "schedule") {
-        const pumpTimes = timesForKind(reminderSchedule?.slots, "pump");
-        const upcoming = listUpcomingClockDueAts(
-          pumpTimes.length > 0 ? pumpTimes : pumpSchedule.times,
-          villageTz,
-          lastPump?.timestamp,
-          Date.now(),
-          6
-        );
-        if (pumpItem) {
-          pumpDueAts = [
-            pumpItem.dueAt,
-            ...upcoming.filter((ts) => ts > pumpItem.dueAt),
-          ].slice(0, 6);
-        } else {
-          pumpDueAts = upcoming;
-        }
+        // Schedule mode: one interval-from-last pump due for delivery.
+        if (delivery.pumpDueAt != null) pumpDueAts = [delivery.pumpDueAt];
       } else {
         const mode = pumpSchedule.mode ?? "fixed";
         if (mode === "interval") {
-          if (pumpItem) pumpDueAts = [pumpItem.dueAt];
-        } else if (pumpItem) {
+          if (delivery.pumpDueAt != null) pumpDueAts = [delivery.pumpDueAt];
+        } else if (delivery.pumpDueAt != null) {
           const later = listUpcomingPumpDueAts(
             {
               enabled: true,
@@ -248,8 +225,8 @@ export function ReminderScheduler({
             lastPump?.timestamp,
             Date.now(),
             6
-          ).filter((ts) => ts > pumpItem.dueAt);
-          pumpDueAts = [pumpItem.dueAt, ...later].slice(0, 6);
+          ).filter((ts) => ts > delivery.pumpDueAt!);
+          pumpDueAts = [delivery.pumpDueAt, ...later].slice(0, 6);
         } else {
           pumpDueAts = listUpcomingPumpDueAts(
             {
@@ -269,24 +246,23 @@ export function ReminderScheduler({
 
     const recording =
       isFeedTimerRecording(secretLink) || activeFeed != null;
+
     const feedDueAt =
       notifOn &&
       feedRemindersEnabled &&
-      feedItem &&
-      feedItem.status !== "ongoing" &&
+      delivery.feedDueAt != null &&
+      !feedOngoing &&
       !recording &&
       !activeSleep
-        ? feedItem.dueAt
+        ? delivery.feedDueAt
         : null;
 
-    // Same source as What's due (wake window → pivot to bedtime/sleep).
     const napDueAt =
       notifOn &&
       napRemindersEnabled &&
       !activeSleep &&
-      sleepItem &&
-      sleepItem.status !== "ongoing"
-        ? sleepItem.dueAt
+      delivery.napDueAt != null
+        ? delivery.napDueAt
         : null;
 
     void syncDueNotifications({
@@ -322,19 +298,15 @@ export function ReminderScheduler({
     });
   }, [
     dueStatus,
-    feedItem,
-    pumpItem,
-    sleepItem,
-    feedDueKey,
-    pumpDueKey,
+    delivery,
+    deliveryKey,
     hourBucket,
     lastPump,
     activeSleep,
     activeFeed,
+    feedOngoing,
     pumpSchedule,
     reminderModeProp,
-    reminderSchedule,
-    timezone,
     feedIntervalHours,
     notifyBeforeProp,
     feedRemindersEnabled,

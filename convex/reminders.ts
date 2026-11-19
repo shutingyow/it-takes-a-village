@@ -42,6 +42,25 @@ const dueItemValidator = v.object({
   caregiverName: v.optional(v.string()),
 });
 
+const scheduleSlotValidator = v.object({
+  id: v.string(),
+  time: v.string(),
+  label: v.optional(v.string()),
+  kind: v.optional(
+    v.union(v.literal("feed"), v.literal("nap"), v.literal("pump"))
+  ),
+  endTime: v.optional(v.string()),
+  period: v.optional(v.union(v.literal("day"), v.literal("night"))),
+  note: v.optional(v.string()),
+});
+
+/** Interval-from-last-log dues for device notifications / Live Activities. */
+const deliveryValidator = v.object({
+  feedDueAt: v.union(v.number(), v.null()),
+  pumpDueAt: v.union(v.number(), v.null()),
+  napDueAt: v.union(v.number(), v.null()),
+});
+
 /** Today's bedtime clock (night window start) as UTC ms, or null if unset/invalid. */
 function todaysBedtimeMs(
   now: number,
@@ -120,6 +139,29 @@ function computeDueStatus(dueAt: number, now: number) {
   };
 }
 
+type DueItem = {
+  type: "feed" | "medication" | "pump" | "sleep";
+  label: string;
+  dueAt: number;
+  status: "ok" | "approaching" | "overdue" | "ongoing";
+  minutesUntilDue: number;
+  caregiverName?: string;
+};
+
+const emptyDelivery = {
+  feedDueAt: null as number | null,
+  pumpDueAt: null as number | null,
+  napDueAt: null as number | null,
+};
+
+/**
+ * What's due vs device delivery are split on purpose:
+ * - `items` + `scheduleSlots`: shared village guide (clock slots in schedule
+ *   mode). Every locked caregiver can read this.
+ * - `delivery`: always interval-from-last-log (feed hours / wake window /
+ *   pump interval) for notifications and lock-screen timers — never stuck on
+ *   a missed timetable slot.
+ */
 export const getDueStatus = query({
   args: {
     secretLink: v.string(),
@@ -129,7 +171,7 @@ export const getDueStatus = query({
   returns: v.object({
     reminderMode: v.union(v.literal("interval"), v.literal("schedule")),
     feedIntervalHours: v.number(),
-    /** Interval actually used for the current next-feed due (day or night). */
+    /** Interval actually used for delivery next-feed due (day or night). */
     effectiveFeedIntervalHours: v.number(),
     nightFeedIntervalEnabled: v.boolean(),
     nightFeedIntervalHours: v.number(),
@@ -137,6 +179,10 @@ export const getDueStatus = query({
     nightFeedWindowEnd: v.string(),
     usingNightInterval: v.boolean(),
     notifyBeforeMinutes: v.number(),
+    /** Shared timetable rows for What's due guide (any caregiver). */
+    scheduleSlots: v.array(scheduleSlotValidator),
+    /** Interval-based dues for ReminderScheduler / Live Activities. */
+    delivery: deliveryValidator,
     items: v.array(dueItemValidator),
   }),
   handler: async (ctx, args) => {
@@ -157,27 +203,24 @@ export const getDueStatus = query({
         nightFeedWindowEnd: night.end,
         usingNightInterval: false,
         notifyBeforeMinutes: DEFAULT_NOTIFY_BEFORE_MINUTES,
+        scheduleSlots: [],
+        delivery: emptyDelivery,
         items: [],
       };
     }
 
     const reminderMode = resolveReminderMode(tracker.reminderMode);
-    const schedule =
-      reminderMode === "schedule"
-        ? normalizeReminderSchedule(tracker.reminderSchedule)
-        : null;
+    // Always normalize so any caregiver can see the village schedule guide,
+    // even while viewing What’s due (not only the settings editor).
+    const schedule = normalizeReminderSchedule(tracker.reminderSchedule);
+    const scheduleSlots =
+      reminderMode === "schedule" ? schedule.slots : [];
     const feedIntervalHours =
       tracker.feedIntervalHours ?? DEFAULT_FEED_INTERVAL_HOURS;
     const notifyBeforeMinutes =
       tracker.notifyBeforeMinutes ?? DEFAULT_NOTIFY_BEFORE_MINUTES;
-    const items: Array<{
-      type: "feed" | "medication" | "pump" | "sleep";
-      label: string;
-      dueAt: number;
-      status: "ok" | "approaching" | "overdue" | "ongoing";
-      minutesUntilDue: number;
-      caregiverName?: string;
-    }> = [];
+    const items: DueItem[] = [];
+    const delivery = { ...emptyDelivery };
     const timeZone = resolveTrackerTimezone(tracker);
 
     let effectiveFeedIntervalHours = feedIntervalHours;
@@ -208,38 +251,39 @@ export const getDueStatus = query({
       );
 
       if (lastFeed) {
-        let dueAt: number | null = null;
-        if (reminderMode === "schedule" && schedule) {
+        const feedAt = clampFeedAtForSkew(lastFeed.timestamp, args.now);
+        const intervalDueAt = computeFeedDueAt(
+          lastFeed.timestamp,
+          feedIntervalHours,
+          night,
+          { now: args.now, timeZone }
+        );
+        delivery.feedDueAt = intervalDueAt;
+        effectiveFeedIntervalHours =
+          (intervalDueAt - feedAt) / (60 * 60 * 1000);
+        usingNightInterval =
+          night.enabled &&
+          effectiveFeedIntervalHours > feedIntervalHours + 1e-9;
+
+        let guideDueAt: number | null = intervalDueAt;
+        if (reminderMode === "schedule") {
           const feedTimes = timesForKind(schedule.slots, "feed");
-          dueAt = computeNextClockDueAt(
-            feedTimes,
-            timeZone,
-            lastFeed.timestamp,
-            args.now
-          );
-          if (dueAt != null) {
-            effectiveFeedIntervalHours =
-              (dueAt - lastFeed.timestamp) / (60 * 60 * 1000);
-          }
-        } else {
-          const feedAt = clampFeedAtForSkew(lastFeed.timestamp, args.now);
-          dueAt = computeFeedDueAt(
-            lastFeed.timestamp,
-            feedIntervalHours,
-            night,
-            { now: args.now, timeZone }
-          );
-          effectiveFeedIntervalHours = (dueAt - feedAt) / (60 * 60 * 1000);
-          usingNightInterval =
-            night.enabled &&
-            effectiveFeedIntervalHours > feedIntervalHours + 1e-9;
+          guideDueAt =
+            feedTimes.length === 0
+              ? null
+              : computeNextClockDueAt(
+                  feedTimes,
+                  timeZone,
+                  lastFeed.timestamp,
+                  args.now
+                );
         }
-        if (dueAt != null) {
-          const due = computeDueStatus(dueAt, args.now);
+        if (guideDueAt != null) {
+          const due = computeDueStatus(guideDueAt, args.now);
           items.push({
             type: "feed",
             label: "feed",
-            dueAt,
+            dueAt: guideDueAt,
             ...due,
           });
         }
@@ -288,35 +332,48 @@ export const getDueStatus = query({
         .order("desc")
         .first();
 
-      let dueAt: number | null = null;
+      const pumpIntervalHours =
+        pumpSchedule.intervalHours ?? DEFAULT_PUMP_INTERVAL_HOURS;
+      const intervalDueAt = computeIntervalPumpDueAt(
+        lastPump?.timestamp,
+        pumpIntervalHours,
+        args.now
+      );
 
-      if (reminderMode === "schedule" && schedule) {
-        const pumpTimes = timesForKind(schedule.slots, "pump");
-        dueAt = computeNextClockDueAt(
-          pumpTimes.length > 0 ? pumpTimes : pumpSchedule.times,
-          timeZone,
-          lastPump?.timestamp,
-          args.now
-        );
+      // Delivery always prefers interval-from-last when schedule mode; in
+      // interval mode keep fixed-slot pump if configured.
+      if (reminderMode === "schedule") {
+        delivery.pumpDueAt = intervalDueAt;
       } else {
         const mode = pumpSchedule.mode ?? "fixed";
-        if (mode === "interval") {
-          dueAt = computeIntervalPumpDueAt(
-            lastPump?.timestamp,
-            pumpSchedule.intervalHours ?? DEFAULT_PUMP_INTERVAL_HOURS,
-            args.now
-          );
-        } else {
-          dueAt = computeNextPumpDueAt(
-            pumpSchedule,
-            lastPump?.timestamp,
-            args.now
-          );
-        }
+        delivery.pumpDueAt =
+          mode === "interval"
+            ? intervalDueAt
+            : computeNextPumpDueAt(
+                pumpSchedule,
+                lastPump?.timestamp,
+                args.now
+              );
       }
 
-      if (dueAt !== null) {
-        const due = computeDueStatus(dueAt, args.now);
+      let guideDueAt: number | null = delivery.pumpDueAt;
+      if (reminderMode === "schedule") {
+        const pumpTimes = timesForKind(schedule.slots, "pump");
+        const clockTimes =
+          pumpTimes.length > 0 ? pumpTimes : pumpSchedule.times;
+        guideDueAt =
+          clockTimes.length === 0
+            ? null
+            : computeNextClockDueAt(
+                clockTimes,
+                timeZone,
+                lastPump?.timestamp,
+                args.now
+              );
+      }
+
+      if (guideDueAt !== null) {
+        const due = computeDueStatus(guideDueAt, args.now);
         const amount =
           pumpSchedule.amountMl !== undefined
             ? `${pumpSchedule.amountMl}ml`
@@ -324,7 +381,7 @@ export const getDueStatus = query({
         items.push({
           type: "pump",
           label: amount,
-          dueAt,
+          dueAt: guideDueAt,
           ...due,
         });
       }
@@ -358,59 +415,69 @@ export const getDueStatus = query({
         const lastEnded = recentSleep.find(
           (entry) => entry.endTime !== undefined
         );
-        if (reminderMode === "schedule" && schedule && lastEnded?.endTime) {
-          const napTimes = timesForKind(schedule.slots, "nap");
-          const dueAt = computeNextClockDueAt(
-            napTimes,
+        const wakeWindowMinutes = tracker.wakeWindowMinutes;
+        const wakeDueAt =
+          wakeWindowMinutes != null &&
+          wakeWindowMinutes > 0 &&
+          lastEnded?.endTime !== undefined
+            ? lastEnded.endTime + wakeWindowMinutes * 60_000
+            : null;
+
+        let intervalSleepDue: {
+          dueAt: number;
+          kind: "nap" | "sleep";
+        } | null = null;
+        if (wakeDueAt != null) {
+          const bedtimeToday = todaysBedtimeMs(
+            args.now,
             timeZone,
-            lastEnded.endTime,
-            args.now
+            night.start
           );
-          if (dueAt != null) {
-            const due = computeDueStatus(dueAt, args.now);
-            items.push({
-              type: "sleep",
-              label: "nap",
-              dueAt,
-              ...due,
+          const sleptTonight =
+            bedtimeToday != null &&
+            recentSleep.some(
+              (entry) =>
+                entry.startTime >= bedtimeToday && entry.type === "night"
+            );
+          if (!sleptTonight) {
+            intervalSleepDue = resolveSleepDue({
+              now: args.now,
+              wakeDueAt,
+              bedtimeToday,
             });
           }
-        } else {
-          const wakeWindowMinutes = tracker.wakeWindowMinutes;
-          if (
-            wakeWindowMinutes != null &&
-            wakeWindowMinutes > 0 &&
-            lastEnded?.endTime !== undefined
-          ) {
-            const wakeDueAt = lastEnded.endTime + wakeWindowMinutes * 60_000;
-            const bedtimeToday = todaysBedtimeMs(
-              args.now,
+        }
+        if (intervalSleepDue) {
+          delivery.napDueAt = intervalSleepDue.dueAt;
+        }
+
+        if (reminderMode === "schedule" && lastEnded?.endTime) {
+          const napTimes = timesForKind(schedule.slots, "nap");
+          if (napTimes.length > 0) {
+            const clockDueAt = computeNextClockDueAt(
+              napTimes,
               timeZone,
-              night.start
+              lastEnded.endTime,
+              args.now
             );
-            const sleptTonight =
-              bedtimeToday != null &&
-              recentSleep.some(
-                (entry) =>
-                  entry.startTime >= bedtimeToday && entry.type === "night"
-              );
-            if (!sleptTonight) {
-              const resolved = resolveSleepDue({
-                now: args.now,
-                wakeDueAt,
-                bedtimeToday,
+            if (clockDueAt != null) {
+              const due = computeDueStatus(clockDueAt, args.now);
+              items.push({
+                type: "sleep",
+                label: "nap",
+                dueAt: clockDueAt,
+                ...due,
               });
-              if (resolved) {
-                const due = computeDueStatus(resolved.dueAt, args.now);
-                items.push({
-                  type: "sleep",
-                  label: resolved.kind,
-                  dueAt: resolved.dueAt,
-                  ...due,
-                });
-              }
             }
           }
+        } else if (intervalSleepDue) {
+          const due = computeDueStatus(intervalSleepDue.dueAt, args.now);
+          items.push({
+            type: "sleep",
+            label: intervalSleepDue.kind,
+            dueAt: intervalSleepDue.dueAt,
+            ...due,
+          });
         }
       }
     }
@@ -427,6 +494,8 @@ export const getDueStatus = query({
       nightFeedWindowEnd: night.end,
       usingNightInterval,
       notifyBeforeMinutes,
+      scheduleSlots,
+      delivery,
       items,
     };
   },

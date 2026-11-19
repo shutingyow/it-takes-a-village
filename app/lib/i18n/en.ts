@@ -489,6 +489,10 @@ export const translations = {
   whatsDue: "What's due",
   whatsDueAllClear: "Nothing urgent right now",
   whatsDueSubtitle: "Feed, nap, and pump timing for this village",
+  whatsDueSubtitleSchedule:
+    "Village schedule guide — phone alerts still follow the last log.",
+  whatsDueGuideTitle: "Today's schedule",
+  whatsDueGuideEmpty: "No schedule rows yet. Add them in Reminders.",
   nextFeedDue: "Next feed",
   nextFeedDueNight: "Next feed (night)",
   nextSleepDue: "Sleep",
@@ -509,6 +513,7 @@ export const translations = {
   feedOverdueHint: "Log a feed to reset the schedule from now.",
   feedLateTimingPushed:
     "Feed was late — next reminder from this feed · due {time}",
+  overdueDismissHint: "OK — this planned time is noted.",
   gotIt: "Got it",
   nextPumpDue: "Next pump",
   nextDoseDue: "Next dose",
