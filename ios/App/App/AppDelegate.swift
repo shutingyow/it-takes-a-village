@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import UserNotifications
+import ActivityKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -62,20 +63,54 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         )
     }
 
-    // MARK: - Silent wake: cancel stale local feed/pump/nap alerts
+    // MARK: - Silent wake: cancel stale alerts + refresh Live Activities
 
     /// Capacitor's JS push plugin does not run for iOS content-available wakes.
     /// When another caregiver logs a feed, Convex sends a silent push; cancel
-    /// pending local schedules so the phone does not fire an outdated due alert.
+    /// pending local schedules and update/restart the since-last feed Live
+    /// Activity so timer-mode devices stay current without opening the app.
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         let reason = userInfo["reason"] as? String
+
         if reason == "feed_changed" {
             Self.cancelDueLocalNotifications()
+            let lastFeedAtMs = Self.doubleValue(userInfo["lastFeedAt"])
+            if #available(iOS 16.2, *) {
+                Task {
+                    await FeedLiveActivityRemote.applyFeedChanged(lastFeedAtMs: lastFeedAtMs)
+                    completionHandler(.newData)
+                }
+                return
+            }
             completionHandler(.newData)
             return
         }
+
+        if reason == "live_activity_update" {
+            let kind = (userInfo["kind"] as? String) ?? "last-feed"
+            let event = (userInfo["event"] as? String) ?? "update"
+            let title = (userInfo["title"] as? String) ?? ""
+            let subtitle = (userInfo["subtitle"] as? String) ?? ""
+            let dueAtMs = Self.doubleValue(userInfo["dueAtMs"]) ?? 0
+            if #available(iOS 16.2, *) {
+                Task {
+                    await FeedLiveActivityRemote.applyLiveActivityUpdate(
+                        kind: kind,
+                        event: event,
+                        title: title,
+                        subtitle: subtitle,
+                        dueAtMs: dueAtMs
+                    )
+                    completionHandler(.newData)
+                }
+                return
+            }
+            completionHandler(.newData)
+            return
+        }
+
         completionHandler(.noData)
     }
 
@@ -83,6 +118,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: dueLocalNotificationIds)
         center.removeDeliveredNotifications(withIdentifiers: dueLocalNotificationIds)
+    }
+
+    private static func doubleValue(_ raw: Any?) -> Double? {
+        if raw == nil || raw is NSNull { return nil }
+        if let n = raw as? Double { return n }
+        if let n = raw as? Int { return Double(n) }
+        if let n = raw as? NSNumber { return n.doubleValue }
+        if let s = raw as? String, let n = Double(s) { return n }
+        return nil
     }
 }
 

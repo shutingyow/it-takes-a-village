@@ -88,11 +88,14 @@ export function ReminderScheduler({
     return () => setLiveActivityPushTokenHandler(null);
   }, [secretLink, selectedCaregiver, upsertLiveActivity]);
 
-  // Register APNs device token so Convex can silent-wake and cancel stale
-  // local feed alerts when another caregiver logs a feed.
+  // Register APNs device token for silent wakes when either delivery mode
+  // is on. Notifications mode: cancel stale local alerts. Timer mode:
+  // native AppDelegate refreshes the since-last Live Activity while
+  // backgrounded (ActivityKit push tokens alone are not enough).
   useEffect(() => {
     void syncDevicePushRegistration({
-      enabled: reminderNotificationsEnabled(),
+      enabled:
+        reminderNotificationsEnabled() || reminderTimersEnabled(),
       secretLink,
       actingCaregiverName: selectedCaregiver,
       upsert: upsertDevicePushToken,

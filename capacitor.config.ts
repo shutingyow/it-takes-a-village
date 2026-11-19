@@ -45,8 +45,9 @@ const config: CapacitorConfig = {
       // Shrink the WebView with the keyboard so forms can scroll above it.
       resize: KeyboardResize.Native,
     },
-    // Silent feed_changed wakes are handled in AppDelegate (cancel local
-    // schedules). Keep presentation empty so silent pushes stay silent.
+    // Silent feed_changed / live_activity_update wakes are handled in
+    // AppDelegate (cancel local schedules + refresh Live Activities).
+    // Keep presentation empty so silent pushes stay silent.
     PushNotifications: {
       presentationOptions: [],
     },

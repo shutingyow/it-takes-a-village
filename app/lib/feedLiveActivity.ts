@@ -32,6 +32,11 @@ interface FeedLiveActivityPlugin {
     activityId?: string;
   }): Promise<void>;
   endAll(): Promise<void>;
+  /** Persist kind opt-in for native silent-wake restarts. */
+  setKindEnabled?(options: {
+    kind: LiveActivityKind;
+    enabled: boolean;
+  }): Promise<void>;
   addListener?(
     eventName: "liveActivityPushToken",
     listenerFunc: (data: {
@@ -117,6 +122,22 @@ export function setLiveActivityKindEnabled(
   } catch {
     // ignore
   }
+  // Native silent wakes read this to decide whether to restart a missing LA.
+  void persistKindEnabledNative(kind, enabled);
+}
+
+async function persistKindEnabledNative(
+  kind: LiveActivityKind,
+  enabled: boolean
+): Promise<void> {
+  if (!isNativePlatform()) return;
+  if (!Capacitor.isPluginAvailable("FeedLiveActivity")) return;
+  if (typeof FeedLiveActivityNative.setKindEnabled !== "function") return;
+  try {
+    await FeedLiveActivityNative.setKindEnabled({ kind, enabled });
+  } catch {
+    // Older native builds without setKindEnabled — ignore.
+  }
 }
 
 type PushTokenHandler = (data: {
@@ -190,6 +211,9 @@ async function syncLiveActivityUnlocked(opts: {
   title: string;
   subtitle: string;
 }): Promise<"live" | "unsupported" | "skipped" | "error"> {
+  // Keep native UserDefaults in sync so silent wakes can restart this kind.
+  void persistKindEnabledNative(opts.kind, opts.enabled);
+
   if (!isNativePlatform() || !opts.enabled) {
     await endLiveActivityUnlocked(opts.kind);
     return "skipped";

@@ -12,6 +12,11 @@ import { internal } from "./_generated/api";
  * - APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC (com.ittakesavillage.app)
  * - APNS_PRIVATE_KEY (PKCS8 .p8 contents, newlines OK as \n)
  * - APNS_PRODUCTION = "true" for App Store / TestFlight production APNs
+ *
+ * Cross-caregiver path (timer delivery mode):
+ * 1. ActivityKit `liveactivity` update to every village last-feed push token
+ * 2. Silent `background` wake with lastFeedAt so native AppDelegate can
+ *    update/restart the Lock Screen timer without opening the app
  */
 
 type ApnsConfig = {
@@ -80,6 +85,8 @@ async function createApnsJwt(config: ApnsConfig): Promise<string> {
   return `${signingInput}.${base64url(sig)}`;
 }
 
+type SendResult = "ok" | "gone" | "error";
+
 async function sendApns(opts: {
   config: ApnsConfig;
   jwt: string;
@@ -87,7 +94,7 @@ async function sendApns(opts: {
   payload: Record<string, unknown>;
   pushType: "liveactivity" | "background";
   topicSuffix?: string;
-}): Promise<void> {
+}): Promise<SendResult> {
   const host = opts.config.production
     ? "api.push.apple.com"
     : "api.sandbox.push.apple.com";
@@ -106,10 +113,25 @@ async function sendApns(opts: {
     },
     body: JSON.stringify(opts.payload),
   });
-  if (!res.ok) {
-    const body = await res.text();
-    console.warn("APNs send failed", res.status, body);
-  }
+  if (res.ok) return "ok";
+  const body = await res.text();
+  console.warn("APNs send failed", res.status, body, opts.pushType);
+  // 410 Unregistered — drop dead ActivityKit / device tokens.
+  if (res.status === 410) return "gone";
+  return "error";
+}
+
+/** ContentState.dueAt is Unix seconds (Double) — see FeedCountdownAttributes. */
+function contentState(opts: {
+  title: string;
+  subtitle: string;
+  dueAtMs: number;
+}) {
+  return {
+    title: opts.title,
+    subtitle: opts.subtitle,
+    dueAt: opts.dueAtMs / 1000,
+  };
 }
 
 export const notifyFeedChanged = internalAction({
@@ -141,18 +163,13 @@ export const notifyFeedChanged = internalAction({
         ? "No milk feed yet"
         : "Time since last feed";
     const dueAtMs = args.lastFeedAt ?? Date.now();
-    // Swift Date JSON (default Codable) = seconds since 2001-01-01.
-    const APPLE_REFERENCE_DATE = 978307200;
-    const contentState = {
-      title,
-      subtitle,
-      dueAt: dueAtMs / 1000 - APPLE_REFERENCE_DATE,
-    };
+    const state = contentState({ title, subtitle, dueAtMs });
 
-    // Update since-last feed on other devices (or end when no milk feed).
-    // Ongoing feed sessions are pushed separately via notifyLiveActivityUpdate.
+    // Update since-last feed on every village device that has a running LA
+    // (or end when no milk feed). Ongoing feed sessions are pushed separately
+    // via notifyLiveActivityUpdate.
     for (const reg of regs) {
-      await sendApns({
+      const result = await sendApns({
         config,
         jwt,
         deviceToken: reg.pushToken,
@@ -162,15 +179,23 @@ export const notifyFeedChanged = internalAction({
           aps: {
             timestamp: Math.floor(Date.now() / 1000),
             event: args.lastFeedAt == null ? "end" : "update",
-            "content-state": contentState,
+            "content-state": state,
             "attributes-type": "FeedCountdownAttributes",
           },
         },
       });
+      if (result === "gone") {
+        await ctx.runMutation(
+          internal.apnsHelpers.deleteLiveActivityByActivityId,
+          { activityId: reg.activityId }
+        );
+      }
     }
 
+    // Silent wake: native AppDelegate updates/restarts the feed LA even when
+    // ActivityKit push tokens are missing or stale (timer delivery mode).
     for (const device of devices) {
-      await sendApns({
+      const result = await sendApns({
         config,
         jwt,
         deviceToken: device.token,
@@ -184,6 +209,12 @@ export const notifyFeedChanged = internalAction({
           lastFeedAt: args.lastFeedAt,
         },
       });
+      if (result === "gone") {
+        await ctx.runMutation(internal.apnsHelpers.deleteDeviceTokenByDevice, {
+          trackerId: args.trackerId,
+          deviceId: device.deviceId,
+        });
+      }
     }
 
     return null;
@@ -212,15 +243,14 @@ export const notifyLiveActivityUpdate = internalAction({
       kind: args.kind,
     });
 
-    const APPLE_REFERENCE_DATE = 978307200;
-    const contentState = {
+    const state = contentState({
       title: args.title,
       subtitle: args.subtitle,
-      dueAt: args.dueAtMs / 1000 - APPLE_REFERENCE_DATE,
-    };
+      dueAtMs: args.dueAtMs,
+    });
 
     for (const reg of regs) {
-      await sendApns({
+      const result = await sendApns({
         config,
         jwt,
         deviceToken: reg.pushToken,
@@ -230,11 +260,17 @@ export const notifyLiveActivityUpdate = internalAction({
           aps: {
             timestamp: Math.floor(Date.now() / 1000),
             event: args.event,
-            "content-state": contentState,
+            "content-state": state,
             "attributes-type": "FeedCountdownAttributes",
           },
         },
       });
+      if (result === "gone") {
+        await ctx.runMutation(
+          internal.apnsHelpers.deleteLiveActivityByActivityId,
+          { activityId: reg.activityId }
+        );
+      }
     }
 
     if (args.silentWake) {
@@ -242,7 +278,7 @@ export const notifyLiveActivityUpdate = internalAction({
         trackerId: args.trackerId,
       });
       for (const device of devices) {
-        await sendApns({
+        const result = await sendApns({
           config,
           jwt,
           deviceToken: device.token,
@@ -252,8 +288,18 @@ export const notifyLiveActivityUpdate = internalAction({
             trackerId: args.trackerId,
             reason: "live_activity_update",
             kind: args.kind,
+            event: args.event,
+            title: args.title,
+            subtitle: args.subtitle,
+            dueAtMs: args.dueAtMs,
           },
         });
+        if (result === "gone") {
+          await ctx.runMutation(internal.apnsHelpers.deleteDeviceTokenByDevice, {
+            trackerId: args.trackerId,
+            deviceId: device.deviceId,
+          });
+        }
       }
     }
 

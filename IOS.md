@@ -146,7 +146,7 @@ The web app schedules **on-device** feed / pump reminders via `@capacitor/local-
 | Browser / Safari tab while page stays open | iOS Safari tabs are unreliable for background alerts |
 | Reschedule when a feed/pump is logged (while app open) | |
 
-**Apple Push (APNs) — Live Activity updates.** When another caregiver logs a milk feed, Convex sends an ActivityKit push so the lock-screen timer resets without opening the app.
+**Apple Push (APNs) — Live Activity updates.** When another caregiver logs a milk feed, Convex sends (1) an ActivityKit `liveactivity` update to every village `last-feed` push token and (2) a silent `feed_changed` wake so native `AppDelegate` can update or restart the Lock Screen timer without opening the app. Timer delivery mode still registers a device push token for that silent wake.
 
 1. Apple Developer → Keys → Apple Push Notifications service (`.p8`)
 2. Xcode App target → Signing & Capabilities → **Push Notifications** (and Live Activities)
@@ -157,7 +157,7 @@ The web app schedules **on-device** feed / pump reminders via `@capacitor/local-
 4. Rebuild/Archive the iOS app after native `pushType: .token` changes
 5. Tokens register via `pushRegistrations.upsertLiveActivity` when Live Activity starts
 
-Local notifications reschedule when the app is open or returns to foreground. With device reminders enabled, the app also registers an APNs device token (`devicePushTokens`). When another caregiver logs a milk feed, Convex sends a silent `feed_changed` push; native `AppDelegate` cancels pending local feed/pump/nap schedules so outdated “feed due” alerts do not fire. Rebuild the iOS app after this change (`npm run cap:sync`, then Xcode Run/Archive) and keep **Push Notifications** + **Background Modes → Remote notifications** enabled.
+Local notifications reschedule when the app is open or returns to foreground. With **timer or notification** delivery enabled, the app registers an APNs device token (`devicePushTokens`). When another caregiver logs a milk feed, Convex sends a silent `feed_changed` push; native `AppDelegate` cancels pending local schedules and refreshes the since-last feed Live Activity. Rebuild the iOS app after native Live Activity / AppDelegate changes (`npm run cap:sync`, then Xcode Run/Archive) and keep **Push Notifications** + **Background Modes → Remote notifications** enabled.
 
 ## Live Activities / Dynamic Island (Lock Screen countdown)
 

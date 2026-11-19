@@ -11,6 +11,10 @@ import FeedCountdownShared
  *
  * Always keeps at most one ActivityKit session per kind so stale JS IDs
  * cannot leave orphan banners (double Live Activities).
+ *
+ * Cross-caregiver sync: ActivityKit push tokens update running activities;
+ * silent `feed_changed` wakes also call `FeedLiveActivityRemote` so timer-mode
+ * devices refresh without opening the app.
  */
 @objc(FeedLiveActivityPlugin)
 public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -22,6 +26,7 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "updateActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endAll", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setKindEnabled", returnType: CAPPluginReturnPromise),
     ]
 
     private static let knownKinds: Set<String> = ["last-feed", "last-pump", "last-nap", "next-feed"]
@@ -44,6 +49,13 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 "reason": "Live Activities are disabled in Settings",
             ])
         }
+    }
+
+    @objc func setKindEnabled(_ call: CAPPluginCall) {
+        let kind = normalizedKind(call.getString("kind"))
+        let enabled = call.getBool("enabled") ?? false
+        FeedLiveActivityRemote.setKindEnabled(kind, enabled: enabled)
+        call.resolve()
     }
 
     @objc func startActivity(_ call: CAPPluginCall) {
@@ -296,7 +308,134 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         return FeedCountdownAttributes.ContentState(
             title: title,
             subtitle: subtitle,
-            dueAt: Date(timeIntervalSince1970: dueAtMs / 1000)
+            dueAt: dueAtMs / 1000.0
         )
+    }
+}
+
+/// Applies remote feed / Live Activity updates without the WebView
+/// (silent APNs wakes while the app is backgrounded).
+enum FeedLiveActivityRemote {
+    private static let defaults = UserDefaults.standard
+    private static func enabledKey(_ kind: String) -> String {
+        "ittav.liveActivity.\(kind).enabled"
+    }
+
+    static func setKindEnabled(_ kind: String, enabled: Bool) {
+        defaults.set(enabled, forKey: enabledKey(kind))
+    }
+
+    static func isKindEnabled(_ kind: String) -> Bool {
+        // Default feed on (matches JS); pump/nap opt-in.
+        if defaults.object(forKey: enabledKey(kind)) == nil {
+            return kind == "last-feed"
+        }
+        return defaults.bool(forKey: enabledKey(kind))
+    }
+
+    /// Silent `feed_changed` from Convex — reset since-last feed timer.
+    @available(iOS 16.2, *)
+    static func applyFeedChanged(lastFeedAtMs: Double?) async {
+        let kind = "last-feed"
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        if let lastFeedAtMs, lastFeedAtMs > 0, lastFeedAtMs.isFinite {
+            let title = "Last feed"
+            let subtitle = "Time since last feed"
+            let state = FeedCountdownAttributes.ContentState(
+                title: title,
+                subtitle: subtitle,
+                dueAt: lastFeedAtMs / 1000.0
+            )
+            await upsert(kind: kind, state: state, startIfMissing: isKindEnabled(kind))
+        } else {
+            await end(kind: kind)
+        }
+    }
+
+    /// Silent `live_activity_update` for any kind (ongoing feed / nap, etc.).
+    @available(iOS 16.2, *)
+    static func applyLiveActivityUpdate(
+        kind rawKind: String,
+        event: String,
+        title: String,
+        subtitle: String,
+        dueAtMs: Double
+    ) async {
+        let kind = normalizedKind(rawKind)
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        if event == "end" {
+            await end(kind: kind)
+            return
+        }
+
+        guard dueAtMs > 0, dueAtMs.isFinite else { return }
+        let state = FeedCountdownAttributes.ContentState(
+            title: title.isEmpty ? defaultTitle(for: kind) : title,
+            subtitle: subtitle,
+            dueAt: dueAtMs / 1000.0
+        )
+        await upsert(kind: kind, state: state, startIfMissing: isKindEnabled(kind))
+    }
+
+    @available(iOS 16.2, *)
+    private static func upsert(
+        kind: String,
+        state: FeedCountdownAttributes.ContentState,
+        startIfMissing: Bool
+    ) async {
+        let matches = Activity<FeedCountdownAttributes>.activities.filter {
+            $0.attributes.kind == kind
+        }
+        let content = ActivityContent(
+            state: state,
+            staleDate: Date().addingTimeInterval(24 * 60 * 60)
+        )
+
+        if !matches.isEmpty {
+            for activity in matches {
+                await activity.update(content)
+            }
+            return
+        }
+
+        guard startIfMissing else { return }
+        do {
+            _ = try Activity.request(
+                attributes: FeedCountdownAttributes(kind: kind),
+                content: content,
+                pushType: .token
+            )
+        } catch {
+            NSLog("FeedLiveActivityRemote start failed: %@", error.localizedDescription)
+        }
+    }
+
+    @available(iOS 16.2, *)
+    private static func end(kind: String) async {
+        for activity in Activity<FeedCountdownAttributes>.activities
+        where activity.attributes.kind == kind {
+            await activity.end(
+                ActivityContent(state: activity.contentState, staleDate: nil),
+                dismissalPolicy: .immediate
+            )
+        }
+    }
+
+    private static func normalizedKind(_ raw: String) -> String {
+        let kind = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if ["last-feed", "last-pump", "last-nap", "next-feed"].contains(kind) {
+            return kind
+        }
+        return "last-feed"
+    }
+
+    private static func defaultTitle(for kind: String) -> String {
+        switch kind {
+        case "last-pump": return "Last pump"
+        case "last-nap": return "Awake since"
+        default: return "Last feed"
+        }
     }
 }

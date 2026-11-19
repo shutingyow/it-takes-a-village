@@ -1,7 +1,8 @@
 /**
  * Register the device APNs token so Convex can silent-wake the app when
- * another caregiver logs a feed — native code then cancels stale local
- * notifications (see AppDelegate).
+ * another caregiver logs a feed. Native AppDelegate then:
+ * - cancels stale local due notifications (notifications delivery mode)
+ * - updates/restarts the since-last feed Live Activity (timer delivery mode)
  */
 
 import { Capacitor } from "@capacitor/core";
@@ -9,7 +10,6 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import { getOrCreateDeviceId } from "@/app/lib/feedLiveActivity";
 import {
   cancelAllDueNotifications,
-  getDeviceRemindersEnabled,
   isNativePlatform,
 } from "@/app/lib/deviceNotifications";
 
@@ -26,6 +26,8 @@ let lastContext: {
   secretLink: string;
   actingCaregiverName: string;
   upsert: UpsertDevicePushToken;
+  /** Timer or notifications delivery — not the legacy local-notif-only flag. */
+  enabled: boolean;
 } | null = null;
 
 function notifyRemindersChanged(): void {
@@ -36,7 +38,7 @@ function notifyRemindersChanged(): void {
 async function upsertToken(token: string): Promise<void> {
   lastToken = token;
   const ctx = lastContext;
-  if (!ctx || !getDeviceRemindersEnabled()) return;
+  if (!ctx || !ctx.enabled) return;
   try {
     await ctx.upsert({
       secretLink: ctx.secretLink,
@@ -62,15 +64,21 @@ async function ensureListeners(): Promise<void> {
     console.warn("Push registration failed", error.error);
   });
 
-  // Foreground delivery of feed_changed (silent wakes are handled natively
-  // in AppDelegate; this covers when JS is already alive).
+  // Foreground delivery of feed_changed / live_activity_update (silent wakes
+  // are handled natively in AppDelegate; this covers when JS is already alive).
   await PushNotifications.addListener(
     "pushNotificationReceived",
     (notification) => {
       const data = notification.data as Record<string, unknown> | undefined;
-      if (data?.reason !== "feed_changed") return;
+      const reason = data?.reason;
+      if (reason !== "feed_changed" && reason !== "live_activity_update") {
+        return;
+      }
       void (async () => {
-        await cancelAllDueNotifications();
+        if (reason === "feed_changed") {
+          await cancelAllDueNotifications();
+        }
+        // ReminderScheduler re-runs Live Activity sync from Convex queries.
         notifyRemindersChanged();
       })();
     }
@@ -78,8 +86,11 @@ async function ensureListeners(): Promise<void> {
 }
 
 /**
- * Ensure APNs device token is registered for this village while reminders
- * are opted in. Safe to call repeatedly from ReminderScheduler.
+ * Ensure APNs device token is registered for this village while timer or
+ * notification delivery is on. Safe to call repeatedly from ReminderScheduler.
+ *
+ * Notification permission is required for the token; timer-mode users are
+ * prompted once so cross-caregiver silent wakes can refresh Lock Screen timers.
  */
 export async function syncDevicePushRegistration(opts: {
   enabled: boolean;
@@ -94,6 +105,7 @@ export async function syncDevicePushRegistration(opts: {
     secretLink: opts.secretLink,
     actingCaregiverName: opts.actingCaregiverName,
     upsert: opts.upsert,
+    enabled: opts.enabled,
   };
 
   if (!opts.enabled) return;

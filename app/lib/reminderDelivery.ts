@@ -92,6 +92,8 @@ export async function setReminderDeliveryMode(
   }
 
   if (mode === "timer") {
+    // Local due alerts off — but device push tokens still register via
+    // ReminderScheduler so silent wakes can refresh Live Activities.
     setDeviceRemindersEnabled(false);
     await cancelAllDueNotifications();
     // Feed since-last is the primary lock-screen timer when choosing timers.
