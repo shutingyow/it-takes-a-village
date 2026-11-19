@@ -324,6 +324,7 @@ export function DueSoonCard({
   });
   const dayHours = dueStatus.feedIntervalHours ?? DEFAULT_FEED_INTERVAL_HOURS;
   const lateLogged =
+    dueStatus.reminderMode !== "schedule" &&
     !overdue &&
     feedItem?.status !== "ongoing" &&
     lastFeed != null &&

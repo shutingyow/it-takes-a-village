@@ -68,6 +68,17 @@ interface SettingsTabProps {
   feedRemindersEnabled?: boolean;
   wakeWindowMinutes?: number;
   napRemindersEnabled?: boolean;
+  reminderMode?: "interval" | "schedule";
+  reminderSchedule?: {
+    slots: Array<{
+      id: string;
+      kind: "feed" | "nap" | "pump";
+      time: string;
+      endTime?: string;
+      period?: "day" | "night";
+      note?: string;
+    }>;
+  };
   pumpSchedule?: {
     enabled: boolean;
     times: string[];
@@ -97,6 +108,8 @@ export function SettingsTab({
   feedRemindersEnabled,
   wakeWindowMinutes,
   napRemindersEnabled,
+  reminderMode,
+  reminderSchedule,
   pumpSchedule,
   openView,
   viewerIsOwner = false,
@@ -189,6 +202,8 @@ export function SettingsTab({
         feedRemindersEnabled={feedRemindersEnabled}
         wakeWindowMinutes={wakeWindowMinutes}
         napRemindersEnabled={napRemindersEnabled}
+        reminderMode={reminderMode}
+        reminderSchedule={reminderSchedule}
         pumpSchedule={pumpSchedule}
         onBack={() => setView("menu")}
       />

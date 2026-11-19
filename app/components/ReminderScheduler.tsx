@@ -8,6 +8,14 @@ import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { formatTime } from "@/app/lib/utils";
 import { listUpcomingPumpDueAts } from "@/convex/lib/pumpSchedule";
 import {
+  listUpcomingClockDueAts,
+  resolveReminderMode,
+  timesForKind,
+  type ReminderMode,
+  type ScheduleSlot,
+} from "@/convex/lib/clockSchedule";
+import { DEFAULT_TRACKER_TIMEZONE } from "@/convex/lib/dayBounds";
+import {
   DEFAULT_NOTIFY_BEFORE_MINUTES,
   syncDueNotifications,
 } from "@/app/lib/deviceNotifications";
@@ -32,6 +40,9 @@ interface ReminderSchedulerProps {
   feedRemindersEnabled?: boolean;
   wakeWindowMinutes?: number;
   napRemindersEnabled?: boolean;
+  reminderMode?: ReminderMode;
+  reminderSchedule?: { slots: ScheduleSlot[] };
+  timezone?: string;
   pumpSchedule?: {
     enabled: boolean;
     times: string[];
@@ -61,6 +72,9 @@ export function ReminderScheduler({
   feedRemindersEnabled = true,
   wakeWindowMinutes,
   napRemindersEnabled = true,
+  reminderMode: reminderModeProp,
+  reminderSchedule,
+  timezone,
   pumpSchedule,
 }: ReminderSchedulerProps) {
   const { t } = useLanguage();
@@ -193,37 +207,63 @@ export function ReminderScheduler({
 
     let pumpDueAts: number[] = [];
     if (notifOn && pumpSchedule?.enabled) {
-      const mode = pumpSchedule.mode ?? "fixed";
-      if (mode === "interval") {
-        // Exact same due the Due soon card shows.
-        if (pumpItem) pumpDueAts = [pumpItem.dueAt];
-      } else if (pumpItem) {
-        const later = listUpcomingPumpDueAts(
-          {
-            enabled: true,
-            times: pumpSchedule.times,
-            amountMl: pumpSchedule.amountMl,
-            timezone: pumpSchedule.timezone,
-            mode: "fixed",
-          },
-          lastPump?.timestamp,
-          Date.now(),
-          6
-        ).filter((ts) => ts > pumpItem.dueAt);
-        pumpDueAts = [pumpItem.dueAt, ...later].slice(0, 6);
-      } else {
-        pumpDueAts = listUpcomingPumpDueAts(
-          {
-            enabled: true,
-            times: pumpSchedule.times,
-            amountMl: pumpSchedule.amountMl,
-            timezone: pumpSchedule.timezone,
-            mode: "fixed",
-          },
+      const reminderMode = resolveReminderMode(
+        dueStatus.reminderMode ?? reminderModeProp
+      );
+      const villageTz =
+        timezone?.trim() ||
+        pumpSchedule.timezone ||
+        DEFAULT_TRACKER_TIMEZONE;
+
+      if (reminderMode === "schedule") {
+        const pumpTimes = timesForKind(reminderSchedule?.slots, "pump");
+        const upcoming = listUpcomingClockDueAts(
+          pumpTimes.length > 0 ? pumpTimes : pumpSchedule.times,
+          villageTz,
           lastPump?.timestamp,
           Date.now(),
           6
         );
+        if (pumpItem) {
+          pumpDueAts = [
+            pumpItem.dueAt,
+            ...upcoming.filter((ts) => ts > pumpItem.dueAt),
+          ].slice(0, 6);
+        } else {
+          pumpDueAts = upcoming;
+        }
+      } else {
+        const mode = pumpSchedule.mode ?? "fixed";
+        if (mode === "interval") {
+          if (pumpItem) pumpDueAts = [pumpItem.dueAt];
+        } else if (pumpItem) {
+          const later = listUpcomingPumpDueAts(
+            {
+              enabled: true,
+              times: pumpSchedule.times,
+              amountMl: pumpSchedule.amountMl,
+              timezone: pumpSchedule.timezone,
+              mode: "fixed",
+            },
+            lastPump?.timestamp,
+            Date.now(),
+            6
+          ).filter((ts) => ts > pumpItem.dueAt);
+          pumpDueAts = [pumpItem.dueAt, ...later].slice(0, 6);
+        } else {
+          pumpDueAts = listUpcomingPumpDueAts(
+            {
+              enabled: true,
+              times: pumpSchedule.times,
+              amountMl: pumpSchedule.amountMl,
+              timezone: pumpSchedule.timezone,
+              mode: "fixed",
+            },
+            lastPump?.timestamp,
+            Date.now(),
+            6
+          );
+        }
       }
     }
 
@@ -292,6 +332,9 @@ export function ReminderScheduler({
     activeSleep,
     activeFeed,
     pumpSchedule,
+    reminderModeProp,
+    reminderSchedule,
+    timezone,
     feedIntervalHours,
     notifyBeforeProp,
     feedRemindersEnabled,

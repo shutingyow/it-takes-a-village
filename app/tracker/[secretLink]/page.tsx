@@ -466,7 +466,10 @@ function TrackerPageInner({
           feedRemindersEnabled={tracker.feedRemindersEnabled}
           wakeWindowMinutes={tracker.wakeWindowMinutes}
           napRemindersEnabled={tracker.napRemindersEnabled}
+          reminderMode={tracker.reminderMode}
+          reminderSchedule={tracker.reminderSchedule}
           pumpSchedule={tracker.pumpSchedule}
+          timezone={tracker.timezone}
         />
         {activeTab === "today" && (
           <InsightsTab
@@ -516,6 +519,8 @@ function TrackerPageInner({
             feedRemindersEnabled={tracker.feedRemindersEnabled}
             wakeWindowMinutes={tracker.wakeWindowMinutes}
             napRemindersEnabled={tracker.napRemindersEnabled}
+            reminderMode={tracker.reminderMode}
+            reminderSchedule={tracker.reminderSchedule}
             pumpSchedule={tracker.pumpSchedule}
             viewerIsOwner={tracker.viewerIsOwner}
             onScrollToTop={() =>

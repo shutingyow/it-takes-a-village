@@ -183,6 +183,8 @@ export function normalizeTrackerForClient(tracker: Doc<"trackers">) {
     feedRemindersEnabled: tracker.feedRemindersEnabled,
     wakeWindowMinutes: tracker.wakeWindowMinutes,
     napRemindersEnabled: tracker.napRemindersEnabled,
+    reminderMode: tracker.reminderMode,
+    reminderSchedule: tracker.reminderSchedule,
     medicationReminders: tracker.medicationReminders,
     pumpSchedule: tracker.pumpSchedule,
     createdAt: tracker.createdAt,

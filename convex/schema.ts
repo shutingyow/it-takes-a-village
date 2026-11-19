@@ -19,6 +19,19 @@ const pumpScheduleValidator = v.object({
   intervalHours: v.optional(v.number()),
 });
 
+const scheduleSlotValidator = v.object({
+  id: v.string(),
+  kind: v.union(v.literal("feed"), v.literal("nap"), v.literal("pump")),
+  time: v.string(),
+  endTime: v.optional(v.string()),
+  period: v.optional(v.union(v.literal("day"), v.literal("night"))),
+  note: v.optional(v.string()),
+});
+
+const reminderScheduleValidator = v.object({
+  slots: v.array(scheduleSlotValidator),
+});
+
 const diaperColourValidator = v.union(
   v.literal("yellow"),
   v.literal("green"),
@@ -91,6 +104,10 @@ export default defineSchema({
     wakeWindowMinutes: v.optional(v.number()),
     /** When false, skip nap wake-window notifications. Default true when unset. */
     napRemindersEnabled: v.optional(v.boolean()),
+    reminderMode: v.optional(
+      v.union(v.literal("interval"), v.literal("schedule"))
+    ),
+    reminderSchedule: v.optional(reminderScheduleValidator),
     medicationReminders: v.optional(v.array(medicationReminderValidator)),
     pumpSchedule: v.optional(pumpScheduleValidator),
     /**

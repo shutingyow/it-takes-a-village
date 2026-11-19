@@ -14,6 +14,12 @@ import {
   DEFAULT_PUMP_INTERVAL_HOURS,
   zonedTimeToUtc,
 } from "./lib/pumpSchedule";
+import {
+  computeNextClockDueAt,
+  normalizeReminderSchedule,
+  resolveReminderMode,
+  timesForKind,
+} from "./lib/clockSchedule";
 import { resolveTrackerTimezone } from "./lib/dayBounds";
 
 const dueItemValidator = v.object({
@@ -121,6 +127,7 @@ export const getDueStatus = query({
     now: v.number(),
   },
   returns: v.object({
+    reminderMode: v.union(v.literal("interval"), v.literal("schedule")),
     feedIntervalHours: v.number(),
     /** Interval actually used for the current next-feed due (day or night). */
     effectiveFeedIntervalHours: v.number(),
@@ -141,6 +148,7 @@ export const getDueStatus = query({
     const night = resolveNightFeedSettings(tracker ?? undefined);
     if (!tracker) {
       return {
+        reminderMode: "interval" as const,
         feedIntervalHours: DEFAULT_FEED_INTERVAL_HOURS,
         effectiveFeedIntervalHours: DEFAULT_FEED_INTERVAL_HOURS,
         nightFeedIntervalEnabled: night.enabled,
@@ -153,6 +161,11 @@ export const getDueStatus = query({
       };
     }
 
+    const reminderMode = resolveReminderMode(tracker.reminderMode);
+    const schedule =
+      reminderMode === "schedule"
+        ? normalizeReminderSchedule(tracker.reminderSchedule)
+        : null;
     const feedIntervalHours =
       tracker.feedIntervalHours ?? DEFAULT_FEED_INTERVAL_HOURS;
     const notifyBeforeMinutes =
@@ -195,24 +208,41 @@ export const getDueStatus = query({
       );
 
       if (lastFeed) {
-        // last feed + day or night interval (cutover may shorten night → day).
-        const feedAt = clampFeedAtForSkew(lastFeed.timestamp, args.now);
-        const dueAt = computeFeedDueAt(
-          lastFeed.timestamp,
-          feedIntervalHours,
-          night,
-          { now: args.now, timeZone }
-        );
-        effectiveFeedIntervalHours = (dueAt - feedAt) / (60 * 60 * 1000);
-        usingNightInterval =
-          night.enabled && effectiveFeedIntervalHours > feedIntervalHours + 1e-9;
-        const due = computeDueStatus(dueAt, args.now);
-        items.push({
-          type: "feed",
-          label: "feed",
-          dueAt,
-          ...due,
-        });
+        let dueAt: number | null = null;
+        if (reminderMode === "schedule" && schedule) {
+          const feedTimes = timesForKind(schedule.slots, "feed");
+          dueAt = computeNextClockDueAt(
+            feedTimes,
+            timeZone,
+            lastFeed.timestamp,
+            args.now
+          );
+          if (dueAt != null) {
+            effectiveFeedIntervalHours =
+              (dueAt - lastFeed.timestamp) / (60 * 60 * 1000);
+          }
+        } else {
+          const feedAt = clampFeedAtForSkew(lastFeed.timestamp, args.now);
+          dueAt = computeFeedDueAt(
+            lastFeed.timestamp,
+            feedIntervalHours,
+            night,
+            { now: args.now, timeZone }
+          );
+          effectiveFeedIntervalHours = (dueAt - feedAt) / (60 * 60 * 1000);
+          usingNightInterval =
+            night.enabled &&
+            effectiveFeedIntervalHours > feedIntervalHours + 1e-9;
+        }
+        if (dueAt != null) {
+          const due = computeDueStatus(dueAt, args.now);
+          items.push({
+            type: "feed",
+            label: "feed",
+            dueAt,
+            ...due,
+          });
+        }
       }
     }
 
@@ -258,21 +288,31 @@ export const getDueStatus = query({
         .order("desc")
         .first();
 
-      const mode = pumpSchedule.mode ?? "fixed";
       let dueAt: number | null = null;
 
-      if (mode === "interval") {
-        dueAt = computeIntervalPumpDueAt(
+      if (reminderMode === "schedule" && schedule) {
+        const pumpTimes = timesForKind(schedule.slots, "pump");
+        dueAt = computeNextClockDueAt(
+          pumpTimes.length > 0 ? pumpTimes : pumpSchedule.times,
+          timeZone,
           lastPump?.timestamp,
-          pumpSchedule.intervalHours ?? DEFAULT_PUMP_INTERVAL_HOURS,
           args.now
         );
       } else {
-        dueAt = computeNextPumpDueAt(
-          pumpSchedule,
-          lastPump?.timestamp,
-          args.now
-        );
+        const mode = pumpSchedule.mode ?? "fixed";
+        if (mode === "interval") {
+          dueAt = computeIntervalPumpDueAt(
+            lastPump?.timestamp,
+            pumpSchedule.intervalHours ?? DEFAULT_PUMP_INTERVAL_HOURS,
+            args.now
+          );
+        } else {
+          dueAt = computeNextPumpDueAt(
+            pumpSchedule,
+            lastPump?.timestamp,
+            args.now
+          );
+        }
       }
 
       if (dueAt !== null) {
@@ -313,45 +353,62 @@ export const getDueStatus = query({
         caregiverName: activeSleep.caregiverName,
       });
     } else {
-      const wakeWindowMinutes = tracker.wakeWindowMinutes;
       const napRemindersEnabled = tracker.napRemindersEnabled !== false;
-      if (
-        wakeWindowMinutes != null &&
-        wakeWindowMinutes > 0 &&
-        napRemindersEnabled
-      ) {
+      if (napRemindersEnabled) {
         const lastEnded = recentSleep.find(
           (entry) => entry.endTime !== undefined
         );
-        if (lastEnded?.endTime !== undefined) {
-          const wakeDueAt = lastEnded.endTime + wakeWindowMinutes * 60_000;
-          // Use night-window start as village bedtime (e.g. 19:30).
-          const bedtimeToday = todaysBedtimeMs(
-            args.now,
+        if (reminderMode === "schedule" && schedule && lastEnded?.endTime) {
+          const napTimes = timesForKind(schedule.slots, "nap");
+          const dueAt = computeNextClockDueAt(
+            napTimes,
             timeZone,
-            night.start
+            lastEnded.endTime,
+            args.now
           );
-          // Already logged tonight's sleep after bedtime → nothing due.
-          const sleptTonight =
-            bedtimeToday != null &&
-            recentSleep.some(
-              (entry) =>
-                entry.startTime >= bedtimeToday && entry.type === "night"
-            );
-          if (!sleptTonight) {
-            const resolved = resolveSleepDue({
-              now: args.now,
-              wakeDueAt,
-              bedtimeToday,
+          if (dueAt != null) {
+            const due = computeDueStatus(dueAt, args.now);
+            items.push({
+              type: "sleep",
+              label: "nap",
+              dueAt,
+              ...due,
             });
-            if (resolved) {
-              const due = computeDueStatus(resolved.dueAt, args.now);
-              items.push({
-                type: "sleep",
-                label: resolved.kind,
-                dueAt: resolved.dueAt,
-                ...due,
+          }
+        } else {
+          const wakeWindowMinutes = tracker.wakeWindowMinutes;
+          if (
+            wakeWindowMinutes != null &&
+            wakeWindowMinutes > 0 &&
+            lastEnded?.endTime !== undefined
+          ) {
+            const wakeDueAt = lastEnded.endTime + wakeWindowMinutes * 60_000;
+            const bedtimeToday = todaysBedtimeMs(
+              args.now,
+              timeZone,
+              night.start
+            );
+            const sleptTonight =
+              bedtimeToday != null &&
+              recentSleep.some(
+                (entry) =>
+                  entry.startTime >= bedtimeToday && entry.type === "night"
+              );
+            if (!sleptTonight) {
+              const resolved = resolveSleepDue({
+                now: args.now,
+                wakeDueAt,
+                bedtimeToday,
               });
+              if (resolved) {
+                const due = computeDueStatus(resolved.dueAt, args.now);
+                items.push({
+                  type: "sleep",
+                  label: resolved.kind,
+                  dueAt: resolved.dueAt,
+                  ...due,
+                });
+              }
             }
           }
         }
@@ -361,6 +418,7 @@ export const getDueStatus = query({
     items.sort((a, b) => a.dueAt - b.dueAt);
 
     return {
+      reminderMode,
       feedIntervalHours,
       effectiveFeedIntervalHours,
       nightFeedIntervalEnabled: night.enabled,

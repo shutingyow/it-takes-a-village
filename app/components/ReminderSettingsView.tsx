@@ -13,6 +13,14 @@ import {
 } from "@/app/lib/pumpCalendar";
 import { DEFAULT_PUMP_INTERVAL_HOURS } from "@/convex/lib/pumpSchedule";
 import {
+  DEFAULT_SCHEDULE_SLOTS,
+  normalizeReminderSchedule,
+  type ReminderMode,
+  type ScheduleSlot,
+  type ScheduleSlotKind,
+  type ScheduleSlotPeriod,
+} from "@/convex/lib/clockSchedule";
+import {
   DEFAULT_NOTIFY_BEFORE_MINUTES,
   getNotificationPermission,
   isNativePlatform,
@@ -51,6 +59,8 @@ interface ReminderSettingsViewProps {
   feedRemindersEnabled?: boolean;
   wakeWindowMinutes?: number;
   napRemindersEnabled?: boolean;
+  reminderMode?: ReminderMode;
+  reminderSchedule?: { slots: ScheduleSlot[] };
   pumpSchedule?: {
     enabled: boolean;
     times: string[];
@@ -67,6 +77,10 @@ type PumpMode = "fixed" | "interval";
 function notifyRemindersChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event("deviceRemindersChanged"));
+}
+
+function newSlotId(kind: ScheduleSlotKind): string {
+  return `${kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 function ReminderToggleRow({
@@ -91,6 +105,207 @@ function ReminderToggleRow({
   );
 }
 
+function ModeChoice({
+  mode,
+  onChange,
+  intervalLabel,
+  scheduleLabel,
+  intervalDesc,
+  scheduleDesc,
+}: {
+  mode: ReminderMode;
+  onChange: (mode: ReminderMode) => void;
+  intervalLabel: string;
+  scheduleLabel: string;
+  intervalDesc: string;
+  scheduleDesc: string;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {(
+        [
+          { id: "interval" as const, label: intervalLabel, desc: intervalDesc },
+          { id: "schedule" as const, label: scheduleLabel, desc: scheduleDesc },
+        ] as const
+      ).map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          onClick={() => onChange(opt.id)}
+          className={`rounded-xl px-3 py-2.5 text-left border ${
+            mode === opt.id
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border bg-[#faf6f2] text-foreground"
+          }`}
+        >
+          <p className="text-sm font-semibold">{opt.label}</p>
+          <p className="text-xs text-muted mt-0.5 leading-snug">{opt.desc}</p>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ScheduleSlotList({
+  kind,
+  slots,
+  onChange,
+  labels,
+}: {
+  kind: ScheduleSlotKind;
+  slots: ScheduleSlot[];
+  onChange: (slots: ScheduleSlot[]) => void;
+  labels: {
+    empty: string;
+    add: string;
+    time: string;
+    windowEnd: string;
+    period: string;
+    periodDay: string;
+    periodNight: string;
+    periodAny: string;
+    remove: string;
+  };
+}) {
+  const kindSlots = slots.filter((s) => s.kind === kind);
+  const [newTime, setNewTime] = useState("");
+  const [newEnd, setNewEnd] = useState("");
+  const [newPeriod, setNewPeriod] = useState<"" | ScheduleSlotPeriod>("");
+
+  const updateSlot = (id: string, patch: Partial<ScheduleSlot>) => {
+    onChange(
+      slots.map((slot) => (slot.id === id ? { ...slot, ...patch } : slot))
+    );
+  };
+
+  const removeSlot = (id: string) => {
+    onChange(slots.filter((slot) => slot.id !== id));
+  };
+
+  const addSlot = () => {
+    if (!newTime) return;
+    const next: ScheduleSlot = {
+      id: newSlotId(kind),
+      kind,
+      time: newTime,
+      ...(newEnd ? { endTime: newEnd } : {}),
+      ...(newPeriod ? { period: newPeriod } : {}),
+    };
+    onChange([...slots, next]);
+    setNewTime("");
+    setNewEnd("");
+    setNewPeriod("");
+  };
+
+  return (
+    <div className="mt-2">
+      {kindSlots.length === 0 ? (
+        <p className="text-xs text-muted mb-2">{labels.empty}</p>
+      ) : (
+        <ul className="space-y-2 mb-3">
+          {kindSlots.map((slot) => (
+            <li
+              key={slot.id}
+              className="rounded-xl border border-border bg-[#faf6f2] px-3 py-2"
+            >
+              <div className="flex flex-wrap items-end gap-2 min-w-0">
+                <div className="min-w-0">
+                  <label className="label-field">{labels.time}</label>
+                  <input
+                    type="time"
+                    value={slot.time}
+                    onChange={(e) =>
+                      updateSlot(slot.id, { time: e.target.value })
+                    }
+                    className="input-field"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <label className="label-field">{labels.windowEnd}</label>
+                  <input
+                    type="time"
+                    value={slot.endTime ?? ""}
+                    onChange={(e) =>
+                      updateSlot(slot.id, {
+                        endTime: e.target.value || undefined,
+                      })
+                    }
+                    className="input-field"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <label className="label-field">{labels.period}</label>
+                  <select
+                    value={slot.period ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      updateSlot(slot.id, {
+                        period:
+                          value === "day" || value === "night"
+                            ? value
+                            : undefined,
+                      });
+                    }}
+                    className="input-field"
+                  >
+                    <option value="">{labels.periodAny}</option>
+                    <option value="day">{labels.periodDay}</option>
+                    <option value="night">{labels.periodNight}</option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeSlot(slot.id)}
+                  className="shrink-0 text-sm font-semibold text-muted px-2 py-2"
+                  title={labels.remove}
+                >
+                  ×
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap gap-2 items-end min-w-0">
+        <input
+          type="time"
+          value={newTime}
+          onChange={(e) => setNewTime(e.target.value)}
+          className="input-field"
+        />
+        <input
+          type="time"
+          value={newEnd}
+          onChange={(e) => setNewEnd(e.target.value)}
+          className="input-field"
+          aria-label={labels.windowEnd}
+        />
+        <select
+          value={newPeriod}
+          onChange={(e) => {
+            const value = e.target.value;
+            setNewPeriod(value === "day" || value === "night" ? value : "");
+          }}
+          className="input-field min-w-0 flex-1"
+        >
+          <option value="">{labels.periodAny}</option>
+          <option value="day">{labels.periodDay}</option>
+          <option value="night">{labels.periodNight}</option>
+        </select>
+        <button
+          type="button"
+          onClick={addSlot}
+          disabled={!newTime}
+          className="shrink-0 px-3 py-2 rounded-xl bg-secondary text-white font-semibold text-sm disabled:opacity-50"
+        >
+          {labels.add}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ReminderSettingsView({
   secretLink,
   selectedCaregiver,
@@ -104,11 +319,24 @@ export function ReminderSettingsView({
   feedRemindersEnabled: initialFeedEnabled,
   wakeWindowMinutes: initialWakeWindow,
   napRemindersEnabled: initialNapEnabled,
+  reminderMode: initialMode,
+  reminderSchedule: initialSchedule,
   pumpSchedule: initialPump,
   onBack,
 }: ReminderSettingsViewProps) {
   const { t } = useLanguage();
   const updateSettings = useMutation(api.trackers.updateReminderSettings);
+
+  const [reminderMode, setReminderMode] = useState<ReminderMode>(
+    initialMode === "schedule" ? "schedule" : "interval"
+  );
+  const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>(() =>
+    normalizeReminderSchedule(
+      initialSchedule?.slots?.length
+        ? initialSchedule
+        : { slots: DEFAULT_SCHEDULE_SLOTS }
+    ).slots
+  );
 
   const [feedEnabled, setFeedEnabled] = useState(initialFeedEnabled ?? true);
   const [feedHours, setFeedHours] = useState(String(initialFeedHours ?? 2.5));
@@ -154,7 +382,8 @@ export function ReminderSettingsView({
 
   const [deliveryMode, setDeliveryMode] =
     useState<ReminderDeliveryMode>("off");
-  const [notifStatus, setNotifStatus] = useState<NotifPermission>("unsupported");
+  const [notifStatus, setNotifStatus] =
+    useState<NotifPermission>("unsupported");
   const [notifBusy, setNotifBusy] = useState(false);
   const [liveFeed, setLiveFeed] = useState(true);
   const [livePump, setLivePump] = useState(false);
@@ -166,7 +395,6 @@ export function ReminderSettingsView({
 
   useEffect(() => {
     let mode = getReminderDeliveryMode();
-    // Lock screen timers are native-only; fall back on web.
     if (mode === "timer" && !isNativePlatform()) {
       mode = "off";
     }
@@ -225,6 +453,27 @@ export function ReminderSettingsView({
     }
   };
 
+  const handleModeChange = (mode: ReminderMode) => {
+    setReminderMode(mode);
+    if (mode === "schedule" && scheduleSlots.length === 0) {
+      setScheduleSlots(
+        normalizeReminderSchedule({ slots: DEFAULT_SCHEDULE_SLOTS }).slots
+      );
+    }
+  };
+
+  const slotLabels = {
+    empty: t("reminderScheduleEmpty"),
+    add: t("reminderScheduleAdd"),
+    time: t("reminderScheduleTime"),
+    windowEnd: t("reminderScheduleWindowEnd"),
+    period: t("reminderSchedulePeriod"),
+    periodDay: t("reminderSchedulePeriodDay"),
+    periodNight: t("reminderSchedulePeriodNight"),
+    periodAny: t("reminderSchedulePeriodAny"),
+    remove: t("remove"),
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
@@ -250,6 +499,7 @@ export function ReminderSettingsView({
       }
       const wakeMins = parseInt(wakeWindow, 10);
       if (
+        reminderMode === "interval" &&
         napEnabled &&
         (isNaN(wakeMins) || wakeMins < 15 || wakeMins > 240)
       ) {
@@ -261,18 +511,57 @@ export function ReminderSettingsView({
       }
       const intervalParsed = parseFloat(pumpIntervalHours);
       if (
+        reminderMode === "interval" &&
         pumpMode === "interval" &&
         (isNaN(intervalParsed) || intervalParsed < 0.5 || intervalParsed > 24)
       ) {
         throw new Error("Invalid pump interval");
       }
-      const times = normalizePumpTimes(pumpTimes);
-      if (pumpMode === "fixed" && pumpEnabled && times.length === 0) {
+
+      const normalizedSchedule = normalizeReminderSchedule({
+        slots: scheduleSlots,
+      });
+      if (reminderMode === "schedule") {
+        const hasFeed = normalizedSchedule.slots.some(
+          (s: ScheduleSlot) => s.kind === "feed"
+        );
+        const hasNap = normalizedSchedule.slots.some(
+          (s: ScheduleSlot) => s.kind === "nap"
+        );
+        const hasPump = normalizedSchedule.slots.some(
+          (s: ScheduleSlot) => s.kind === "pump"
+        );
+        if (
+          (feedEnabled && !hasFeed) ||
+          (napEnabled && !hasNap) ||
+          (pumpEnabled && !hasPump)
+        ) {
+          throw new Error(t("reminderScheduleNeedSlot"));
+        }
+      }
+
+      const times =
+        reminderMode === "schedule"
+          ? normalizePumpTimes(
+              normalizedSchedule.slots
+                .filter((s: ScheduleSlot) => s.kind === "pump")
+                .map((s: ScheduleSlot) => s.time)
+            )
+          : normalizePumpTimes(pumpTimes);
+      if (
+        reminderMode === "interval" &&
+        pumpMode === "fixed" &&
+        pumpEnabled &&
+        times.length === 0
+      ) {
         throw new Error("Add at least one pump time");
       }
+
       await updateSettings({
         secretLink,
         actingCaregiverName: selectedCaregiver,
+        reminderMode,
+        reminderSchedule: normalizedSchedule,
         feedRemindersEnabled: feedEnabled,
         feedIntervalHours: parsed,
         nightFeedIntervalEnabled: nightEnabled,
@@ -293,14 +582,15 @@ export function ReminderSettingsView({
           times: times.length > 0 ? times : [...DEFAULT_PUMP_TIMES],
           amountMl,
           timezone: pumpTimezone,
-          mode: pumpMode,
+          mode: reminderMode === "schedule" ? "fixed" : pumpMode,
           intervalHours:
             pumpMode === "interval"
               ? intervalParsed
               : parseFloat(pumpIntervalHours) || DEFAULT_PUMP_INTERVAL_HOURS,
         },
       });
-      setPumpTimes(times.length > 0 ? times : [...DEFAULT_PUMP_TIMES]);
+      setScheduleSlots(normalizedSchedule.slots);
+      if (times.length > 0) setPumpTimes(times);
       setMessage(t("settingsSaved"));
       notifyRemindersChanged();
     } catch (err) {
@@ -322,7 +612,14 @@ export function ReminderSettingsView({
   };
 
   const handleDownloadCalendar = () => {
-    const times = normalizePumpTimes(pumpTimes);
+    const times =
+      reminderMode === "schedule"
+        ? normalizePumpTimes(
+            scheduleSlots
+              .filter((s) => s.kind === "pump")
+              .map((s) => s.time)
+          )
+        : normalizePumpTimes(pumpTimes);
     if (times.length === 0) {
       setError(t("pumpTimesRequired"));
       return;
@@ -440,12 +737,31 @@ export function ReminderSettingsView({
       )}
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+        <p className="text-sm font-semibold text-foreground mb-3">
+          {t("reminderTimingMode")}
+        </p>
+        <ModeChoice
+          mode={reminderMode}
+          onChange={handleModeChange}
+          intervalLabel={t("reminderModeInterval")}
+          scheduleLabel={t("reminderModeSchedule")}
+          intervalDesc={t("reminderModeIntervalDesc")}
+          scheduleDesc={t("reminderModeScheduleDesc")}
+        />
+        {reminderMode === "schedule" && (
+          <p className="text-xs text-muted mt-3 leading-snug">
+            {t("reminderScheduleHint")}
+          </p>
+        )}
+      </div>
+
+      <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
         <ReminderToggleRow
           label={t("feedReminders")}
           checked={feedEnabled}
           onChange={setFeedEnabled}
         />
-        {feedEnabled && (
+        {feedEnabled && reminderMode === "interval" && (
           <>
             <label className="label-field">{t("feedIntervalHours")}</label>
             <input
@@ -527,6 +843,14 @@ export function ReminderSettingsView({
             </div>
           </>
         )}
+        {feedEnabled && reminderMode === "schedule" && (
+          <ScheduleSlotList
+            kind="feed"
+            slots={scheduleSlots}
+            onChange={setScheduleSlots}
+            labels={slotLabels}
+          />
+        )}
       </div>
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
@@ -537,34 +861,6 @@ export function ReminderSettingsView({
         />
         {pumpEnabled && (
           <>
-            <p className="text-xs font-medium text-muted mb-2">
-              {t("pumpReminderMode")}
-            </p>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setPumpMode("fixed")}
-                className={`rounded-xl px-3 py-2.5 text-sm font-semibold border ${
-                  pumpMode === "fixed"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-[#faf6f2] text-foreground"
-                }`}
-              >
-                {t("pumpModeFixed")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPumpMode("interval")}
-                className={`rounded-xl px-3 py-2.5 text-sm font-semibold border ${
-                  pumpMode === "interval"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-[#faf6f2] text-foreground"
-                }`}
-              >
-                {t("pumpModeInterval")}
-              </button>
-            </div>
-
             <label className="label-field">{t("pumpDefaultAmount")}</label>
             <input
               type="number"
@@ -576,61 +872,108 @@ export function ReminderSettingsView({
               className="input-field mb-3"
             />
 
-            {pumpMode === "interval" ? (
+            {reminderMode === "schedule" ? (
               <>
-                <label className="label-field">{t("pumpIntervalHours")}</label>
-                <input
-                  type="number"
-                  min="0.5"
-                  max="24"
-                  step="0.5"
-                  value={pumpIntervalHours}
-                  onChange={(e) => setPumpIntervalHours(e.target.value)}
-                  className="input-field"
+                <ScheduleSlotList
+                  kind="pump"
+                  slots={scheduleSlots}
+                  onChange={setScheduleSlots}
+                  labels={slotLabels}
                 />
+                <button
+                  type="button"
+                  onClick={handleDownloadCalendar}
+                  className="w-full mt-3 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
+                >
+                  {t("addPumpAlarmsToCalendar")}
+                </button>
               </>
             ) : (
               <>
                 <p className="text-xs font-medium text-muted mb-2">
-                  {t("pumpTimesLabel")}
+                  {t("pumpReminderMode")}
                 </p>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {pumpTimes.map((time) => (
-                    <button
-                      key={time}
-                      type="button"
-                      onClick={() => handleRemovePumpTime(time)}
-                      className="rounded-xl bg-[#faf6f2] px-3 py-1.5 text-sm font-medium text-foreground"
-                      title={t("remove")}
-                    >
-                      {time} ×
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-2 mb-3 min-w-0">
-                  <input
-                    type="time"
-                    value={newPumpTime}
-                    onChange={(e) => setNewPumpTime(e.target.value)}
-                    className="input-field flex-1 min-w-0"
-                  />
+                <div className="grid grid-cols-2 gap-2 mb-3">
                   <button
                     type="button"
-                    onClick={handleAddPumpTime}
-                    disabled={!newPumpTime}
-                    className="shrink-0 px-3 py-2 rounded-xl bg-secondary text-white font-semibold text-sm disabled:opacity-50"
+                    onClick={() => setPumpMode("fixed")}
+                    className={`rounded-xl px-3 py-2.5 text-sm font-semibold border ${
+                      pumpMode === "fixed"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-[#faf6f2] text-foreground"
+                    }`}
                   >
-                    {t("add")}
+                    {t("pumpModeFixed")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPumpMode("interval")}
+                    className={`rounded-xl px-3 py-2.5 text-sm font-semibold border ${
+                      pumpMode === "interval"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-[#faf6f2] text-foreground"
+                    }`}
+                  >
+                    {t("pumpModeInterval")}
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleDownloadCalendar}
-                  className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
-                >
-                  {t("addPumpAlarmsToCalendar")}
-                </button>
+                {pumpMode === "interval" ? (
+                  <>
+                    <label className="label-field">{t("pumpIntervalHours")}</label>
+                    <input
+                      type="number"
+                      min="0.5"
+                      max="24"
+                      step="0.5"
+                      value={pumpIntervalHours}
+                      onChange={(e) => setPumpIntervalHours(e.target.value)}
+                      className="input-field"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-medium text-muted mb-2">
+                      {t("pumpTimesLabel")}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {pumpTimes.map((time) => (
+                        <button
+                          key={time}
+                          type="button"
+                          onClick={() => handleRemovePumpTime(time)}
+                          className="rounded-xl bg-[#faf6f2] px-3 py-1.5 text-sm font-medium text-foreground"
+                          title={t("remove")}
+                        >
+                          {time} ×
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 mb-3 min-w-0">
+                      <input
+                        type="time"
+                        value={newPumpTime}
+                        onChange={(e) => setNewPumpTime(e.target.value)}
+                        className="input-field flex-1 min-w-0"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddPumpTime}
+                        disabled={!newPumpTime}
+                        className="shrink-0 px-3 py-2 rounded-xl bg-secondary text-white font-semibold text-sm disabled:opacity-50"
+                      >
+                        {t("add")}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadCalendar}
+                      className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
+                    >
+                      {t("addPumpAlarmsToCalendar")}
+                    </button>
+                  </>
+                )}
               </>
             )}
           </>
@@ -643,7 +986,7 @@ export function ReminderSettingsView({
           checked={napEnabled}
           onChange={setNapEnabled}
         />
-        {napEnabled && (
+        {napEnabled && reminderMode === "interval" && (
           <>
             <label className="label-field">{t("wakeWindowMinutes")}</label>
             <input
@@ -657,7 +1000,34 @@ export function ReminderSettingsView({
             />
           </>
         )}
+        {napEnabled && reminderMode === "schedule" && (
+          <ScheduleSlotList
+            kind="nap"
+            slots={scheduleSlots}
+            onChange={setScheduleSlots}
+            labels={slotLabels}
+          />
+        )}
       </div>
+
+      {reminderMode === "schedule" && (
+        <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+          <label className="label-field">{t("notifyBeforeMinutes")}</label>
+          <select
+            value={notifyBefore}
+            onChange={(e) => setNotifyBefore(e.target.value)}
+            className="input-field"
+          >
+            {NOTIFY_BEFORE_OPTIONS.map((mins) => (
+              <option key={mins} value={String(mins)}>
+                {mins === 0
+                  ? t("notifyBeforeAtDue")
+                  : t("notifyBeforeOption", { minutes: String(mins) })}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <button
         type="button"

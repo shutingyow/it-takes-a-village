@@ -23,6 +23,13 @@ import {
   DEFAULT_PUMP_TIMEZONE,
   normalizePumpTimes,
 } from "./lib/pumpSchedule";
+import {
+  normalizeReminderSchedule,
+  resolveReminderMode,
+  timesForKind,
+  type ReminderMode,
+  type ReminderSchedule,
+} from "./lib/clockSchedule";
 import { DEFAULT_TRACKER_TIMEZONE } from "./lib/dayBounds";
 import { deleteStorageIds } from "./lib/storageCleanup";
 
@@ -39,6 +46,19 @@ const pumpScheduleValidator = v.object({
   timezone: v.optional(v.string()),
   mode: v.optional(v.union(v.literal("fixed"), v.literal("interval"))),
   intervalHours: v.optional(v.number()),
+});
+
+const scheduleSlotValidator = v.object({
+  id: v.string(),
+  kind: v.union(v.literal("feed"), v.literal("nap"), v.literal("pump")),
+  time: v.string(),
+  endTime: v.optional(v.string()),
+  period: v.optional(v.union(v.literal("day"), v.literal("night"))),
+  note: v.optional(v.string()),
+});
+
+const reminderScheduleValidator = v.object({
+  slots: v.array(scheduleSlotValidator),
 });
 
 const NOTIFY_BEFORE_OPTIONS = [0, 5, 10, 15, 20, 30] as const;
@@ -69,6 +89,10 @@ const trackerReturnValidator = v.object({
   feedRemindersEnabled: v.optional(v.boolean()),
   wakeWindowMinutes: v.optional(v.number()),
   napRemindersEnabled: v.optional(v.boolean()),
+  reminderMode: v.optional(
+    v.union(v.literal("interval"), v.literal("schedule"))
+  ),
+  reminderSchedule: v.optional(reminderScheduleValidator),
   medicationReminders: v.optional(v.array(medicationReminderValidator)),
   pumpSchedule: v.optional(pumpScheduleValidator),
   createdAt: v.number(),
@@ -368,6 +392,10 @@ export const updateReminderSettings = mutation({
     feedRemindersEnabled: v.optional(v.boolean()),
     wakeWindowMinutes: v.optional(v.number()),
     napRemindersEnabled: v.optional(v.boolean()),
+    reminderMode: v.optional(
+      v.union(v.literal("interval"), v.literal("schedule"))
+    ),
+    reminderSchedule: v.optional(reminderScheduleValidator),
     medicationReminders: v.optional(
       v.array(
         v.object({
@@ -397,6 +425,8 @@ export const updateReminderSettings = mutation({
       feedRemindersEnabled?: boolean;
       wakeWindowMinutes?: number;
       napRemindersEnabled?: boolean;
+      reminderMode?: ReminderMode;
+      reminderSchedule?: ReminderSchedule;
       medicationReminders?: Array<{
         name: string;
         intervalHours: number;
@@ -482,6 +512,18 @@ export const updateReminderSettings = mutation({
       updates.napRemindersEnabled = args.napRemindersEnabled;
     }
 
+    if (args.reminderMode !== undefined) {
+      updates.reminderMode = resolveReminderMode(args.reminderMode);
+    }
+
+    if (args.reminderSchedule !== undefined) {
+      const normalized = normalizeReminderSchedule(args.reminderSchedule);
+      if (normalized.slots.length === 0) {
+        throw new Error("Add at least one schedule slot");
+      }
+      updates.reminderSchedule = normalized;
+    }
+
     if (args.medicationReminders !== undefined) {
       updates.medicationReminders = args.medicationReminders
         .map((r) => ({
@@ -494,9 +536,23 @@ export const updateReminderSettings = mutation({
 
     if (args.pumpSchedule !== undefined) {
       const mode = args.pumpSchedule.mode ?? "fixed";
-      const times = normalizePumpTimes(args.pumpSchedule.times);
-      if (mode === "fixed") {
-        if (times.length === 0) {
+      let times = normalizePumpTimes(args.pumpSchedule.times);
+      const effectiveMode = resolveReminderMode(
+        args.reminderMode ?? tracker.reminderMode
+      );
+      if (effectiveMode === "schedule") {
+        const schedule =
+          updates.reminderSchedule ??
+          (args.reminderSchedule
+            ? normalizeReminderSchedule(args.reminderSchedule)
+            : tracker.reminderSchedule
+              ? normalizeReminderSchedule(tracker.reminderSchedule)
+              : undefined);
+        const fromSlots = timesForKind(schedule?.slots, "pump");
+        if (fromSlots.length > 0) times = fromSlots;
+      }
+      if (mode === "fixed" || effectiveMode === "schedule") {
+        if (args.pumpSchedule.enabled && times.length === 0) {
           throw new Error("Add at least one pump time (HH:mm)");
         }
         if (times.length > 24) {
@@ -505,7 +561,7 @@ export const updateReminderSettings = mutation({
       }
       const intervalHours =
         args.pumpSchedule.intervalHours ?? DEFAULT_PUMP_INTERVAL_HOURS;
-      if (mode === "interval") {
+      if (mode === "interval" && effectiveMode !== "schedule") {
         if (intervalHours < 0.5 || intervalHours > 24) {
           throw new Error("Pump interval must be between 0.5 and 24 hours");
         }
@@ -522,7 +578,7 @@ export const updateReminderSettings = mutation({
         times: times.length > 0 ? times : [...DEFAULT_PUMP_TIMES],
         amountMl: amountMl ?? DEFAULT_PUMP_AMOUNT_ML,
         timezone: args.pumpSchedule.timezone?.trim() || DEFAULT_PUMP_TIMEZONE,
-        mode,
+        mode: effectiveMode === "schedule" ? "fixed" : mode,
         intervalHours,
       };
     }
