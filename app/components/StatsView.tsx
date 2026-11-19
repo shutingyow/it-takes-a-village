@@ -22,7 +22,7 @@ import type { TranslationKey } from "@/app/lib/i18n/en";
 import { BirthDateField } from "./BirthDateField";
 import { TodayTimetable } from "./TodayTimetable";
 
-type ChartMetric = "feeds" | "milk" | "diapers" | "pumps";
+type ChartMetric = "feeds" | "sleep" | "diapers" | "pumps";
 type RangeMode = "daily" | "weekly";
 
 interface StatsViewProps {
@@ -39,11 +39,24 @@ interface StatsViewProps {
   forcedRange?: RangeMode;
 }
 
+type FeedSessionRow = {
+  type: "breast" | "bottle";
+  timestamp: number;
+  amount?: number;
+  bottleMilk?: "formula" | "breastmilk";
+  durationMinutes?: number;
+};
+
 const METRIC_COLOURS: Record<"feeds" | "diapers" | "pumps", string> = {
   feeds: "#c4846a",
   diapers: "#8fa68f",
   pumps: "#a89b8a",
 };
+
+const SLEEP_NIGHT_COLOUR = "#8fa4b8";
+const SLEEP_NAP_COLOUR = "#c4846a";
+const MILK_FORMULA_COLOUR = "#c4846a";
+const MILK_BREAST_COLOUR = "#8fa4b8";
 
 function AverageLine({
   averageValue,
@@ -274,6 +287,67 @@ function StatLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function formatFeedSessionDetail(
+  session: FeedSessionRow,
+  t: (key: TranslationKey, values?: Record<string, string | number>) => string
+): string {
+  if (session.type === "bottle" && session.amount != null && session.amount > 0) {
+    if (session.bottleMilk === "formula") {
+      return t("feedBottleMlKind", {
+        amount: session.amount,
+        kind: t("formula"),
+      });
+    }
+    if (session.bottleMilk === "breastmilk") {
+      return t("feedBottleMlKind", {
+        amount: session.amount,
+        kind: t("breastmilk"),
+      });
+    }
+    return t("feedBottleMl", { amount: session.amount });
+  }
+  if (session.durationMinutes != null && session.durationMinutes > 0) {
+    return t("feedNursingDuration", { minutes: session.durationMinutes });
+  }
+  if (session.type === "breast") return t("statsBreastfeeding");
+  return t("statsBottle");
+}
+
+function FeedSequenceList({
+  sessions,
+  t,
+}: {
+  sessions: FeedSessionRow[];
+  t: (key: TranslationKey, values?: Record<string, string | number>) => string;
+}) {
+  if (sessions.length === 0) {
+    return (
+      <p className="text-xs text-muted py-1">{t("feedSequenceEmptyDay")}</p>
+    );
+  }
+  return (
+    <div className="space-y-1.5">
+      {sessions.map((session, index) => (
+        <div
+          key={`${session.timestamp}-${session.type}-${index}`}
+          className="flex items-baseline justify-between gap-2"
+        >
+          <span className="text-xs text-muted min-w-0 truncate">
+            <span className="text-foreground/80 font-medium">
+              {t("feedSequenceItem", { n: index + 1 })}
+            </span>
+            {" · "}
+            {formatTime(session.timestamp)}
+          </span>
+          <span className="text-sm font-semibold text-foreground tabular-nums shrink-0">
+            {formatFeedSessionDetail(session, t)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Headline number only; tap to reveal breakdown. */
 function ExpandableSummary({
   title,
@@ -404,8 +478,8 @@ export function StatsView({
   }
 
   const segments: Array<{ id: ChartMetric; labelKey: TranslationKey }> = [
-    { id: "feeds", labelKey: "feeds" },
-    { id: "milk", labelKey: "milkMl" },
+    { id: "feeds", labelKey: "feedsAndMilk" },
+    { id: "sleep", labelKey: "sleep" },
     { id: "diapers", labelKey: "diapers" },
     { id: "pumps", labelKey: "pumps" },
   ];
@@ -486,8 +560,8 @@ export function StatsView({
   const chartTitleKey: TranslationKey =
     metric === "feeds"
       ? "feedsPerDay"
-      : metric === "milk"
-        ? "mlFedPerDay"
+      : metric === "sleep"
+        ? "sleepPerDay"
         : metric === "diapers"
           ? "diapersPerDay"
           : "pumpsPerDay";
@@ -504,6 +578,36 @@ export function StatsView({
       ? day != null && day.formulaMl + day.breastmilkMl > 0
       : days != null &&
         !days.every((d) => d.formulaMl + d.breastmilkMl === 0);
+  const hasSleepData =
+    rangeMode === "daily"
+      ? day != null && day.sleepMinutes > 0
+      : days != null && !days.every((d) => d.sleepMinutes === 0);
+
+  const avgNapMinutesPerDay =
+    daysForAverage.length > 0
+      ? Math.round(
+          daysForAverage.reduce((sum, d) => sum + d.napSleepMinutes, 0) /
+            daysForAverage.length
+        )
+      : 0;
+  const avgNightMinutesPerDay =
+    daysForAverage.length > 0
+      ? Math.round(
+          daysForAverage.reduce((sum, d) => sum + d.nightSleepMinutes, 0) /
+            daysForAverage.length
+        )
+      : 0;
+  const avgSleepMinutesPerDay =
+    daysForAverage.length > 0
+      ? Math.round(
+          daysForAverage.reduce((sum, d) => sum + d.sleepMinutes, 0) /
+            daysForAverage.length
+        )
+      : (weeklySummary?.avgSleepMinutesPerDay ?? 0);
+  const sleepMax = Math.max(
+    ...(days?.map((d) => d.sleepMinutes) ?? [0]),
+    1
+  );
 
   const fullDate = formatInsightDate(selectedDateKey, language);
   const dayAge = birthDate
@@ -716,58 +820,47 @@ export function StatsView({
         <div className="space-y-0">
           <p className="section-label">{t("todaysSummary")}</p>
           <ExpandableSummary
-            title={t("feeds")}
-            empty={day.feedCount === 0}
-            emptyLabel={t("noDataYet")}
-            value={String(day.feedCount)}
-          >
-            <StatLine
-              label={t("statsBreastfeeding")}
-              value={String(day.breastCount)}
-            />
-            <StatLine
-              label={t("statsBottle")}
-              value={String(day.bottleCount)}
-            />
-          </ExpandableSummary>
-
-          <ExpandableSummary
-            title={t("milkMl")}
+            title={t("feedsAndMilk")}
             empty={
+              day.feedCount === 0 &&
               day.formulaMl + day.breastmilkMl + day.breastDurationMinutes === 0
             }
             emptyLabel={t("noDataYet")}
             value={(() => {
               const totalMl = day.formulaMl + day.breastmilkMl;
-              const nursing =
-                day.breastDurationMinutes > 0
+              const parts = [
+                day.feedCount > 0 ? String(day.feedCount) : null,
+                totalMl > 0 ? `${totalMl} ml` : null,
+                day.breastDurationMinutes > 0 && totalMl === 0
                   ? t("statsMinutesValue", {
                       minutes: String(day.breastDurationMinutes),
                     })
-                  : null;
-              if (totalMl > 0 && nursing) return `${totalMl} ml · ${nursing}`;
-              if (totalMl > 0) return `${totalMl} ml`;
-              return nursing;
+                  : null,
+              ].filter(Boolean);
+              return parts.length > 0 ? parts.join(" · ") : null;
             })()}
           >
-            <StatLine
-              label={t("statsBreastMilkMl")}
-              value={day.breastmilkMl > 0 ? `${day.breastmilkMl} ml` : "—"}
-            />
-            <StatLine
-              label={t("statsFormulaMl")}
-              value={day.formulaMl > 0 ? `${day.formulaMl} ml` : "—"}
-            />
-            <StatLine
-              label={t("statsBreastMinutes")}
-              value={
-                day.breastDurationMinutes > 0
-                  ? t("statsMinutesValue", {
-                      minutes: String(day.breastDurationMinutes),
-                    })
-                  : "—"
-              }
-            />
+            {(day.formulaMl > 0 || day.breastmilkMl > 0) && (
+              <>
+                <StatLine
+                  label={t("statsBreastMilkMl")}
+                  value={day.breastmilkMl > 0 ? `${day.breastmilkMl} ml` : "—"}
+                />
+                <StatLine
+                  label={t("statsFormulaMl")}
+                  value={day.formulaMl > 0 ? `${day.formulaMl} ml` : "—"}
+                />
+              </>
+            )}
+            {day.breastDurationMinutes > 0 && (
+              <StatLine
+                label={t("statsBreastMinutes")}
+                value={t("statsMinutesValue", {
+                  minutes: String(day.breastDurationMinutes),
+                })}
+              />
+            )}
+            <FeedSequenceList sessions={day.feedSessions} t={t} />
           </ExpandableSummary>
 
           {day.solidsCount > 0 && (
@@ -880,189 +973,368 @@ export function StatsView({
             ))}
           </div>
 
-          {metric === "milk" ? (
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
-                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
-                  {t("formulaMl")}
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {totalFormulaMl > 0 ? `${totalFormulaMl} ml` : "—"}
-                </p>
-              </div>
-              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
-                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
-                  {t("breastmilkMl")}
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {totalBreastmilkMl > 0 ? `${totalBreastmilkMl} ml` : "—"}
-                </p>
-              </div>
-              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow col-span-2">
-                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
-                  {t("avgMlPerDay")}
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {avgMilkMlPerDay > 0 ? `${avgMilkMlPerDay} ml` : "—"}
-                </p>
-              </div>
-            </div>
-          ) : metric === "pumps" ? (
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
-                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
-                  {t("pumpSessionsWeek")}
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {totalCount > 0 ? totalCount : "—"}
-                </p>
-              </div>
-              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
-                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
-                  {t("pumpsPerDay")}
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {avgCountPerDay > 0 ? avgCountPerDay : "—"}
-                </p>
-              </div>
-              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
-                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
-                  {t("pumpVolumeWeek")}
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {totalPumpMl > 0 ? `${totalPumpMl} ml` : "—"}
-                </p>
-              </div>
-              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
-                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
-                  {t("avgPumpMlPerDay")}
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {avgPumpMlPerDay > 0 ? `${avgPumpMlPerDay} ml` : "—"}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
-                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
-                  {t(metric === "feeds" ? "feeds" : "diapers")}
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {totalCount > 0 ? totalCount : "—"}
-                </p>
-              </div>
-              <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
-                <p className="text-[10px] font-semibold uppercase text-muted mb-1">
-                  {t(chartTitleKey)}
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {avgCountPerDay > 0 ? avgCountPerDay : "—"}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {days && (
-            <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-              <p className="text-sm font-semibold text-foreground mb-3">
-                {t(chartTitleKey)}
-              </p>
-
-              {metric === "milk" ? (
-                !hasMilkData ? (
-                  <p className="text-sm text-muted text-center py-4">
-                    {t("noDataYet")}
+          {metric === "sleep" ? (
+            <>
+              <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+                {!hasSleepData ? (
+                  <p className="text-sm text-muted text-center py-2">
+                    {t("sleepWeekEmpty")}
                   </p>
                 ) : (
                   <>
-                    <StackedBarChart
-                      data={days.map((d) => ({
-                        label: d.label,
-                        bottom: d.formulaMl,
-                        top: d.breastmilkMl,
-                        total: d.formulaMl + d.breastmilkMl,
-                      }))}
-                      maxValue={milkMax}
-                      bottomColour="#c4846a"
-                      topColour="#8fa4b8"
-                      formatValue={(v) => `${v}`}
-                      averageValue={avgMilkMlPerDay}
-                    />
-                    <ChartLegend
-                      items={[
-                        {
-                          colour: "#c4846a",
-                          label: `${t("formula")}: ${totalFormulaMl} ml`,
-                        },
-                        {
-                          colour: "#8fa4b8",
-                          label: `${t("breastmilk")}: ${totalBreastmilkMl} ml`,
-                        },
-                        {
-                          dashed: true,
-                          label: `${t("chartAverage")}: ${avgMilkMlPerDay} ml`,
-                        },
-                      ]}
-                    />
+                    <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+                      <div className="space-y-2 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: SLEEP_NAP_COLOUR }}
+                            aria-hidden
+                          />
+                          <span className="text-xs text-muted">
+                            {t("avgNapSleep")}
+                          </span>
+                          <span className="text-sm font-semibold text-foreground tabular-nums">
+                            {avgNapMinutesPerDay > 0
+                              ? formatSleepTotal(avgNapMinutesPerDay)
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: SLEEP_NIGHT_COLOUR }}
+                            aria-hidden
+                          />
+                          <span className="text-xs text-muted">
+                            {t("avgNightSleep")}
+                          </span>
+                          <span className="text-sm font-semibold text-foreground tabular-nums">
+                            {avgNightMinutesPerDay > 0
+                              ? formatSleepTotal(avgNightMinutesPerDay)
+                              : "—"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] font-semibold uppercase text-muted mb-0.5">
+                          {t("avgDailySleep")}
+                        </p>
+                        <p className="text-xl font-bold text-foreground tabular-nums">
+                          {avgSleepMinutesPerDay > 0
+                            ? formatSleepTotal(avgSleepMinutesPerDay)
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    {days && (
+                      <>
+                        <p className="text-sm font-semibold text-foreground mb-3">
+                          {t("sleepPerDay")}
+                        </p>
+                        <StackedBarChart
+                          data={days.map((d) => ({
+                            label: d.label,
+                            bottom: d.nightSleepMinutes,
+                            top: d.napSleepMinutes,
+                            total: d.sleepMinutes,
+                          }))}
+                          maxValue={sleepMax}
+                          bottomColour={SLEEP_NIGHT_COLOUR}
+                          topColour={SLEEP_NAP_COLOUR}
+                          formatValue={(v) => formatSleepTotal(v)}
+                          averageValue={avgSleepMinutesPerDay}
+                        />
+                        <ChartLegend
+                          items={[
+                            {
+                              colour: SLEEP_NIGHT_COLOUR,
+                              label: t("statsSleepBedtime"),
+                            },
+                            {
+                              colour: SLEEP_NAP_COLOUR,
+                              label: t("statsSleepNaps"),
+                            },
+                            {
+                              dashed: true,
+                              label: `${t("chartAverage")}: ${
+                                avgSleepMinutesPerDay > 0
+                                  ? formatSleepTotal(avgSleepMinutesPerDay)
+                                  : "—"
+                              }`,
+                            },
+                          ]}
+                        />
+                      </>
+                    )}
+                    {weeklySummary &&
+                      weeklySummary.longestStretchMinutes > 0 && (
+                        <p className="text-xs text-muted mt-3">
+                          {t("longestStretch")}:{" "}
+                          {formatSleepTotal(
+                            weeklySummary.longestStretchMinutes
+                          )}
+                        </p>
+                      )}
                   </>
-                )
-              ) : !hasCountData ? (
-                <p className="text-sm text-muted text-center py-4">
-                  {t("noDataYet")}
-                </p>
-              ) : metric === "diapers" ? (
-                <>
-                  <StackedBarChart
-                    data={days.map((d) => ({
-                      label: d.label,
-                      bottom: d.wetCount,
-                      top: d.dirtyCount,
-                      total: d.diaperCount,
-                    }))}
-                    maxValue={countMax}
-                    bottomColour="#8fa68f"
-                    topColour="#c9a84c"
-                    averageValue={avgCountPerDay}
-                  />
-                  <ChartLegend
-                    items={[
-                      { colour: "#8fa68f", label: `${t("wet")}: ${totalWet}` },
-                      {
-                        colour: "#c9a84c",
-                        label: `${t("dirty")}: ${totalDirty}`,
-                      },
-                      {
-                        dashed: true,
-                        label: `${t("chartAverage")}: ${avgCountPerDay}`,
-                      },
-                    ]}
-                  />
-                </>
-              ) : (
-                <>
-                  <BarChart
-                    data={days.map((d) => ({
-                      label: d.label,
-                      value: getCountValue(d),
-                    }))}
-                    maxValue={countMax}
-                    colour={METRIC_COLOURS[metric]}
-                    averageValue={avgCountPerDay}
-                  />
-                  <ChartLegend
-                    items={[
-                      {
-                        dashed: true,
-                        label: `${t("chartAverage")}: ${avgCountPerDay}`,
-                      },
-                    ]}
-                  />
-                </>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            </>
+          ) : metric === "feeds" ? (
+            <>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                  <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                    {t("feeds")}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    {totalCount > 0 ? totalCount : "—"}
+                  </p>
+                </div>
+                <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                  <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                    {t("feedsPerDay")}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    {avgCountPerDay > 0 ? avgCountPerDay : "—"}
+                  </p>
+                </div>
+                <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                  <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                    {t("totalMlDay")}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    {totalMilkMl > 0 ? `${totalMilkMl} ml` : "—"}
+                  </p>
+                </div>
+                <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                  <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                    {t("avgMlPerDay")}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    {avgMilkMlPerDay > 0 ? `${avgMilkMlPerDay} ml` : "—"}
+                  </p>
+                </div>
+              </div>
 
+              {days && (
+                <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+                  <p className="text-sm font-semibold text-foreground mb-3">
+                    {t("mlFedPerDay")}
+                  </p>
+                  {!hasMilkData && !hasCountData ? (
+                    <p className="text-sm text-muted text-center py-4">
+                      {t("noDataYet")}
+                    </p>
+                  ) : hasMilkData ? (
+                    <>
+                      <StackedBarChart
+                        data={days.map((d) => ({
+                          label: d.label,
+                          bottom: d.formulaMl,
+                          top: d.breastmilkMl,
+                          total: d.formulaMl + d.breastmilkMl,
+                        }))}
+                        maxValue={milkMax}
+                        bottomColour={MILK_FORMULA_COLOUR}
+                        topColour={MILK_BREAST_COLOUR}
+                        formatValue={(v) => `${v}`}
+                        averageValue={avgMilkMlPerDay}
+                      />
+                      <ChartLegend
+                        items={[
+                          {
+                            colour: MILK_FORMULA_COLOUR,
+                            label: `${t("formula")}: ${totalFormulaMl} ml`,
+                          },
+                          {
+                            colour: MILK_BREAST_COLOUR,
+                            label: `${t("breastmilk")}: ${totalBreastmilkMl} ml`,
+                          },
+                          {
+                            dashed: true,
+                            label: `${t("chartAverage")}: ${avgMilkMlPerDay} ml`,
+                          },
+                        ]}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <BarChart
+                        data={days.map((d) => ({
+                          label: d.label,
+                          value: d.feedCount,
+                        }))}
+                        maxValue={countMax}
+                        colour={METRIC_COLOURS.feeds}
+                        averageValue={avgCountPerDay}
+                      />
+                      <ChartLegend
+                        items={[
+                          {
+                            dashed: true,
+                            label: `${t("chartAverage")}: ${avgCountPerDay}`,
+                          },
+                        ]}
+                      />
+                    </>
+                  )}
+                </div>
+              )}
+
+              {days &&
+                days.some((d) => d.feedSessions.length > 0) && (
+                  <div className="mb-2">
+                    <p className="section-label">{t("feedSequenceTitle")}</p>
+                    {days
+                      .filter((d) => d.feedSessions.length > 0)
+                      .map((d) => (
+                        <ExpandableSummary
+                          key={d.date}
+                          title={`${d.label} · ${d.date.slice(5)}`}
+                          empty={false}
+                          emptyLabel={t("feedSequenceEmptyDay")}
+                          value={String(d.feedSessions.length)}
+                        >
+                          <FeedSequenceList sessions={d.feedSessions} t={t} />
+                        </ExpandableSummary>
+                      ))}
+                  </div>
+                )}
+            </>
+          ) : metric === "pumps" ? (
+            <>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                  <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                    {t("pumpSessionsWeek")}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    {totalCount > 0 ? totalCount : "—"}
+                  </p>
+                </div>
+                <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                  <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                    {t("pumpsPerDay")}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    {avgCountPerDay > 0 ? avgCountPerDay : "—"}
+                  </p>
+                </div>
+                <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                  <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                    {t("pumpVolumeWeek")}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    {totalPumpMl > 0 ? `${totalPumpMl} ml` : "—"}
+                  </p>
+                </div>
+                <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                  <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                    {t("avgPumpMlPerDay")}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    {avgPumpMlPerDay > 0 ? `${avgPumpMlPerDay} ml` : "—"}
+                  </p>
+                </div>
+              </div>
+              {days && (
+                <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+                  <p className="text-sm font-semibold text-foreground mb-3">
+                    {t("pumpsPerDay")}
+                  </p>
+                  {!hasCountData ? (
+                    <p className="text-sm text-muted text-center py-4">
+                      {t("noDataYet")}
+                    </p>
+                  ) : (
+                    <>
+                      <BarChart
+                        data={days.map((d) => ({
+                          label: d.label,
+                          value: d.pumpCount,
+                        }))}
+                        maxValue={countMax}
+                        colour={METRIC_COLOURS.pumps}
+                        averageValue={avgCountPerDay}
+                      />
+                      <ChartLegend
+                        items={[
+                          {
+                            dashed: true,
+                            label: `${t("chartAverage")}: ${avgCountPerDay}`,
+                          },
+                        ]}
+                      />
+                    </>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                  <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                    {t("diapers")}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    {totalCount > 0 ? totalCount : "—"}
+                  </p>
+                </div>
+                <div className="bg-surface border border-border rounded-2xl p-3 card-shadow">
+                  <p className="text-[10px] font-semibold uppercase text-muted mb-1">
+                    {t("diapersPerDay")}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    {avgCountPerDay > 0 ? avgCountPerDay : "—"}
+                  </p>
+                </div>
+              </div>
+              {days && (
+                <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+                  <p className="text-sm font-semibold text-foreground mb-3">
+                    {t("diapersPerDay")}
+                  </p>
+                  {!hasCountData ? (
+                    <p className="text-sm text-muted text-center py-4">
+                      {t("noDataYet")}
+                    </p>
+                  ) : (
+                    <>
+                      <StackedBarChart
+                        data={days.map((d) => ({
+                          label: d.label,
+                          bottom: d.wetCount,
+                          top: d.dirtyCount,
+                          total: d.diaperCount,
+                        }))}
+                        maxValue={countMax}
+                        bottomColour="#8fa68f"
+                        topColour="#c9a84c"
+                        averageValue={avgCountPerDay}
+                      />
+                      <ChartLegend
+                        items={[
+                          {
+                            colour: "#8fa68f",
+                            label: `${t("wet")}: ${totalWet}`,
+                          },
+                          {
+                            colour: "#c9a84c",
+                            label: `${t("dirty")}: ${totalDirty}`,
+                          },
+                          {
+                            dashed: true,
+                            label: `${t("chartAverage")}: ${avgCountPerDay}`,
+                          },
+                        ]}
+                      />
+                    </>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
     </div>

@@ -21,6 +21,17 @@ const sleepSessionValidator = v.object({
   minutes: v.number(),
 });
 
+/** Milk feeds only (breast + bottle) for weekly sequence lists. */
+const feedSessionValidator = v.object({
+  type: v.union(v.literal("breast"), v.literal("bottle")),
+  timestamp: v.number(),
+  amount: v.optional(v.number()),
+  bottleMilk: v.optional(
+    v.union(v.literal("formula"), v.literal("breastmilk"))
+  ),
+  durationMinutes: v.optional(v.number()),
+});
+
 const dayStatValidator = v.object({
   date: v.string(),
   label: v.string(),
@@ -39,6 +50,7 @@ const dayStatValidator = v.object({
   pumpCount: v.number(),
   pumpTotalMl: v.number(),
   pumpSessions: v.array(pumpSessionValidator),
+  feedSessions: v.array(feedSessionValidator),
   sleepMinutes: v.number(),
   nightSleepMinutes: v.number(),
   napSleepMinutes: v.number(),
@@ -96,6 +108,13 @@ type DayStat = {
   pumpCount: number;
   pumpTotalMl: number;
   pumpSessions: Array<{ timestamp: number; amount: number }>;
+  feedSessions: Array<{
+    type: "breast" | "bottle";
+    timestamp: number;
+    amount?: number;
+    bottleMilk?: "formula" | "breastmilk";
+    durationMinutes?: number;
+  }>;
   sleepMinutes: number;
   nightSleepMinutes: number;
   napSleepMinutes: number;
@@ -205,6 +224,28 @@ function buildDayStat(
   }));
   const pumpTotalMl = pumpSessions.reduce((sum, p) => sum + p.amount, 0);
 
+  const feedSessions = dayFeeds
+    .filter((f) => f.type === "breast" || f.type === "bottle")
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((f) => {
+      const durationMinutes = f.durationMinutes ?? f.duration;
+      const session: DayStat["feedSessions"][number] = {
+        type: f.type as "breast" | "bottle",
+        timestamp: f.timestamp,
+      };
+      if (f.type === "bottle" && f.amount != null && f.amount > 0) {
+        session.amount = f.amount;
+      }
+      const kind = bottleMilkKind(f);
+      if (f.type === "bottle" && kind) {
+        session.bottleMilk = kind;
+      }
+      if (durationMinutes != null && durationMinutes > 0) {
+        session.durationMinutes = durationMinutes;
+      }
+      return session;
+    });
+
   let nightSleepMinutes = 0;
   let napSleepMinutes = 0;
   const sleepSessions: Array<{
@@ -255,6 +296,7 @@ function buildDayStat(
     pumpCount: dayPumps.length,
     pumpTotalMl,
     pumpSessions,
+    feedSessions,
     sleepMinutes,
     nightSleepMinutes,
     napSleepMinutes,
