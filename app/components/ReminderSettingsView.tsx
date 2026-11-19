@@ -2,7 +2,7 @@
 
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import {
   DEFAULT_PUMP_AMOUNT_ML,
@@ -40,9 +40,20 @@ import {
   DEFAULT_NIGHT_FEED_INTERVAL_HOURS,
   DEFAULT_NIGHT_FEED_START,
 } from "@/convex/lib/feedSchedule";
+import { BottomSheet } from "./ui/BottomSheet";
+import { IconPlus } from "./icons";
 
 const NOTIFY_BEFORE_OPTIONS = [0, 5, 10, 15, 20, 30] as const;
 const DEFAULT_WAKE_WINDOW_MINUTES = 90;
+
+const HOUR_PX = 48;
+const DAY_START_HOUR = 0;
+const DAY_END_HOUR = 23;
+const HOURS = Array.from(
+  { length: DAY_END_HOUR - DAY_START_HOUR + 1 },
+  (_, i) => DAY_START_HOUR + i
+);
+const DEFAULT_BLOCK_MINUTES = 45;
 
 interface ReminderSettingsViewProps {
   secretLink: string;
@@ -72,6 +83,14 @@ interface ReminderSettingsViewProps {
 
 type PumpMode = "fixed" | "interval";
 
+type SlotDraft = {
+  id: string | null;
+  time: string;
+  label: string;
+  note: string;
+  kind?: ScheduleSlotKind;
+};
+
 function notifyRemindersChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event("deviceRemindersChanged"));
@@ -97,6 +116,65 @@ function hydrateScheduleLabels(
     if (slot.kind) return { ...slot, label: kindLabels[slot.kind] };
     return slot;
   });
+}
+
+function parseHhMm(value: string): { hour: number; minute: number } | null {
+  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
+  if (!match) return null;
+  return { hour: Number(match[1]), minute: Number(match[2]) };
+}
+
+function minutesFromMidnight(time: string): number | null {
+  const parsed = parseHhMm(time);
+  if (!parsed) return null;
+  return parsed.hour * 60 + parsed.minute;
+}
+
+function formatHourLabel(hour: number, hour12: boolean): string {
+  if (!hour12) return `${String(hour).padStart(2, "0")}:00`;
+  if (hour === 0) return "12 AM";
+  if (hour === 12) return "12 PM";
+  if (hour < 12) return `${hour} AM`;
+  return `${hour - 12} PM`;
+}
+
+function defaultDraftTime(): string {
+  const now = new Date();
+  const hour = String(now.getHours()).padStart(2, "0");
+  return `${hour}:00`;
+}
+
+function slotBlockStyle(kind: ScheduleSlotKind | undefined): {
+  bg: string;
+  text: string;
+  bar: string;
+} {
+  if (kind === "feed") {
+    return {
+      bg: "bg-[#fde8e8]",
+      text: "text-[#7a1f1a]",
+      bar: "bg-[#c43c3c]",
+    };
+  }
+  if (kind === "nap") {
+    return {
+      bg: "bg-[#d8f0e0]",
+      text: "text-[#145a32]",
+      bar: "bg-[#2f8f55]",
+    };
+  }
+  if (kind === "pump") {
+    return {
+      bg: "bg-[#dceefb]",
+      text: "text-[#0f4f7a]",
+      bar: "bg-[#2f87c5]",
+    };
+  }
+  return {
+    bg: "bg-primary/15",
+    text: "text-foreground",
+    bar: "bg-primary",
+  };
 }
 
 function ReminderToggleRow({
@@ -162,156 +240,378 @@ function ModeChoice({
   );
 }
 
-function ScheduleTimetable({
+function ScheduleSlotSheet({
+  draft,
+  onChange,
+  onClose,
+  onSave,
+  onDelete,
+  error,
+  labels,
+}: {
+  draft: SlotDraft;
+  onChange: (next: SlotDraft) => void;
+  onClose: () => void;
+  onSave: () => void;
+  onDelete?: () => void;
+  error?: string | null;
+  labels: {
+    titleAdd: string;
+    titleEdit: string;
+    time: string;
+    activity: string;
+    activityPlaceholder: string;
+    note: string;
+    notePlaceholder: string;
+    categoryHelp: string;
+    remindNone: string;
+    kindFeed: string;
+    kindNap: string;
+    kindPump: string;
+    save: string;
+    remove: string;
+  };
+}) {
+  const kinds: Array<{ id: ScheduleSlotKind | ""; label: string }> = [
+    { id: "", label: labels.remindNone },
+    { id: "feed", label: labels.kindFeed },
+    { id: "nap", label: labels.kindNap },
+    { id: "pump", label: labels.kindPump },
+  ];
+
+  const applyKind = (value: ScheduleSlotKind | "") => {
+    if (!value) {
+      onChange({ ...draft, kind: undefined });
+      return;
+    }
+    const kindLabel =
+      value === "feed"
+        ? labels.kindFeed
+        : value === "nap"
+          ? labels.kindNap
+          : labels.kindPump;
+    onChange({
+      ...draft,
+      kind: value,
+      label: draft.label.trim() ? draft.label : kindLabel,
+    });
+  };
+
+  return (
+    <BottomSheet
+      title={draft.id ? labels.titleEdit : labels.titleAdd}
+      onClose={onClose}
+    >
+      <div className="pt-3 space-y-3">
+        {error ? (
+          <div className="rounded-xl border border-[#e8b4b4] bg-[#fdf0f0] px-3 py-2 text-sm text-[#9b3b3b]">
+            {error}
+          </div>
+        ) : null}
+        <div>
+          <label className="label-field">{labels.time}</label>
+          <input
+            type="time"
+            value={draft.time}
+            onChange={(e) => onChange({ ...draft, time: e.target.value })}
+            className="input-field font-semibold tabular-nums"
+            aria-label={labels.time}
+          />
+        </div>
+        <div>
+          <label className="label-field">{labels.activity}</label>
+          <input
+            type="text"
+            value={draft.label}
+            onChange={(e) => onChange({ ...draft, label: e.target.value })}
+            maxLength={80}
+            placeholder={labels.activityPlaceholder}
+            className="input-field font-semibold"
+            aria-label={labels.activity}
+          />
+        </div>
+        <div>
+          <label className="label-field">{labels.note}</label>
+          <input
+            type="text"
+            value={draft.note}
+            onChange={(e) => onChange({ ...draft, note: e.target.value })}
+            maxLength={80}
+            placeholder={labels.notePlaceholder}
+            className="input-field text-sm"
+            aria-label={labels.note}
+          />
+        </div>
+        <div>
+          <p className="text-xs text-muted mb-2 leading-snug">
+            {labels.categoryHelp}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {kinds.map((opt) => {
+              const selected = (draft.kind ?? "") === opt.id;
+              return (
+                <button
+                  key={opt.id || "none"}
+                  type="button"
+                  onClick={() => applyKind(opt.id)}
+                  className={`rounded-xl px-3 py-1.5 text-sm font-semibold border ${
+                    selected
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-[#faf6f2] text-foreground"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <button type="button" onClick={onSave} className="btn-primary w-full">
+          {labels.save}
+        </button>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="w-full rounded-xl border border-[#e8b4b4] bg-[#fdf0f0] px-3 py-2.5 text-sm font-semibold text-[#9b3b3b]"
+          >
+            {labels.remove}
+          </button>
+        )}
+      </div>
+    </BottomSheet>
+  );
+}
+
+function DayScheduleCalendar({
   slots,
   onChange,
   labels,
+  hour12,
 }: {
   slots: ScheduleSlot[];
   onChange: (slots: ScheduleSlot[]) => void;
   labels: {
     empty: string;
     add: string;
+    titleAdd: string;
+    titleEdit: string;
     time: string;
     activity: string;
     activityPlaceholder: string;
     note: string;
     notePlaceholder: string;
-    remindAs: string;
+    categoryHelp: string;
     remindNone: string;
     kindFeed: string;
     kindNap: string;
     kindPump: string;
+    save: string;
     remove: string;
+    needTimeAndLabel: string;
   };
+  hour12: boolean;
 }) {
-  const ordered = sortSlotsChronological(slots);
+  const [draft, setDraft] = useState<SlotDraft | null>(null);
+  const [sheetError, setSheetError] = useState<string | null>(null);
 
-  const updateSlot = (
-    id: string,
-    patch: Partial<ScheduleSlot> & { clearKind?: boolean }
-  ) => {
-    onChange(
-      slots.map((slot) => {
-        if (slot.id !== id) return slot;
-        const { clearKind, ...rest } = patch;
-        const next: ScheduleSlot = { ...slot, ...rest };
-        if (clearKind) delete next.kind;
-        if (rest.note === "") delete next.note;
-        return next;
-      })
+  const ordered = useMemo(() => sortSlotsChronological(slots), [slots]);
+  const gridHeight = (DAY_END_HOUR - DAY_START_HOUR + 1) * HOUR_PX;
+
+  const todayLabel = useMemo(() => {
+    const now = new Date();
+    const weekday = new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
+    }).format(now);
+    const day = new Intl.DateTimeFormat(undefined, { day: "numeric" }).format(
+      now
     );
+    return { weekday: weekday.toUpperCase(), day };
+  }, []);
+
+  const openAdd = () => {
+    setSheetError(null);
+    setDraft({
+      id: null,
+      time: defaultDraftTime(),
+      label: "",
+      note: "",
+    });
   };
 
-  const removeSlot = (id: string) => {
-    onChange(slots.filter((slot) => slot.id !== id));
+  const openEdit = (slot: ScheduleSlot) => {
+    setSheetError(null);
+    setDraft({
+      id: slot.id,
+      time: slot.time,
+      label: slot.label ?? "",
+      note: slot.note ?? "",
+      kind: slot.kind,
+    });
   };
 
-  const addSlot = () => {
-    onChange([
-      ...slots,
-      {
-        id: newSlotId(),
-        time: "",
-        label: "",
-      },
-    ]);
+  const saveDraft = () => {
+    if (!draft) return;
+    if (!draft.time.trim() || !draft.label.trim()) {
+      setSheetError(labels.needTimeAndLabel);
+      return;
+    }
+    const nextSlot: ScheduleSlot = {
+      id: draft.id ?? newSlotId(),
+      time: draft.time,
+      label: draft.label.trim(),
+      ...(draft.note.trim() ? { note: draft.note.trim() } : {}),
+      ...(draft.kind ? { kind: draft.kind } : {}),
+    };
+    if (draft.id) {
+      onChange(
+        slots.map((slot) => (slot.id === draft.id ? nextSlot : slot))
+      );
+    } else {
+      onChange([...slots, nextSlot]);
+    }
+    setDraft(null);
+    setSheetError(null);
+  };
+
+  const deleteDraft = () => {
+    if (!draft?.id) return;
+    onChange(slots.filter((slot) => slot.id !== draft.id));
+    setDraft(null);
+    setSheetError(null);
   };
 
   return (
-    <div>
-      {ordered.length === 0 ? (
-        <p className="text-xs text-muted mb-3">{labels.empty}</p>
-      ) : (
-        <ul className="space-y-2 mb-3">
-          {ordered.map((slot) => (
-            <li
-              key={slot.id}
-              className="rounded-xl border border-border bg-[#faf6f2] px-2.5 py-2 space-y-1.5"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <input
-                  type="time"
-                  value={slot.time}
-                  onChange={(e) =>
-                    updateSlot(slot.id, { time: e.target.value })
-                  }
-                  className="input-field w-[6.5rem] shrink-0 font-semibold tabular-nums"
-                  aria-label={labels.time}
-                />
-                <input
-                  type="text"
-                  value={slot.label ?? ""}
-                  onChange={(e) =>
-                    updateSlot(slot.id, { label: e.target.value })
-                  }
-                  maxLength={80}
-                  placeholder={labels.activityPlaceholder}
-                  className="input-field min-w-0 flex-1 font-semibold"
-                  aria-label={labels.activity}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeSlot(slot.id)}
-                  className="shrink-0 text-sm font-semibold text-muted px-1.5 py-1"
-                  title={labels.remove}
-                  aria-label={labels.remove}
-                >
-                  ×
-                </button>
+    <div className="relative rounded-2xl border border-border bg-surface overflow-hidden">
+      <div className="flex items-start gap-3 px-3 py-2.5 border-b border-border/70">
+        <div className="w-12 shrink-0 text-center pt-0.5">
+          <p className="text-[10px] font-semibold tracking-wide text-muted">
+            {todayLabel.weekday}
+          </p>
+          <p className="text-2xl font-semibold tabular-nums text-foreground leading-none">
+            {todayLabel.day}
+          </p>
+        </div>
+        <p className="text-sm text-muted pt-2 leading-snug">
+          {ordered.length === 0
+            ? labels.empty
+            : `${ordered.length} · ${ordered
+                .slice(0, 2)
+                .map((s) => s.label ?? s.time)
+                .join(", ")}${ordered.length > 2 ? "…" : ""}`}
+        </p>
+      </div>
+
+      <div className="relative max-h-[min(58vh,560px)] overflow-y-auto overscroll-contain">
+        <div className="flex min-w-0 px-2 py-1">
+          <div className="w-14 shrink-0 relative" style={{ height: gridHeight }}>
+            {HOURS.map((hour) => (
+              <div
+                key={hour}
+                className="absolute right-2 text-[11px] tabular-nums text-muted leading-none -translate-y-1/2"
+                style={{ top: (hour - DAY_START_HOUR) * HOUR_PX }}
+              >
+                {formatHourLabel(hour, hour12)}
               </div>
-              <input
-                type="text"
-                value={slot.note ?? ""}
-                onChange={(e) =>
-                  updateSlot(slot.id, {
-                    note: e.target.value === "" ? undefined : e.target.value,
-                  })
-                }
-                maxLength={80}
-                placeholder={labels.notePlaceholder}
-                className="input-field w-full text-sm text-muted"
-                aria-label={labels.note}
+            ))}
+          </div>
+          <div
+            className="relative flex-1 min-w-0 border-l border-border/80"
+            style={{ height: gridHeight }}
+          >
+            {HOURS.map((hour) => (
+              <div
+                key={hour}
+                className="absolute left-0 right-0 border-t border-border/60"
+                style={{ top: (hour - DAY_START_HOUR) * HOUR_PX }}
               />
-              <div className="flex items-center gap-2 min-w-0">
-                <label className="text-xs text-muted shrink-0">
-                  {labels.remindAs}
-                </label>
-                <select
-                  value={slot.kind ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (
-                      value === "feed" ||
-                      value === "nap" ||
-                      value === "pump"
-                    ) {
-                      updateSlot(slot.id, { kind: value });
-                    } else {
-                      updateSlot(slot.id, { clearKind: true });
-                    }
-                  }}
-                  className="input-field min-w-0 flex-1 text-sm"
-                  aria-label={labels.remindAs}
+            ))}
+
+            {ordered.map((slot) => {
+              const startMin = minutesFromMidnight(slot.time);
+              if (startMin == null) return null;
+              const endMin = slot.endTime
+                ? (minutesFromMidnight(slot.endTime) ??
+                  startMin + DEFAULT_BLOCK_MINUTES)
+                : startMin + DEFAULT_BLOCK_MINUTES;
+              const top =
+                ((startMin / 60 - DAY_START_HOUR) * HOUR_PX);
+              const height = Math.max(
+                28,
+                ((Math.max(endMin, startMin + 20) - startMin) / 60) * HOUR_PX
+              );
+              const style = slotBlockStyle(slot.kind);
+              return (
+                <button
+                  key={slot.id}
+                  type="button"
+                  onClick={() => openEdit(slot)}
+                  className={`absolute left-1 right-2 z-10 rounded-lg px-1.5 py-1 flex items-start gap-1.5 overflow-hidden text-left border border-black/[0.04] ${style.bg}`}
+                  style={{ top, height }}
+                  title={`${slot.time} · ${slot.label ?? ""}`}
                 >
-                  <option value="">{labels.remindNone}</option>
-                  <option value="feed">{labels.kindFeed}</option>
-                  <option value="nap">{labels.kindNap}</option>
-                  <option value="pump">{labels.kindPump}</option>
-                </select>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                  <span
+                    className={`w-1 self-stretch rounded-full shrink-0 ${style.bar}`}
+                  />
+                  <span className="min-w-0">
+                    <span
+                      className={`block text-[11px] font-bold truncate ${style.text}`}
+                    >
+                      {slot.time}
+                      {slot.label ? ` · ${slot.label}` : ""}
+                    </span>
+                    {slot.note ? (
+                      <span className="block text-[10px] text-muted truncate">
+                        {slot.note}
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
       <button
         type="button"
-        onClick={addSlot}
-        className="w-full rounded-xl border border-dashed border-border bg-surface px-3 py-2.5 text-sm font-semibold text-primary"
+        onClick={openAdd}
+        className="absolute bottom-3 right-3 z-20 size-12 rounded-2xl bg-primary text-white shadow-[0_4px_16px_var(--shadow-sheet)] flex items-center justify-center touch-manipulation active:scale-95 transition-transform"
+        aria-label={labels.add}
+        title={labels.add}
       >
-        {labels.add}
+        <IconPlus size={22} className="text-white" />
       </button>
+
+      {draft && (
+        <ScheduleSlotSheet
+          draft={draft}
+          onChange={setDraft}
+          onClose={() => {
+            setDraft(null);
+            setSheetError(null);
+          }}
+          onSave={saveDraft}
+          onDelete={draft.id ? deleteDraft : undefined}
+          error={sheetError}
+          labels={{
+            titleAdd: labels.titleAdd,
+            titleEdit: labels.titleEdit,
+            time: labels.time,
+            activity: labels.activity,
+            activityPlaceholder: labels.activityPlaceholder,
+            note: labels.note,
+            notePlaceholder: labels.notePlaceholder,
+            categoryHelp: labels.categoryHelp,
+            remindNone: labels.remindNone,
+            kindFeed: labels.kindFeed,
+            kindNap: labels.kindNap,
+            kindPump: labels.kindPump,
+            save: labels.save,
+            remove: labels.remove,
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -334,7 +634,7 @@ export function ReminderSettingsView({
   pumpSchedule: initialPump,
   onBack,
 }: ReminderSettingsViewProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const updateSettings = useMutation(api.trackers.updateReminderSettings);
 
   const [reminderMode, setReminderMode] = useState<ReminderMode>(
@@ -470,20 +770,24 @@ export function ReminderSettingsView({
     setReminderMode(mode);
   };
 
-  const slotLabels = {
+  const calendarLabels = {
     empty: t("reminderScheduleEmpty"),
     add: t("reminderScheduleAdd"),
+    titleAdd: t("reminderScheduleAddEntry"),
+    titleEdit: t("reminderScheduleEditEntry"),
     time: t("reminderScheduleTime"),
     activity: t("reminderScheduleActivity"),
     activityPlaceholder: t("reminderScheduleActivityPlaceholder"),
     note: t("reminderScheduleNote"),
     notePlaceholder: t("reminderScheduleNotePlaceholder"),
-    remindAs: t("reminderScheduleRemindAs"),
+    categoryHelp: t("reminderScheduleCategoryHelp"),
     remindNone: t("reminderScheduleRemindNone"),
     kindFeed: t("reminderScheduleKindFeed"),
     kindNap: t("reminderScheduleKindNap"),
     kindPump: t("reminderScheduleKindPump"),
+    save: t("reminderScheduleSaveEntry"),
     remove: t("remove"),
+    needTimeAndLabel: t("reminderScheduleNeedTimeAndLabel"),
   };
 
   const handleSave = async () => {
@@ -542,6 +846,18 @@ export function ReminderSettingsView({
         slots: scheduleSlots,
       });
 
+      const scheduleHas = (kind: ScheduleSlotKind) =>
+        normalizedSchedule.slots.some((s) => s.kind === kind);
+
+      // Schedule mode: kinds on calendar entries drive due logic — no separate
+      // feed/nap/pump reminder toggles.
+      const effectiveFeedEnabled =
+        reminderMode === "schedule" ? scheduleHas("feed") : feedEnabled;
+      const effectiveNapEnabled =
+        reminderMode === "schedule" ? scheduleHas("nap") : napEnabled;
+      const effectivePumpEnabled =
+        reminderMode === "schedule" ? scheduleHas("pump") : pumpEnabled;
+
       const times =
         reminderMode === "schedule"
           ? normalizePumpTimes(
@@ -564,7 +880,7 @@ export function ReminderSettingsView({
         actingCaregiverName: selectedCaregiver,
         reminderMode,
         reminderSchedule: normalizedSchedule,
-        feedRemindersEnabled: feedEnabled,
+        feedRemindersEnabled: effectiveFeedEnabled,
         feedIntervalHours: parsed,
         nightFeedIntervalEnabled: nightEnabled,
         nightFeedIntervalHours: nightEnabled
@@ -573,14 +889,14 @@ export function ReminderSettingsView({
         nightFeedWindowStart: nightStart,
         nightFeedWindowEnd: nightEnd,
         notifyBeforeMinutes: lead,
-        napRemindersEnabled: napEnabled,
+        napRemindersEnabled: effectiveNapEnabled,
         wakeWindowMinutes:
           !isNaN(wakeMins) && wakeMins >= 15 && wakeMins <= 240
             ? wakeMins
             : DEFAULT_WAKE_WINDOW_MINUTES,
         medicationReminders: [],
         pumpSchedule: {
-          enabled: pumpEnabled,
+          enabled: effectivePumpEnabled,
           times: times.length > 0 ? times : [...DEFAULT_PUMP_TIMES],
           amountMl,
           timezone: pumpTimezone,
@@ -592,6 +908,11 @@ export function ReminderSettingsView({
         },
       });
       setScheduleSlots(normalizedSchedule.slots);
+      if (reminderMode === "schedule") {
+        setFeedEnabled(effectiveFeedEnabled);
+        setNapEnabled(effectiveNapEnabled);
+        setPumpEnabled(effectivePumpEnabled);
+      }
       if (times.length > 0) setPumpTimes(times);
       setMessage(t("settingsSaved"));
       notifyRemindersChanged();
@@ -638,6 +959,9 @@ export function ReminderSettingsView({
     setMessage(t("pumpCalendarDownloaded"));
   };
 
+  const hour12 = language !== "zh";
+  const scheduleHasPump = scheduleSlots.some((s) => s.kind === "pump");
+
   return (
     <div className="p-4">
       <button
@@ -648,8 +972,11 @@ export function ReminderSettingsView({
         {t("backToMore")}
       </button>
 
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-1">
         {t("reminderSettings")}
+      </p>
+      <p className="text-xs text-muted mb-3 leading-snug">
+        {t("reminderPageHierarchyHint")}
       </p>
 
       {error && (
@@ -664,8 +991,11 @@ export function ReminderSettingsView({
       )}
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <p className="text-sm font-semibold text-foreground mb-3">
+        <p className="text-sm font-semibold text-foreground mb-1">
           {t("reminderDeliveryTitle")}
+        </p>
+        <p className="text-xs text-muted mb-3 leading-snug">
+          {t("reminderDeliverySectionHint")}
         </p>
         <div className="grid grid-cols-1 gap-2">
           {(
@@ -739,8 +1069,11 @@ export function ReminderSettingsView({
       )}
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <p className="text-sm font-semibold text-foreground mb-3">
+        <p className="text-sm font-semibold text-foreground mb-1">
           {t("reminderTimingMode")}
+        </p>
+        <p className="text-xs text-muted mb-3 leading-snug">
+          {t("reminderTimingSectionHint")}
         </p>
         <ModeChoice
           mode={reminderMode}
@@ -752,45 +1085,26 @@ export function ReminderSettingsView({
         />
       </div>
 
-      {reminderMode === "schedule" && (
-        <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-          <p className="text-sm font-semibold text-foreground mb-1">
-            {t("reminderScheduleSlots")}
-          </p>
-          <p className="text-xs text-muted mb-3 leading-snug">
+      {reminderMode === "schedule" ? (
+        <>
+          <p className="text-xs text-muted mb-2 leading-snug px-0.5">
             {t("reminderScheduleHint")}
           </p>
-          <ScheduleTimetable
-            slots={scheduleSlots}
-            onChange={setScheduleSlots}
-            labels={slotLabels}
-          />
-        </div>
-      )}
-
-      <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <ReminderToggleRow
-          label={t("feedReminders")}
-          checked={feedEnabled}
-          onChange={setFeedEnabled}
-        />
-        {feedEnabled && reminderMode === "interval" && (
-          <>
-            <label className="label-field">{t("feedIntervalHours")}</label>
-            <input
-              type="number"
-              min="0.5"
-              max="24"
-              step="0.5"
-              value={feedHours}
-              onChange={(e) => setFeedHours(e.target.value)}
-              className="input-field mb-3"
+          <div className="mb-4">
+            <DayScheduleCalendar
+              slots={scheduleSlots}
+              onChange={setScheduleSlots}
+              labels={calendarLabels}
+              hour12={hour12}
             />
+          </div>
+
+          <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
             <label className="label-field">{t("notifyBeforeMinutes")}</label>
             <select
               value={notifyBefore}
               onChange={(e) => setNotifyBefore(e.target.value)}
-              className="input-field mb-4"
+              className="input-field"
             >
               {NOTIFY_BEFORE_OPTIONS.map((mins) => (
                 <option key={mins} value={String(mins)}>
@@ -800,84 +1114,20 @@ export function ReminderSettingsView({
                 </option>
               ))}
             </select>
+          </div>
 
-            <div className="border-t border-border pt-3">
-              <ReminderToggleRow
-                label={t("nightFeedReminders")}
-                checked={nightEnabled}
-                onChange={setNightEnabled}
+          {scheduleHasPump && (
+            <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+              <label className="label-field">{t("pumpDefaultAmount")}</label>
+              <input
+                type="number"
+                min="0"
+                max="1000"
+                step="10"
+                value={pumpAmount}
+                onChange={(e) => setPumpAmount(e.target.value)}
+                className="input-field mb-3"
               />
-              <p className="text-xs text-muted mb-3 leading-snug">
-                {t("nightFeedRemindersHint")}
-              </p>
-              {nightEnabled && (
-                <>
-                  <label className="label-field">
-                    {t("nightFeedIntervalHours")}
-                  </label>
-                  <input
-                    type="number"
-                    min="0.5"
-                    max="24"
-                    step="0.5"
-                    value={nightHours}
-                    onChange={(e) => setNightHours(e.target.value)}
-                    className="input-field mb-3"
-                  />
-                  <p className="text-xs font-medium text-muted mb-2">
-                    {t("nightFeedWindow")}
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 min-w-0">
-                    <div className="min-w-0">
-                      <label className="label-field">
-                        {t("nightFeedWindowStart")}
-                      </label>
-                      <input
-                        type="time"
-                        value={nightStart}
-                        onChange={(e) => setNightStart(e.target.value)}
-                        className="input-field"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <label className="label-field">
-                        {t("nightFeedWindowEnd")}
-                      </label>
-                      <input
-                        type="time"
-                        value={nightEnd}
-                        onChange={(e) => setNightEnd(e.target.value)}
-                        className="input-field"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <ReminderToggleRow
-          label={t("pumpReminders")}
-          checked={pumpEnabled}
-          onChange={setPumpEnabled}
-        />
-        {pumpEnabled && (
-          <>
-            <label className="label-field">{t("pumpDefaultAmount")}</label>
-            <input
-              type="number"
-              min="0"
-              max="1000"
-              step="10"
-              value={pumpAmount}
-              onChange={(e) => setPumpAmount(e.target.value)}
-              className="input-field mb-3"
-            />
-
-            {reminderMode === "schedule" ? (
               <button
                 type="button"
                 onClick={handleDownloadCalendar}
@@ -885,8 +1135,120 @@ export function ReminderSettingsView({
               >
                 {t("addPumpAlarmsToCalendar")}
               </button>
-            ) : (
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+            <ReminderToggleRow
+              label={t("feedReminders")}
+              checked={feedEnabled}
+              onChange={setFeedEnabled}
+            />
+            {feedEnabled && (
               <>
+                <label className="label-field">{t("feedIntervalHours")}</label>
+                <input
+                  type="number"
+                  min="0.5"
+                  max="24"
+                  step="0.5"
+                  value={feedHours}
+                  onChange={(e) => setFeedHours(e.target.value)}
+                  className="input-field mb-3"
+                />
+                <label className="label-field">{t("notifyBeforeMinutes")}</label>
+                <select
+                  value={notifyBefore}
+                  onChange={(e) => setNotifyBefore(e.target.value)}
+                  className="input-field mb-4"
+                >
+                  {NOTIFY_BEFORE_OPTIONS.map((mins) => (
+                    <option key={mins} value={String(mins)}>
+                      {mins === 0
+                        ? t("notifyBeforeAtDue")
+                        : t("notifyBeforeOption", { minutes: String(mins) })}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="border-t border-border pt-3">
+                  <ReminderToggleRow
+                    label={t("nightFeedReminders")}
+                    checked={nightEnabled}
+                    onChange={setNightEnabled}
+                  />
+                  <p className="text-xs text-muted mb-3 leading-snug">
+                    {t("nightFeedRemindersHint")}
+                  </p>
+                  {nightEnabled && (
+                    <>
+                      <label className="label-field">
+                        {t("nightFeedIntervalHours")}
+                      </label>
+                      <input
+                        type="number"
+                        min="0.5"
+                        max="24"
+                        step="0.5"
+                        value={nightHours}
+                        onChange={(e) => setNightHours(e.target.value)}
+                        className="input-field mb-3"
+                      />
+                      <p className="text-xs font-medium text-muted mb-2">
+                        {t("nightFeedWindow")}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 min-w-0">
+                        <div className="min-w-0">
+                          <label className="label-field">
+                            {t("nightFeedWindowStart")}
+                          </label>
+                          <input
+                            type="time"
+                            value={nightStart}
+                            onChange={(e) => setNightStart(e.target.value)}
+                            className="input-field"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <label className="label-field">
+                            {t("nightFeedWindowEnd")}
+                          </label>
+                          <input
+                            type="time"
+                            value={nightEnd}
+                            onChange={(e) => setNightEnd(e.target.value)}
+                            className="input-field"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+            <ReminderToggleRow
+              label={t("pumpReminders")}
+              checked={pumpEnabled}
+              onChange={setPumpEnabled}
+            />
+            {pumpEnabled && (
+              <>
+                <label className="label-field">{t("pumpDefaultAmount")}</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="1000"
+                  step="10"
+                  value={pumpAmount}
+                  onChange={(e) => setPumpAmount(e.target.value)}
+                  className="input-field mb-3"
+                />
+
                 <p className="text-xs font-medium text-muted mb-2">
                   {t("pumpReminderMode")}
                 </p>
@@ -973,49 +1335,30 @@ export function ReminderSettingsView({
                 )}
               </>
             )}
-          </>
-        )}
-      </div>
+          </div>
 
-      <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <ReminderToggleRow
-          label={t("napReminders")}
-          checked={napEnabled}
-          onChange={setNapEnabled}
-        />
-        {napEnabled && reminderMode === "interval" && (
-          <>
-            <label className="label-field">{t("wakeWindowMinutes")}</label>
-            <input
-              type="number"
-              min="15"
-              max="240"
-              step="5"
-              value={wakeWindow}
-              onChange={(e) => setWakeWindow(e.target.value)}
-              className="input-field"
+          <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+            <ReminderToggleRow
+              label={t("napReminders")}
+              checked={napEnabled}
+              onChange={setNapEnabled}
             />
-          </>
-        )}
-      </div>
-
-      {reminderMode === "schedule" && (
-        <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-          <label className="label-field">{t("notifyBeforeMinutes")}</label>
-          <select
-            value={notifyBefore}
-            onChange={(e) => setNotifyBefore(e.target.value)}
-            className="input-field"
-          >
-            {NOTIFY_BEFORE_OPTIONS.map((mins) => (
-              <option key={mins} value={String(mins)}>
-                {mins === 0
-                  ? t("notifyBeforeAtDue")
-                  : t("notifyBeforeOption", { minutes: String(mins) })}
-              </option>
-            ))}
-          </select>
-        </div>
+            {napEnabled && (
+              <>
+                <label className="label-field">{t("wakeWindowMinutes")}</label>
+                <input
+                  type="number"
+                  min="15"
+                  max="240"
+                  step="5"
+                  value={wakeWindow}
+                  onChange={(e) => setWakeWindow(e.target.value)}
+                  className="input-field"
+                />
+              </>
+            )}
+          </div>
+        </>
       )}
 
       <button
