@@ -486,7 +486,7 @@ export const translations = {
 
   // Reminders
   dueSoon: "Due soon",
-  whatsDue: "What's due",
+  whatsDue: "Schedule",
   whatsDueAllClear: "Nothing urgent right now",
   whatsDueGuideEmpty: "No schedule rows yet. Add them in Reminders.",
   /** Settings editor only — not shown on the Today schedule card. */

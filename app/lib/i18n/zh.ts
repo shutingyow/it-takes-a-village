@@ -451,7 +451,7 @@ export const zh: Translations = {
   todayTabLarge: "今日",
 
   dueSoon: "即将到期",
-  whatsDue: "到期提醒",
+  whatsDue: "时间表",
   whatsDueAllClear: "暂时没有紧急事项",
   whatsDueGuideEmpty: "还没有时间表。可在「提醒」里添加。",
   /** 仅设置页编辑器用 — 今日时间表卡片不显示。 */

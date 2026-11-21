@@ -78,6 +78,14 @@ function TrackerPageInner({
   const appShell = useAppShell();
   const { isAuthenticated } = useConvexAuth();
   const [activeTab, setActiveTab] = useState<TrackerTab>("home");
+  /** Bump to remount a tab and clear nested sub-views (re-tap home behavior). */
+  const [tabRootKeys, setTabRootKeys] = useState({
+    home: 0,
+    today: 0,
+    weekly: 0,
+    profile: 0,
+    settings: 0,
+  });
   const [profileOpenView, setProfileOpenView] = useState<ProfileView | null>(
     null
   );
@@ -304,11 +312,25 @@ function TrackerPageInner({
     setActiveLogModal(type);
   };
 
+  const resetTabRoot = (tab: Exclude<TrackerTab, "log">) => {
+    setTabRootKeys((prev) => ({ ...prev, [tab]: prev[tab] + 1 }));
+    if (tab === "profile") setProfileOpenView(null);
+    mainRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  };
+
   const handleTabChange = (tab: TrackerTab) => {
     if (tab === "log") {
       setShowLogSheet(true);
       return;
     }
+    // Re-tap active tab → return to that tab's root (clear nested views).
+    // Switching tabs also remounts via conditional render; bump key so a
+    // same-tab return always lands on root even if React reuses state.
+    if (tab === activeTab) {
+      resetTabRoot(tab);
+      return;
+    }
+    resetTabRoot(tab);
     setActiveTab(tab);
   };
 
@@ -443,6 +465,7 @@ function TrackerPageInner({
       >
         {activeTab === "home" && (
           <HomeTab
+            key={tabRootKeys.home}
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
             babyName={tracker.babyName}
@@ -473,6 +496,7 @@ function TrackerPageInner({
         />
         {activeTab === "today" && (
           <InsightsTab
+            key={tabRootKeys.today}
             babyName={tracker.babyName}
             birthDate={tracker.birthDate}
             secretLink={secretLink}
@@ -484,6 +508,7 @@ function TrackerPageInner({
         )}
         {activeTab === "weekly" && (
           <InsightsTab
+            key={tabRootKeys.weekly}
             babyName={tracker.babyName}
             birthDate={tracker.birthDate}
             secretLink={secretLink}
@@ -495,6 +520,7 @@ function TrackerPageInner({
         )}
         {activeTab === "profile" && (
           <ProfileTab
+            key={tabRootKeys.profile}
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
             openView={profileOpenView}
@@ -505,6 +531,7 @@ function TrackerPageInner({
         )}
         {activeTab === "settings" && (
           <SettingsTab
+            key={tabRootKeys.settings}
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
             caregivers={tracker.caregivers}
