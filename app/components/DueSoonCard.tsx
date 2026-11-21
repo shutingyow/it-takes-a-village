@@ -33,6 +33,7 @@ type DueKind = "feed" | "pump" | "sleep";
 interface DueSoonCardProps {
   secretLink: string;
   selectedCaregiver: string;
+  babyName?: string;
   pumpScheduleEnabled?: boolean;
   /** Compact row on Today; click opens the detail view. */
   onOpenDetail?: () => void;
@@ -309,6 +310,7 @@ function useDueSoonData(
 export function DueSoonCard({
   secretLink,
   selectedCaregiver,
+  babyName,
   pumpScheduleEnabled,
   onOpenDetail,
   detail = false,
@@ -487,8 +489,10 @@ export function DueSoonCard({
       <div className="px-4 pb-4 min-w-0">
         <div className="rounded-2xl border border-border bg-gradient-to-b from-[#fffaf7] to-white px-1 pt-3 pb-1 shadow-sm">
           <div className="px-3 pb-3 border-b border-border/70">
-            <h2 className="text-lg font-semibold text-foreground leading-snug">
-              {t("todaysSchedule")}
+            <h2 className="text-lg font-semibold uppercase tracking-wide text-foreground leading-snug">
+              {t("childsSchedule", {
+                name: babyName?.trim() || t("babyFallback"),
+              })}
             </h2>
           </div>
 

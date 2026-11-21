@@ -50,6 +50,7 @@ export function HomeTab({
       <DueSoonCard
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
+        babyName={babyName}
         pumpScheduleEnabled={pumpScheduleEnabled}
         detail
         onBack={() => setShowDueDetail(false)}
@@ -109,6 +110,7 @@ export function HomeTab({
       <DueSoonCard
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
+        babyName={babyName}
         pumpScheduleEnabled={pumpScheduleEnabled}
         onOpenDetail={() => setShowDueDetail(true)}
       />
