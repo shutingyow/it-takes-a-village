@@ -93,11 +93,14 @@ export function IconActivity(props: IconProps) {
   );
 }
 
-/** Crescent moon for Nap tiles / timetable. */
+/** Crescent moon for Nap tiles / timetable — optical mass matches feed/diaper/pump. */
 export function IconSleep(props: IconProps) {
   return (
     <Icon {...props}>
-      <path d="M20.5 14.2A8 8 0 0 1 9.8 3.5 8.2 8.2 0 1 0 20.5 14.2Z" />
+      {/* Slightly inset + nudged so the crescent reads centered like sibling glyphs */}
+      <g transform="translate(12 12) scale(0.9) translate(-11.1 -12.9)">
+        <path d="M20.5 14.2A8 8 0 0 1 9.8 3.5 8.2 8.2 0 1 0 20.5 14.2Z" />
+      </g>
     </Icon>
   );
 }

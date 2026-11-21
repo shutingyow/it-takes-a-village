@@ -66,7 +66,7 @@ export function TrackerBottomNav({
       className="app-tab-bar absolute bottom-0 inset-x-0 z-40 w-full min-w-0"
       aria-label="Main"
     >
-      <div className="flex items-end w-full min-w-0 px-1 pt-1.5 pb-1 safe-bottom">
+      <div className="flex items-start w-full min-w-0 px-1 pt-1.5 pb-1 safe-bottom">
         {leftTabs.map((tab) => (
           <NavItem
             key={tab.id}
@@ -80,13 +80,13 @@ export function TrackerBottomNav({
         <button
           type="button"
           onClick={onLogPress}
-          className="flex flex-col items-center shrink-0 -mt-5 px-1.5 touch-manipulation"
+          className="flex flex-col items-center shrink-0 self-start -mt-5 px-1.5 touch-manipulation"
           aria-label={t("tabLog")}
         >
           <span className="w-14 h-14 rounded-full bg-terracotta text-white flex items-center justify-center shadow-lg ring-[3px] ring-terracotta/30 active:scale-95 transition-transform">
             <IconLogPlus size={26} />
           </span>
-          <span className="text-[10px] font-semibold text-terracotta mt-1 truncate max-w-[3.75rem]">
+          <span className="text-[10px] font-semibold leading-tight text-terracotta mt-1 truncate max-w-[3.75rem]">
             {t("tabLog")}
           </span>
         </button>
@@ -121,14 +121,16 @@ function NavItem({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex-1 min-w-0 flex flex-col items-center gap-0.5 py-1.5 px-0.5 min-h-[48px] transition-colors touch-manipulation",
+        "flex-1 min-w-0 flex flex-col items-center justify-start gap-0.5 pt-1.5 pb-1.5 px-0.5 min-h-[48px] transition-colors touch-manipulation",
         active ? "text-terracotta" : "text-muted"
       )}
     >
-      {icon}
+      <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center">
+        {icon}
+      </span>
       <span
         className={cn(
-          "text-[10px] font-medium truncate max-w-full leading-tight",
+          "text-[10px] font-medium truncate max-w-full leading-tight h-[1.25em]",
           active && "font-semibold"
         )}
       >
