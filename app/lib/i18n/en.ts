@@ -589,7 +589,7 @@ export const translations = {
   liveActivityLastNapSubtitle: "Nap ended {time}",
   liveActivityLastNapSubtitleEmpty: "Log a nap to start",
   feedOngoingTitle: "Feed ongoing",
-  feedOngoingBanner: "Ongoing for {minutes} minutes",
+  feedOngoingBanner: "Ongoing for {time}",
   feedOngoingBy: "Logged by {name}",
   nappingBanner: "Napping · {time}",
   sleepingBanner: "Sleeping · {time}",

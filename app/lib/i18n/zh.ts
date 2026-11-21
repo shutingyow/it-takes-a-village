@@ -549,7 +549,7 @@ export const zh: Translations = {
   liveActivityLastNapSubtitle: "小睡结束于 {time}",
   liveActivityLastNapSubtitleEmpty: "记录一次小睡后开始",
   feedOngoingTitle: "喂奶中",
-  feedOngoingBanner: "进行中 · {minutes} 分钟",
+  feedOngoingBanner: "进行中 · {time}",
   feedOngoingBy: "由 {name} 记录",
   nappingBanner: "小睡中 · {time}",
   sleepingBanner: "睡觉中 · {time}",

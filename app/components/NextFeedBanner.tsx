@@ -96,11 +96,15 @@ export function NextFeedBanner({ secretLink, selectedCaregiver }: NextFeedBanner
 
   const primary = feedOngoing
     ? t("feedOngoingBanner", {
-        minutes: formatOngoingMinutes(activeFeed.startedAt, now),
+        time: formatMinutesCompact(
+          formatOngoingMinutes(activeFeed.startedAt, now)
+        ),
       })
     : sleepOngoing
       ? t("feedOngoingBanner", {
-          minutes: formatOngoingMinutes(activeSleep.startTime, now),
+          time: formatMinutesCompact(
+            formatOngoingMinutes(activeSleep.startTime, now)
+          ),
         })
       : !feed
         ? t("logFeedForDue")

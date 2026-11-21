@@ -37,7 +37,7 @@ export function formatTimeAgo(timestamp: number): string {
   return `${days}d ago`;
 }
 
-/** Whole minutes since `startedAt`, for “Ongoing for N minutes”. */
+/** Whole minutes since `startedAt`, for “Ongoing for {time}” via formatMinutesCompact. */
 export function formatOngoingMinutes(startedAt: number, now = Date.now()): number {
   return Math.max(0, Math.floor((now - startedAt) / 60_000));
 }
