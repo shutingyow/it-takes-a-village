@@ -15,6 +15,7 @@ import type { TranslationKey } from "@/app/lib/i18n/en";
 import { ActivityEntryCard, type ActivityEntry } from "./ActivityEntryCard";
 import { EditActivitySheet } from "./EditActivitySheet";
 import { FeedIntervalList } from "./FeedIntervalList";
+import { SleepIntervalList } from "./SleepIntervalList";
 import type { HomeCategory } from "./HomeCategoryGrid";
 import { ActivityIcon, type ActivityType } from "./icons";
 
@@ -356,6 +357,24 @@ export function HomeCategoryDetail({
                           ActivityEntry,
                           { entryType: "feed" }
                         > => entry.entryType === "feed"
+                      )}
+                      order="newest"
+                      onEdit={setEditingEntry}
+                      onDelete={handleDelete}
+                    />
+                  </div>
+                ) : category === "nap" ? (
+                  <div className="bg-surface border border-border rounded-2xl px-3 py-2 min-w-0 overflow-hidden">
+                    <SleepIntervalList
+                      entries={entries.filter(
+                        (
+                          entry
+                        ): entry is Extract<
+                          ActivityEntry,
+                          { entryType: "nap" | "sleep" }
+                        > =>
+                          entry.entryType === "nap" ||
+                          entry.entryType === "sleep"
                       )}
                       order="newest"
                       onEdit={setEditingEntry}

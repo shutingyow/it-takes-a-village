@@ -21,7 +21,8 @@ const FILTERS: Array<{ id: ActivityFilterType; labelKey: TranslationKey }> = [
   { id: "diaper", labelKey: "diaper" },
   { id: "pump", labelKey: "pump" },
   { id: "activity", labelKey: "filterActivity" },
-  { id: "nap", labelKey: "filterNap" },
+  // Chip covers naps + bedtime (history "nap" filter includes both).
+  { id: "nap", labelKey: "sleep" },
   { id: "moment", labelKey: "filterMoments" },
   { id: "health", labelKey: "health" },
   { id: "growth", labelKey: "growth" },

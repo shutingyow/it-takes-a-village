@@ -6,6 +6,7 @@ import { formatTime, formatDate } from "@/app/lib/utils";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ActivityEntryCard, type ActivityEntry } from "../ActivityEntryCard";
 import { FeedIntervalList } from "../FeedIntervalList";
+import { SleepIntervalList } from "../SleepIntervalList";
 import { EditActivitySheet } from "../EditActivitySheet";
 import {
   ActivityTypeFilter,
@@ -123,6 +124,23 @@ export function HistoryTab({
                       entry
                     ): entry is Extract<ActivityEntry, { entryType: "feed" }> =>
                       entry.entryType === "feed"
+                  )}
+                  order="newest"
+                  onEdit={setEditingEntry}
+                  onDelete={handleDelete}
+                />
+              </div>
+            ) : filter === "nap" ? (
+              <div className="bg-surface border border-border rounded-2xl px-3 py-2 min-w-0 overflow-hidden">
+                <SleepIntervalList
+                  entries={entries.filter(
+                    (
+                      entry
+                    ): entry is Extract<
+                      ActivityEntry,
+                      { entryType: "nap" | "sleep" }
+                    > =>
+                      entry.entryType === "nap" || entry.entryType === "sleep"
                   )}
                   order="newest"
                   onEdit={setEditingEntry}

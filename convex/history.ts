@@ -229,22 +229,21 @@ export const getActivity = query({
         time: e.timestamp,
         intervalMinutes: feedIntervals.get(e._id) ?? null,
       })),
-      ...sleepEntries
-        .filter((e) => filterType !== "nap" || e.type === "nap")
-        .map((e) =>
-          e.type === "nap"
-            ? {
-                ...e,
-                entryType: "nap" as const,
-                time: e.startTime,
-                wakeWindowBeforeMinutes: null as number | null,
-              }
-            : {
-                ...e,
-                entryType: "sleep" as const,
-                time: e.startTime,
-              }
-        ),
+      // "nap" filter shows naps + bedtime so caregivers see the full sleep log.
+      ...sleepEntries.map((e) =>
+        e.type === "nap"
+          ? {
+              ...e,
+              entryType: "nap" as const,
+              time: e.startTime,
+              wakeWindowBeforeMinutes: null as number | null,
+            }
+          : {
+              ...e,
+              entryType: "sleep" as const,
+              time: e.startTime,
+            }
+      ),
       ...diaperEntries.map(e => ({ ...e, entryType: "diaper" as const, time: e.timestamp })),
       ...pumpEntries.map(e => ({ ...e, entryType: "pump" as const, time: e.timestamp })),
       ...healthEntries.map(e => ({ ...e, entryType: "health" as const, time: e.timestamp })),
