@@ -488,12 +488,9 @@ export const translations = {
   dueSoon: "Due soon",
   whatsDue: "What's due",
   whatsDueAllClear: "Nothing urgent right now",
-  whatsDueSubtitle: "Feed, nap, and pump timing for this village",
-  whatsDueSubtitleSchedule:
-    "Village schedule guide — phone alerts still follow the last log.",
-  whatsDueGuideTitle: "Today's schedule",
   whatsDueGuideEmpty: "No schedule rows yet. Add them in Reminders.",
-  whatsDueGuideHint: "A guide, not a strict clock",
+  /** Settings editor only — not shown on the Today schedule card. */
+  whatsDueGuideHint: "Times are a guide — adjust as you go",
   scheduleNowLine: "Now",
   nextFeedDue: "Next feed",
   nextFeedDueNight: "Next feed (night)",
@@ -515,7 +512,6 @@ export const translations = {
   feedOverdueHint: "Log a feed to reset the schedule from now.",
   feedLateTimingPushed:
     "Feed was late — next reminder from this feed · due {time}",
-  overdueDismissHint: "OK — this planned time is noted.",
   gotIt: "Got it",
   nextPumpDue: "Next pump",
   nextDoseDue: "Next dose",

@@ -139,9 +139,10 @@ function DueRow({
   const { t } = useLanguage();
   const isOverdue = item?.status === "overdue" && !overdueDismissed;
   const isOngoing = item?.status === "ongoing";
+  // After “Got it”, keep the planned clock — no confirmation line.
   const primary =
     overdueDismissed && item?.status === "overdue"
-      ? t("overdueDismissHint")
+      ? t("dueAtClock", { time: formatTime(item.dueAt) })
       : duePrimary(item, emptyHint, t);
   const chipKey =
     overdueDismissed && item?.status === "overdue"
@@ -273,14 +274,11 @@ function DueRow({
     <div className="min-w-0">
       {row}
       {showGotIt && (
-        <div className="mx-3 mb-2 flex items-start justify-between gap-2 rounded-lg bg-beige-light/80 px-2.5 py-2">
-          <p className="text-[11px] font-medium text-muted leading-snug min-w-0">
-            {t("overdueDismissHint")}
-          </p>
+        <div className="mx-3 mb-2 flex justify-end">
           <button
             type="button"
             onClick={onGotIt}
-            className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-primary px-1"
+            className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-primary px-2.5 py-1.5 rounded-lg bg-beige-light/80"
           >
             {t("gotIt")}
           </button>
@@ -411,23 +409,15 @@ export function DueSoonCard({
 
   // Home strip: real dues only (overdue → due soon → on track). Skip ongoing so
   // an active nap never hides a feed overdue; calm empty if only ongoing exists.
-  // Detail page may still headline ongoing — rows always list it.
   // Dismissed overdue (“Got it”) drops out of the strip until dueAt changes.
+  // Detail page uses a fixed “Today’s schedule” title; rows list status.
   const stripHeadline =
     headlineCandidates.find(activeOverdue) ??
     headlineCandidates.find((item) => item.status === "approaching") ??
     headlineCandidates.find((item) => item.status === "ok") ??
     null;
 
-  const detailHeadline =
-    headlineCandidates.find(activeOverdue) ??
-    headlineCandidates.find((item) => item.status === "approaching") ??
-    headlineCandidates.find((item) => item.status === "ongoing") ??
-    headlineCandidates.find((item) => item.status === "ok") ??
-    headlineCandidates[0] ??
-    null;
-
-  const urgent = detail ? detailHeadline : stripHeadline;
+  const urgent = stripHeadline;
 
   const urgentTitle = !urgent
     ? t("whatsDueAllClear")
@@ -497,28 +487,16 @@ export function DueSoonCard({
       <div className="px-4 pb-4 min-w-0">
         <div className="rounded-2xl border border-border bg-gradient-to-b from-[#fffaf7] to-white px-1 pt-3 pb-1 shadow-sm">
           <div className="px-3 pb-3 border-b border-border/70">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-              {t("whatsDue")}
-            </p>
-            <h2 className="text-lg font-semibold text-foreground mt-0.5 leading-snug">
-              {urgentLine}
+            <h2 className="text-lg font-semibold text-foreground leading-snug">
+              {t("todaysSchedule")}
             </h2>
-            <p className="text-xs text-muted mt-1 leading-snug">
-              {dueStatus.reminderMode === "schedule"
-                ? t("whatsDueSubtitleSchedule")
-                : t("whatsDueSubtitle")}
-            </p>
           </div>
 
           {dueStatus.reminderMode === "schedule" && (
-            <div className="mx-3 mb-2 mt-1 rounded-xl bg-beige-light/50 px-2.5 py-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted mb-1">
-                {t("whatsDueGuideTitle")}
-              </p>
+            <div className="mx-3 mb-2 mt-2 rounded-xl bg-beige-light/50 px-2.5 py-2.5">
               <ScheduleGuideList
                 slots={dueStatus.scheduleSlots}
                 emptyLabel={t("whatsDueGuideEmpty")}
-                guideHint={t("whatsDueGuideHint")}
                 dayLabel={t("reminderSchedulePeriodDay")}
                 nightLabel={t("reminderSchedulePeriodNight")}
                 nowLabel={t("scheduleNowLine")}
@@ -531,6 +509,12 @@ export function DueSoonCard({
               />
             </div>
           )}
+
+          <div className="px-3 pt-2 pb-0.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+              {t("reminderSettings")}
+            </p>
+          </div>
 
           <DueRow
             kind="feed"
