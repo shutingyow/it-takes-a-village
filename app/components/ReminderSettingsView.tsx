@@ -2,7 +2,7 @@
 
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import {
   DEFAULT_PUMP_AMOUNT_ML,
@@ -42,18 +42,10 @@ import {
 } from "@/convex/lib/feedSchedule";
 import { BottomSheet } from "./ui/BottomSheet";
 import { IconPlus } from "./icons";
+import { ScheduleGuideList } from "./ScheduleGuideList";
 
 const NOTIFY_BEFORE_OPTIONS = [0, 5, 10, 15, 20, 30] as const;
 const DEFAULT_WAKE_WINDOW_MINUTES = 90;
-
-const HOUR_PX = 48;
-const DAY_START_HOUR = 0;
-const DAY_END_HOUR = 23;
-const HOURS = Array.from(
-  { length: DAY_END_HOUR - DAY_START_HOUR + 1 },
-  (_, i) => DAY_START_HOUR + i
-);
-const DEFAULT_BLOCK_MINUTES = 45;
 
 interface ReminderSettingsViewProps {
   secretLink: string;
@@ -100,12 +92,6 @@ function newSlotId(): string {
   return `slot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-function sortSlotsChronological(slots: ScheduleSlot[]): ScheduleSlot[] {
-  return [...slots].sort(
-    (a, b) => a.time.localeCompare(b.time) || a.id.localeCompare(b.id)
-  );
-}
-
 /** Fill missing labels on legacy kind-only rows using the current locale. */
 function hydrateScheduleLabels(
   slots: ScheduleSlot[],
@@ -118,63 +104,10 @@ function hydrateScheduleLabels(
   });
 }
 
-function parseHhMm(value: string): { hour: number; minute: number } | null {
-  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
-  if (!match) return null;
-  return { hour: Number(match[1]), minute: Number(match[2]) };
-}
-
-function minutesFromMidnight(time: string): number | null {
-  const parsed = parseHhMm(time);
-  if (!parsed) return null;
-  return parsed.hour * 60 + parsed.minute;
-}
-
-function formatHourLabel(hour: number, hour12: boolean): string {
-  if (!hour12) return `${String(hour).padStart(2, "0")}:00`;
-  if (hour === 0) return "12 AM";
-  if (hour === 12) return "12 PM";
-  if (hour < 12) return `${hour} AM`;
-  return `${hour - 12} PM`;
-}
-
 function defaultDraftTime(): string {
   const now = new Date();
   const hour = String(now.getHours()).padStart(2, "0");
   return `${hour}:00`;
-}
-
-function slotBlockStyle(kind: ScheduleSlotKind | undefined): {
-  bg: string;
-  text: string;
-  bar: string;
-} {
-  if (kind === "feed") {
-    return {
-      bg: "bg-[#fde8e8]",
-      text: "text-[#7a1f1a]",
-      bar: "bg-[#c43c3c]",
-    };
-  }
-  if (kind === "nap") {
-    return {
-      bg: "bg-[#d8f0e0]",
-      text: "text-[#145a32]",
-      bar: "bg-[#2f8f55]",
-    };
-  }
-  if (kind === "pump") {
-    return {
-      bg: "bg-[#dceefb]",
-      text: "text-[#0f4f7a]",
-      bar: "bg-[#2f87c5]",
-    };
-  }
-  return {
-    bg: "bg-primary/15",
-    text: "text-foreground",
-    bar: "bg-primary",
-  };
 }
 
 function ReminderToggleRow({
@@ -387,7 +320,6 @@ function DayScheduleCalendar({
   slots,
   onChange,
   labels,
-  hour12,
 }: {
   slots: ScheduleSlot[];
   onChange: (slots: ScheduleSlot[]) => void;
@@ -409,25 +341,15 @@ function DayScheduleCalendar({
     save: string;
     remove: string;
     needTimeAndLabel: string;
+    guideHint: string;
+    dayLabel: string;
+    nightLabel: string;
+    nowLabel: string;
+    activityFallback: string;
   };
-  hour12: boolean;
 }) {
   const [draft, setDraft] = useState<SlotDraft | null>(null);
   const [sheetError, setSheetError] = useState<string | null>(null);
-
-  const ordered = useMemo(() => sortSlotsChronological(slots), [slots]);
-  const gridHeight = (DAY_END_HOUR - DAY_START_HOUR + 1) * HOUR_PX;
-
-  const todayLabel = useMemo(() => {
-    const now = new Date();
-    const weekday = new Intl.DateTimeFormat(undefined, {
-      weekday: "short",
-    }).format(now);
-    const day = new Intl.DateTimeFormat(undefined, { day: "numeric" }).format(
-      now
-    );
-    return { weekday: weekday.toUpperCase(), day };
-  }, []);
 
   const openAdd = () => {
     setSheetError(null);
@@ -482,95 +404,23 @@ function DayScheduleCalendar({
   };
 
   return (
-    <div className="relative rounded-2xl border border-border bg-surface overflow-hidden">
-      <div className="flex items-start gap-3 px-3 py-2.5 border-b border-border/70">
-        <div className="w-12 shrink-0 text-center pt-0.5">
-          <p className="text-[10px] font-semibold tracking-wide text-muted">
-            {todayLabel.weekday}
-          </p>
-          <p className="text-2xl font-semibold tabular-nums text-foreground leading-none">
-            {todayLabel.day}
-          </p>
-        </div>
-        <p className="text-sm text-muted pt-2 leading-snug">
-          {ordered.length === 0
-            ? labels.empty
-            : `${ordered.length} · ${ordered
-                .slice(0, 2)
-                .map((s) => s.label ?? s.time)
-                .join(", ")}${ordered.length > 2 ? "…" : ""}`}
-        </p>
-      </div>
-
-      <div className="relative max-h-[min(58vh,560px)] overflow-y-auto overscroll-contain">
-        <div className="flex min-w-0 px-2 py-1">
-          <div className="w-14 shrink-0 relative" style={{ height: gridHeight }}>
-            {HOURS.map((hour) => (
-              <div
-                key={hour}
-                className="absolute right-2 text-[11px] tabular-nums text-muted leading-none -translate-y-1/2"
-                style={{ top: (hour - DAY_START_HOUR) * HOUR_PX }}
-              >
-                {formatHourLabel(hour, hour12)}
-              </div>
-            ))}
-          </div>
-          <div
-            className="relative flex-1 min-w-0 border-l border-border/80"
-            style={{ height: gridHeight }}
-          >
-            {HOURS.map((hour) => (
-              <div
-                key={hour}
-                className="absolute left-0 right-0 border-t border-border/60"
-                style={{ top: (hour - DAY_START_HOUR) * HOUR_PX }}
-              />
-            ))}
-
-            {ordered.map((slot) => {
-              const startMin = minutesFromMidnight(slot.time);
-              if (startMin == null) return null;
-              const endMin = slot.endTime
-                ? (minutesFromMidnight(slot.endTime) ??
-                  startMin + DEFAULT_BLOCK_MINUTES)
-                : startMin + DEFAULT_BLOCK_MINUTES;
-              const top =
-                ((startMin / 60 - DAY_START_HOUR) * HOUR_PX);
-              const height = Math.max(
-                28,
-                ((Math.max(endMin, startMin + 20) - startMin) / 60) * HOUR_PX
-              );
-              const style = slotBlockStyle(slot.kind);
-              return (
-                <button
-                  key={slot.id}
-                  type="button"
-                  onClick={() => openEdit(slot)}
-                  className={`absolute left-1 right-2 z-10 rounded-lg px-1.5 py-1 flex items-start gap-1.5 overflow-hidden text-left border border-black/[0.04] ${style.bg}`}
-                  style={{ top, height }}
-                  title={`${slot.time} · ${slot.label ?? ""}`}
-                >
-                  <span
-                    className={`w-1 self-stretch rounded-full shrink-0 ${style.bar}`}
-                  />
-                  <span className="min-w-0">
-                    <span
-                      className={`block text-[11px] font-bold truncate ${style.text}`}
-                    >
-                      {slot.time}
-                      {slot.label ? ` · ${slot.label}` : ""}
-                    </span>
-                    {slot.note ? (
-                      <span className="block text-[10px] text-muted truncate">
-                        {slot.note}
-                      </span>
-                    ) : null}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+    <div className="relative rounded-2xl border border-border bg-beige-light/40 overflow-hidden">
+      <div className="max-h-[min(58vh,560px)] overflow-y-auto overscroll-contain px-2.5 pt-2.5 pb-16">
+        <ScheduleGuideList
+          slots={slots}
+          emptyLabel={labels.empty}
+          guideHint={labels.guideHint}
+          dayLabel={labels.dayLabel}
+          nightLabel={labels.nightLabel}
+          nowLabel={labels.nowLabel}
+          kindLabels={{
+            feed: labels.kindFeed,
+            nap: labels.kindNap,
+            pump: labels.kindPump,
+          }}
+          activityFallback={labels.activityFallback}
+          onSlotClick={openEdit}
+        />
       </div>
 
       <button
@@ -634,7 +484,7 @@ export function ReminderSettingsView({
   pumpSchedule: initialPump,
   onBack,
 }: ReminderSettingsViewProps) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const updateSettings = useMutation(api.trackers.updateReminderSettings);
 
   const [reminderMode, setReminderMode] = useState<ReminderMode>(
@@ -788,6 +638,11 @@ export function ReminderSettingsView({
     save: t("reminderScheduleSaveEntry"),
     remove: t("remove"),
     needTimeAndLabel: t("reminderScheduleNeedTimeAndLabel"),
+    guideHint: t("whatsDueGuideHint"),
+    dayLabel: t("reminderSchedulePeriodDay"),
+    nightLabel: t("reminderSchedulePeriodNight"),
+    nowLabel: t("scheduleNowLine"),
+    activityFallback: t("reminderScheduleActivity"),
   };
 
   const handleSave = async () => {
@@ -959,7 +814,6 @@ export function ReminderSettingsView({
     setMessage(t("pumpCalendarDownloaded"));
   };
 
-  const hour12 = language !== "zh";
   const scheduleHasPump = scheduleSlots.some((s) => s.kind === "pump");
 
   return (
@@ -1095,7 +949,6 @@ export function ReminderSettingsView({
               slots={scheduleSlots}
               onChange={setScheduleSlots}
               labels={calendarLabels}
-              hour12={hour12}
             />
           </div>
 

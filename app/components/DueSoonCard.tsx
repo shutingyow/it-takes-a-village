@@ -26,6 +26,7 @@ import {
   isOverdueAckDismissed,
   overdueAckKindForItem,
 } from "@/app/lib/overdueAck";
+import { ScheduleGuideList } from "./ScheduleGuideList";
 
 type DueKind = "feed" | "pump" | "sleep";
 
@@ -510,53 +511,24 @@ export function DueSoonCard({
           </div>
 
           {dueStatus.reminderMode === "schedule" && (
-            <div className="mx-3 mb-2 mt-1 rounded-lg bg-beige-light/60 px-2.5 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted mb-1.5">
+            <div className="mx-3 mb-2 mt-1 rounded-xl bg-beige-light/50 px-2.5 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted mb-1">
                 {t("whatsDueGuideTitle")}
               </p>
-              {dueStatus.scheduleSlots.length === 0 ? (
-                <p className="text-[11px] text-muted leading-snug">
-                  {t("whatsDueGuideEmpty")}
-                </p>
-              ) : (
-                <ul className="space-y-1">
-                  {[...dueStatus.scheduleSlots]
-                    .sort((a, b) => a.time.localeCompare(b.time))
-                    .map((slot) => {
-                      const kindLabel =
-                        slot.kind === "feed"
-                          ? t("reminderScheduleKindFeed")
-                          : slot.kind === "nap"
-                            ? t("reminderScheduleKindNap")
-                            : slot.kind === "pump"
-                              ? t("reminderScheduleKindPump")
-                              : null;
-                      const name =
-                        slot.label?.trim() ||
-                        kindLabel ||
-                        t("reminderScheduleActivity");
-                      return (
-                        <li
-                          key={slot.id}
-                          className="flex items-baseline gap-2 min-w-0 text-[12px]"
-                        >
-                          <span className="tabular-nums font-semibold text-foreground shrink-0">
-                            {slot.time}
-                            {slot.endTime ? `–${slot.endTime}` : ""}
-                          </span>
-                          <span className="text-foreground truncate min-w-0">
-                            {name}
-                          </span>
-                          {slot.note ? (
-                            <span className="text-muted truncate shrink min-w-0">
-                              · {slot.note}
-                            </span>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                </ul>
-              )}
+              <ScheduleGuideList
+                slots={dueStatus.scheduleSlots}
+                emptyLabel={t("whatsDueGuideEmpty")}
+                guideHint={t("whatsDueGuideHint")}
+                dayLabel={t("reminderSchedulePeriodDay")}
+                nightLabel={t("reminderSchedulePeriodNight")}
+                nowLabel={t("scheduleNowLine")}
+                kindLabels={{
+                  feed: t("reminderScheduleKindFeed"),
+                  nap: t("reminderScheduleKindNap"),
+                  pump: t("reminderScheduleKindPump"),
+                }}
+                activityFallback={t("reminderScheduleActivity")}
+              />
             </div>
           )}
 

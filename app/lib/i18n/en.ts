@@ -493,6 +493,8 @@ export const translations = {
     "Village schedule guide — phone alerts still follow the last log.",
   whatsDueGuideTitle: "Today's schedule",
   whatsDueGuideEmpty: "No schedule rows yet. Add them in Reminders.",
+  whatsDueGuideHint: "A guide, not a strict clock",
+  scheduleNowLine: "Now",
   nextFeedDue: "Next feed",
   nextFeedDueNight: "Next feed (night)",
   nextSleepDue: "Sleep",
@@ -533,11 +535,11 @@ export const translations = {
   reminderDeliverySectionHint: "How this device shows timers or notifications.",
   reminderTimingMode: "When are things due?",
   reminderTimingSectionHint:
-    "Interval uses the last log. Schedule uses the calendar below.",
+    "Interval uses the last log. Schedule uses the list below.",
   reminderModeInterval: "Interval",
   reminderModeSchedule: "Schedule",
   reminderModeIntervalDesc: "Due from the last log plus hours or wake window.",
-  reminderModeScheduleDesc: "Due at the times you place on the day calendar.",
+  reminderModeScheduleDesc: "Due at the times you list for the day.",
   reminderScheduleHint:
     "Tap + to add a time. Tag Feed, Nap, or Pump only when What's due should use that entry.",
   reminderScheduleSlots: "Your schedule",
@@ -552,7 +554,7 @@ export const translations = {
   reminderScheduleRemindAs: "Remind as",
   reminderScheduleRemindNone: "No tag",
   reminderScheduleCategoryHelp:
-    "Optional tag for What's due — leave off for display-only.",
+    "Optional tag for What's due — leave off for display-only rows.",
   reminderSchedulePeriod: "Part of day",
   reminderSchedulePeriodDay: "Day",
   reminderSchedulePeriodNight: "Night",
