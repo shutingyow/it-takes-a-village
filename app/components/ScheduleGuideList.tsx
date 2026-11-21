@@ -163,7 +163,7 @@ function NowLine({ label }: { label: string }) {
       <span className="shrink-0 rounded-full bg-terracotta px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-white leading-none">
         {label}
       </span>
-      <span className="h-px flex-1 bg-terracotta/80" />
+      <span className="h-0.5 flex-1 rounded-full bg-terracotta/80" />
     </div>
   );
 }
