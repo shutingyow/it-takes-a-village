@@ -826,11 +826,8 @@ export function ReminderSettingsView({
         {t("backToMore")}
       </button>
 
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-1">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">
         {t("reminderSettings")}
-      </p>
-      <p className="text-xs text-muted mb-3 leading-snug">
-        {t("reminderPageHierarchyHint")}
       </p>
 
       {error && (
@@ -845,11 +842,8 @@ export function ReminderSettingsView({
       )}
 
       <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-        <p className="text-sm font-semibold text-foreground mb-1">
+        <p className="text-sm font-semibold text-foreground mb-3">
           {t("reminderDeliveryTitle")}
-        </p>
-        <p className="text-xs text-muted mb-3 leading-snug">
-          {t("reminderDeliverySectionHint")}
         </p>
         <div className="grid grid-cols-1 gap-2">
           {(
@@ -900,10 +894,9 @@ export function ReminderSettingsView({
 
       {deliveryMode === "timer" && isNativePlatform() && (
         <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-          <p className="text-sm font-semibold text-foreground mb-1">
+          <p className="text-sm font-semibold text-foreground mb-3">
             {t("liveActivityTimers")}
           </p>
-          <p className="text-xs text-muted mb-3">{t("liveActivityTimersDesc")}</p>
           <ReminderToggleRow
             label={t("liveActivityToggleFeed")}
             checked={liveFeed}
@@ -952,24 +945,26 @@ export function ReminderSettingsView({
             />
           </div>
 
-          <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-            <label className="label-field">{t("notifyBeforeMinutes")}</label>
-            <select
-              value={notifyBefore}
-              onChange={(e) => setNotifyBefore(e.target.value)}
-              className="input-field"
-            >
-              {NOTIFY_BEFORE_OPTIONS.map((mins) => (
-                <option key={mins} value={String(mins)}>
-                  {mins === 0
-                    ? t("notifyBeforeAtDue")
-                    : t("notifyBeforeOption", { minutes: String(mins) })}
-                </option>
-              ))}
-            </select>
-          </div>
+          {deliveryMode === "notifications" && (
+            <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
+              <label className="label-field">{t("notifyBeforeMinutes")}</label>
+              <select
+                value={notifyBefore}
+                onChange={(e) => setNotifyBefore(e.target.value)}
+                className="input-field"
+              >
+                {NOTIFY_BEFORE_OPTIONS.map((mins) => (
+                  <option key={mins} value={String(mins)}>
+                    {mins === 0
+                      ? t("notifyBeforeAtDue")
+                      : t("notifyBeforeOption", { minutes: String(mins) })}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          {scheduleHasPump && (
+          {deliveryMode === "notifications" && scheduleHasPump && (
             <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
               <label className="label-field">{t("pumpDefaultAmount")}</label>
               <input
@@ -1009,22 +1004,30 @@ export function ReminderSettingsView({
                   step="0.5"
                   value={feedHours}
                   onChange={(e) => setFeedHours(e.target.value)}
-                  className="input-field mb-3"
+                  className={`input-field ${deliveryMode === "notifications" ? "mb-3" : "mb-4"}`}
                 />
-                <label className="label-field">{t("notifyBeforeMinutes")}</label>
-                <select
-                  value={notifyBefore}
-                  onChange={(e) => setNotifyBefore(e.target.value)}
-                  className="input-field mb-4"
-                >
-                  {NOTIFY_BEFORE_OPTIONS.map((mins) => (
-                    <option key={mins} value={String(mins)}>
-                      {mins === 0
-                        ? t("notifyBeforeAtDue")
-                        : t("notifyBeforeOption", { minutes: String(mins) })}
-                    </option>
-                  ))}
-                </select>
+                {deliveryMode === "notifications" && (
+                  <>
+                    <label className="label-field">
+                      {t("notifyBeforeMinutes")}
+                    </label>
+                    <select
+                      value={notifyBefore}
+                      onChange={(e) => setNotifyBefore(e.target.value)}
+                      className="input-field mb-4"
+                    >
+                      {NOTIFY_BEFORE_OPTIONS.map((mins) => (
+                        <option key={mins} value={String(mins)}>
+                          {mins === 0
+                            ? t("notifyBeforeAtDue")
+                            : t("notifyBeforeOption", {
+                                minutes: String(mins),
+                              })}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
 
                 <div className="border-t border-border pt-3">
                   <ReminderToggleRow
@@ -1091,16 +1094,22 @@ export function ReminderSettingsView({
             />
             {pumpEnabled && (
               <>
-                <label className="label-field">{t("pumpDefaultAmount")}</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="1000"
-                  step="10"
-                  value={pumpAmount}
-                  onChange={(e) => setPumpAmount(e.target.value)}
-                  className="input-field mb-3"
-                />
+                {deliveryMode === "notifications" && (
+                  <>
+                    <label className="label-field">
+                      {t("pumpDefaultAmount")}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1000"
+                      step="10"
+                      value={pumpAmount}
+                      onChange={(e) => setPumpAmount(e.target.value)}
+                      className="input-field mb-3"
+                    />
+                  </>
+                )}
 
                 <p className="text-xs font-medium text-muted mb-2">
                   {t("pumpReminderMode")}
@@ -1161,7 +1170,9 @@ export function ReminderSettingsView({
                         </button>
                       ))}
                     </div>
-                    <div className="flex gap-2 mb-3 min-w-0">
+                    <div
+                      className={`flex gap-2 min-w-0 ${deliveryMode === "notifications" ? "mb-3" : ""}`}
+                    >
                       <input
                         type="time"
                         value={newPumpTime}
@@ -1177,13 +1188,15 @@ export function ReminderSettingsView({
                         {t("add")}
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleDownloadCalendar}
-                      className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
-                    >
-                      {t("addPumpAlarmsToCalendar")}
-                    </button>
+                    {deliveryMode === "notifications" && (
+                      <button
+                        type="button"
+                        onClick={handleDownloadCalendar}
+                        className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
+                      >
+                        {t("addPumpAlarmsToCalendar")}
+                      </button>
+                    )}
                   </>
                 )}
               </>

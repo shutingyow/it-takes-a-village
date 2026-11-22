@@ -353,10 +353,7 @@ export function SettingsTab({
         >
           {t("backToSettings")}
         </button>
-        <p className="section-label">{t("accountSettings")}</p>
-        <p className="text-sm text-muted mb-4 -mt-2">
-          {t("accountSettingsDesc")}
-        </p>
+        <p className="section-label mb-4">{t("accountSettings")}</p>
 
         <div className="mb-4 bg-surface border border-border rounded-2xl p-4 card-shadow">
           <p className="text-sm font-semibold text-foreground mb-1">
@@ -550,7 +547,7 @@ export function SettingsTab({
       id: "account",
       icon: <IconSettings size={20} className="text-terracotta" />,
       label: t("accountSettings"),
-      description: t("accountSettingsDesc"),
+      description: "",
     },
     {
       id: "reminders",

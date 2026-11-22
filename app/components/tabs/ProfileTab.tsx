@@ -171,8 +171,7 @@ export function ProfileTab({
 
   return (
     <div className="p-4">
-      <p className="section-label">{t("profileHub")}</p>
-      <p className="text-sm text-muted mb-4 -mt-2">{t("profileHubDesc")}</p>
+      <p className="section-label mb-4">{t("profileHub")}</p>
 
       <div className="mb-4">
         <p className="text-sm font-semibold text-foreground mb-2">

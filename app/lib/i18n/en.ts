@@ -84,7 +84,7 @@ export const translations = {
   villageTimezone: "Timezone",
   accountSection: "Account",
   accountSettings: "Account settings",
-  accountSettingsDesc: "Sign in, language, appearance & timezone",
+  accountSettingsDesc: "",
   babyDetails: "Baby details",
   accountSignedOut:
     "Sign in to manage this village (caregivers). Caregivers don’t need an account.",
@@ -185,7 +185,7 @@ export const translations = {
   backToProfile: "‹ Back to Profile",
   backToSettings: "‹ Back to Settings",
   profileHub: "Profile",
-  profileHubDesc: "Baby details, notes, health & more",
+  profileHubDesc: "",
   settingsHub: "Settings",
   settingsHubDesc: "Account, reminders, export & admin",
   notesDesc: "Handover notes for caregivers",
@@ -528,9 +528,8 @@ export const translations = {
   privacyPolicy: "Privacy Policy",
   reminderSettings: "Reminders",
   reminderSettingsDesc: "Feed, pump & nap",
-  reminderPageHierarchyHint:
-    "Alerts on this device are separate from when dues are calculated.",
-  reminderDeliverySectionHint: "How this device shows timers or notifications.",
+  reminderPageHierarchyHint: "",
+  reminderDeliverySectionHint: "",
   reminderTimingMode: "When are things due?",
   reminderTimingSectionHint:
     "Interval uses the last log. Schedule uses the list below.",
@@ -596,8 +595,7 @@ export const translations = {
   nappingBanner: "Napping · {time}",
   sleepingBanner: "Sleeping · {time}",
   liveActivityTimers: "Lock screen timers",
-  liveActivityTimersDesc:
-    "Show time since the last feed, pump, or sleep on the Lock Screen. While a feed or sleep is in progress, that timer switches to in-progress instead.",
+  liveActivityTimersDesc: "",
   liveActivityToggleFeed: "Feed timer",
   liveActivityTogglePump: "Pump timer",
   liveActivityToggleNap: "Nap / awake timer",
