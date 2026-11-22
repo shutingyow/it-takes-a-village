@@ -502,7 +502,8 @@ export const getTodayNapStatus = query({
       .order("desc")
       .take(80);
 
-    const latest = recent.find((entry) => entry.type === "nap");
+    // Nap or bedtime — awake/napping status follows the latest sleep of either type.
+    const latest = recent[0];
     if (!latest) {
       return { state: "none" as const };
     }

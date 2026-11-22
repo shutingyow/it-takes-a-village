@@ -145,6 +145,12 @@ export function enumerateClockSlots(
   return slots.sort((a, b) => a - b);
 }
 
+/**
+ * Next guide clock times after the last log.
+ * Skips past slots — the shared schedule is a guide following baby cues, so
+ * What's due advances to the next upcoming window instead of labeling a
+ * missed clock time as "overdue". Interval delivery (lock screen) is separate.
+ */
 export function listUpcomingClockDueAts(
   times: string[],
   timeZone: string,
@@ -160,8 +166,6 @@ export function listUpcomingClockDueAts(
   if (afterLast.length === 0) return [];
   const horizon = now + 24 * 60 * 60 * 1000;
   const result: number[] = [];
-  const overdueOrDue = afterLast.find((ts) => ts <= now);
-  if (overdueOrDue !== undefined) result.push(overdueOrDue);
   for (const ts of afterLast) {
     if (ts <= now) continue;
     if (ts > horizon) break;

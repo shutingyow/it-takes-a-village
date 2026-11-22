@@ -125,6 +125,7 @@ export function HomeCategoryGrid({
       if (amountMl !== undefined) {
         bits.push(t("amountMlShort", { amount: amountMl }));
       } else if (feedDue && feedDue.status !== "ongoing") {
+        // Soft past-window copy — avoid “overdue” scare on the Home tile.
         bits.push(
           feedDue.status === "overdue"
             ? t("overdueBy", {

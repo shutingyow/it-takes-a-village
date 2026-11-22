@@ -83,9 +83,11 @@ function duePrimary(
   item: DueItem | null,
   emptyHint: string,
   t: (
-    key: "overdueBy" | "dueIn" | "ongoingElapsed",
-    vars: { time: string }
-  ) => string
+    key: "overdueBy" | "dueIn" | "ongoingElapsed" | "suggestedAt",
+    vars?: { time: string }
+  ) => string,
+  /** Schedule guide: past windows show calm “Suggested”, not lateness. */
+  guideMode = false
 ): string {
   if (!item) return emptyHint;
   if (item.status === "ongoing") {
@@ -94,6 +96,8 @@ function duePrimary(
     });
   }
   if (item.status === "overdue") {
+    // Guide = shared timetable following baby cues — no “overdue” scare.
+    if (guideMode) return t("suggestedAt");
     return t("overdueBy", {
       time: formatMinutesCompact(item.minutesUntilDue),
     });
@@ -127,6 +131,7 @@ function DueRow({
   onOpen,
   overdueDismissed,
   onGotIt,
+  guideMode = false,
 }: {
   kind: DueKind;
   title: string;
@@ -136,19 +141,24 @@ function DueRow({
   onOpen?: () => void;
   overdueDismissed?: boolean;
   onGotIt?: () => void;
+  /** Schedule timetable mode — calm past-slot copy, no scare styling. */
+  guideMode?: boolean;
 }) {
   const { t } = useLanguage();
-  const isOverdue = item?.status === "overdue" && !overdueDismissed;
+  const isOverdue =
+    item?.status === "overdue" && !overdueDismissed && !guideMode;
   const isOngoing = item?.status === "ongoing";
   // After “Got it”, keep the planned clock — no confirmation line.
   const primary =
     overdueDismissed && item?.status === "overdue"
       ? t("dueAtClock", { time: formatTime(item.dueAt) })
-      : duePrimary(item, emptyHint, t);
+      : duePrimary(item, emptyHint, t, guideMode);
   const chipKey =
     overdueDismissed && item?.status === "overdue"
       ? "dueStatusOk"
-      : statusChipKey(item);
+      : guideMode && item?.status === "overdue"
+        ? "dueStatusOk"
+        : statusChipKey(item);
   const actionLabel = isOngoing ? t("whatsDueTapToOpen") : t("whatsDueTapToLog");
   const showGotIt =
     detail && item?.status === "overdue" && !overdueDismissed && onGotIt;
@@ -406,18 +416,24 @@ export function DueSoonCard({
     ...medItems,
   ].filter((item): item is DueItem => item != null);
 
+  const guideMode = dueStatus.reminderMode === "schedule";
+
   const activeOverdue = (item: DueItem) =>
     item.status === "overdue" && !isItemOverdueDismissed(item);
 
-  // Home strip: real dues only (overdue → due soon → on track). Skip ongoing so
-  // an active nap never hides a feed overdue; calm empty if only ongoing exists.
-  // Dismissed overdue (“Got it”) drops out of the strip until dueAt changes.
-  // Detail page uses a fixed “Today’s schedule” title; rows list status.
-  const stripHeadline =
-    headlineCandidates.find(activeOverdue) ??
-    headlineCandidates.find((item) => item.status === "approaching") ??
-    headlineCandidates.find((item) => item.status === "ok") ??
-    null;
+  // Home strip: interval mode prefers overdue → due soon → on track.
+  // Schedule guide skips overdue scare and shows the next calm window.
+  // Skip ongoing so an active nap never hides a feed due; calm empty if only
+  // ongoing exists. Dismissed overdue (“Got it”) drops out until dueAt changes.
+  const stripHeadline = guideMode
+    ? (headlineCandidates.find((item) => item.status === "approaching") ??
+      headlineCandidates.find((item) => item.status === "ok") ??
+      headlineCandidates.find(activeOverdue) ??
+      null)
+    : (headlineCandidates.find(activeOverdue) ??
+      headlineCandidates.find((item) => item.status === "approaching") ??
+      headlineCandidates.find((item) => item.status === "ok") ??
+      null);
 
   const urgent = stripHeadline;
 
@@ -435,7 +451,7 @@ export function DueSoonCard({
     ? t("whatsDueAllClear")
     : urgent.status === "ongoing"
       ? `${urgentTitle} · ${formatDuration(urgent.dueAt)}`
-      : `${urgentTitle} · ${duePrimary(urgent, "", t)}`;
+      : `${urgentTitle} · ${duePrimary(urgent, "", t, guideMode)}`;
 
   if (!detail) {
     return (
@@ -449,14 +465,7 @@ export function DueSoonCard({
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
               {t("whatsDue")}
             </p>
-            <p
-              className={cn(
-                "text-sm font-semibold truncate mt-0.5",
-                urgent?.status === "overdue"
-                  ? "text-terracotta"
-                  : "text-foreground"
-              )}
-            >
+            <p className="text-sm font-semibold truncate mt-0.5 text-foreground">
               {urgentLine}
               {urgent && (
                 <span className="text-muted font-medium">
@@ -530,9 +539,10 @@ export function DueSoonCard({
             item={feedItem}
             emptyHint={t("logFeedForDue")}
             detail
+            guideMode={guideMode}
             overdueDismissed={feedDismissed}
             onGotIt={
-              feedItem?.status === "overdue"
+              !guideMode && feedItem?.status === "overdue"
                 ? () => dismissItem(feedItem)
                 : undefined
             }
@@ -553,9 +563,10 @@ export function DueSoonCard({
             item={sleepItem}
             emptyHint={t("noSleepDueYet")}
             detail
+            guideMode={guideMode}
             overdueDismissed={sleepDismissed}
             onGotIt={
-              sleepItem?.status === "overdue"
+              !guideMode && sleepItem?.status === "overdue"
                 ? () => dismissItem(sleepItem)
                 : undefined
             }
@@ -578,9 +589,10 @@ export function DueSoonCard({
                 item={pumpItem}
                 emptyHint={t("noPumpDueYet")}
                 detail
+                guideMode={guideMode}
                 overdueDismissed={pumpDismissed}
                 onGotIt={
-                  pumpItem?.status === "overdue"
+                  !guideMode && pumpItem?.status === "overdue"
                     ? () => dismissItem(pumpItem)
                     : undefined
                 }

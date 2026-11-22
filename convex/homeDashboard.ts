@@ -115,8 +115,11 @@ export const getTileSummaries = query({
       .order("desc")
       .take(40);
 
-    const lastNap = recentSleep.find((entry) => entry.type === "nap");
-    const sleepForTile = activeSleep ?? lastNap;
+    // Nap or bedtime — Home Sleep tile shows the latest completed sleep of either type.
+    const lastCompletedSleep = recentSleep.find(
+      (entry) => entry.endTime !== undefined
+    );
+    const sleepForTile = activeSleep ?? lastCompletedSleep;
 
     let nap: {
       startTime: number;
