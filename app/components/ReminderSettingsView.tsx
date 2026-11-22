@@ -5,13 +5,11 @@ import { api } from "@/convex/_generated/api";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import {
-  DEFAULT_PUMP_AMOUNT_ML,
   DEFAULT_PUMP_TIMEZONE,
   DEFAULT_PUMP_TIMES,
-  downloadPumpScheduleIcs,
+  DEFAULT_PUMP_INTERVAL_HOURS,
   normalizePumpTimes,
-} from "@/app/lib/pumpCalendar";
-import { DEFAULT_PUMP_INTERVAL_HOURS } from "@/convex/lib/pumpSchedule";
+} from "@/convex/lib/pumpSchedule";
 import {
   normalizeReminderSchedule,
   type ReminderMode,
@@ -50,7 +48,6 @@ const DEFAULT_WAKE_WINDOW_MINUTES = 90;
 interface ReminderSettingsViewProps {
   secretLink: string;
   selectedCaregiver: string;
-  babyName?: string;
   feedIntervalHours?: number;
   nightFeedIntervalEnabled?: boolean;
   nightFeedIntervalHours?: number;
@@ -469,7 +466,6 @@ function DayScheduleCalendar({
 export function ReminderSettingsView({
   secretLink,
   selectedCaregiver,
-  babyName,
   feedIntervalHours: initialFeedHours,
   nightFeedIntervalEnabled: initialNightEnabled,
   nightFeedIntervalHours: initialNightHours,
@@ -534,9 +530,6 @@ export function ReminderSettingsView({
     initialPump?.times?.length
       ? [...initialPump.times]
       : [...DEFAULT_PUMP_TIMES]
-  );
-  const [pumpAmount, setPumpAmount] = useState(
-    String(initialPump?.amountMl ?? DEFAULT_PUMP_AMOUNT_ML)
   );
   const [newPumpTime, setNewPumpTime] = useState("");
   const [pumpTimezone] = useState(
@@ -676,10 +669,6 @@ export function ReminderSettingsView({
       ) {
         throw new Error("Wake window must be between 15 and 240 minutes");
       }
-      const amountMl = parseFloat(pumpAmount);
-      if (isNaN(amountMl) || amountMl < 0) {
-        throw new Error("Invalid pump amount");
-      }
       const intervalParsed = parseFloat(pumpIntervalHours);
       if (
         reminderMode === "interval" &&
@@ -753,7 +742,6 @@ export function ReminderSettingsView({
         pumpSchedule: {
           enabled: effectivePumpEnabled,
           times: times.length > 0 ? times : [...DEFAULT_PUMP_TIMES],
-          amountMl,
           timezone: pumpTimezone,
           mode: reminderMode === "schedule" ? "fixed" : pumpMode,
           intervalHours:
@@ -788,33 +776,6 @@ export function ReminderSettingsView({
   const handleRemovePumpTime = (time: string) => {
     setPumpTimes(pumpTimes.filter((t) => t !== time));
   };
-
-  const handleDownloadCalendar = () => {
-    const times =
-      reminderMode === "schedule"
-        ? normalizePumpTimes(
-            scheduleSlots
-              .filter((s) => s.kind === "pump")
-              .map((s) => s.time)
-          )
-        : normalizePumpTimes(pumpTimes);
-    if (times.length === 0) {
-      setError(t("pumpTimesRequired"));
-      return;
-    }
-    const amountMl = parseFloat(pumpAmount);
-    downloadPumpScheduleIcs(
-      {
-        times,
-        amountMl: isNaN(amountMl) ? DEFAULT_PUMP_AMOUNT_ML : amountMl,
-        timezone: pumpTimezone,
-      },
-      { babyName }
-    );
-    setMessage(t("pumpCalendarDownloaded"));
-  };
-
-  const scheduleHasPump = scheduleSlots.some((s) => s.kind === "pump");
 
   return (
     <div className="p-4">
@@ -963,28 +924,6 @@ export function ReminderSettingsView({
               </select>
             </div>
           )}
-
-          {deliveryMode === "notifications" && scheduleHasPump && (
-            <div className="bg-surface border border-border rounded-2xl p-4 card-shadow mb-4">
-              <label className="label-field">{t("pumpDefaultAmount")}</label>
-              <input
-                type="number"
-                min="0"
-                max="1000"
-                step="10"
-                value={pumpAmount}
-                onChange={(e) => setPumpAmount(e.target.value)}
-                className="input-field mb-3"
-              />
-              <button
-                type="button"
-                onClick={handleDownloadCalendar}
-                className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
-              >
-                {t("addPumpAlarmsToCalendar")}
-              </button>
-            </div>
-          )}
         </>
       ) : (
         <>
@@ -1094,23 +1033,6 @@ export function ReminderSettingsView({
             />
             {pumpEnabled && (
               <>
-                {deliveryMode === "notifications" && (
-                  <>
-                    <label className="label-field">
-                      {t("pumpDefaultAmount")}
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="1000"
-                      step="10"
-                      value={pumpAmount}
-                      onChange={(e) => setPumpAmount(e.target.value)}
-                      className="input-field mb-3"
-                    />
-                  </>
-                )}
-
                 <p className="text-xs font-medium text-muted mb-2">
                   {t("pumpReminderMode")}
                 </p>
@@ -1170,9 +1092,7 @@ export function ReminderSettingsView({
                         </button>
                       ))}
                     </div>
-                    <div
-                      className={`flex gap-2 min-w-0 ${deliveryMode === "notifications" ? "mb-3" : ""}`}
-                    >
+                    <div className="flex gap-2 min-w-0">
                       <input
                         type="time"
                         value={newPumpTime}
@@ -1188,15 +1108,6 @@ export function ReminderSettingsView({
                         {t("add")}
                       </button>
                     </div>
-                    {deliveryMode === "notifications" && (
-                      <button
-                        type="button"
-                        onClick={handleDownloadCalendar}
-                        className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-primary"
-                      >
-                        {t("addPumpAlarmsToCalendar")}
-                      </button>
-                    )}
                   </>
                 )}
               </>

@@ -193,7 +193,6 @@ export function SettingsTab({
       <ReminderSettingsView
         secretLink={secretLink}
         selectedCaregiver={selectedCaregiver}
-        babyName={babyName}
         feedIntervalHours={feedIntervalHours}
         nightFeedIntervalEnabled={nightFeedIntervalEnabled}
         nightFeedIntervalHours={nightFeedIntervalHours}

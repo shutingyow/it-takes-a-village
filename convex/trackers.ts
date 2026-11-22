@@ -580,7 +580,11 @@ export const updateReminderSettings = mutation({
       updates.pumpSchedule = {
         enabled: args.pumpSchedule.enabled,
         times: times.length > 0 ? times : [...DEFAULT_PUMP_TIMES],
-        amountMl: amountMl ?? DEFAULT_PUMP_AMOUNT_ML,
+        // Preserve stored amount when callers omit it (reminder settings no longer edits this).
+        amountMl:
+          amountMl ??
+          tracker.pumpSchedule?.amountMl ??
+          DEFAULT_PUMP_AMOUNT_ML,
         timezone: args.pumpSchedule.timezone?.trim() || DEFAULT_PUMP_TIMEZONE,
         mode: effectiveMode === "schedule" ? "fixed" : mode,
         intervalHours,
