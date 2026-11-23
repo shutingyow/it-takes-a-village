@@ -125,7 +125,7 @@ export function SettingsTab({
   const { isAuthenticated } = useConvexAuth();
   const { signIn, signOut } = useAuthActions();
   const [view, setView] = useState<SettingsView>("menu");
-  const [shareCopied, setShareCopied] = useState(false);
+  const [shareCopiedName, setShareCopiedName] = useState<string | null>(null);
   const trackerUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/tracker/${secretLink}`
@@ -220,7 +220,7 @@ export function SettingsTab({
 
   if (view === "share" && isAdmin) {
     const invitees = caregivers.filter((c) => c.role !== "admin");
-    const copyText = async (value: string) => {
+    const copyText = async (value: string, caregiverName: string) => {
       try {
         await navigator.clipboard.writeText(value);
       } catch {
@@ -231,8 +231,8 @@ export function SettingsTab({
         document.execCommand("copy");
         document.body.removeChild(input);
       }
-      setShareCopied(true);
-      window.setTimeout(() => setShareCopied(false), 2000);
+      setShareCopiedName(caregiverName);
+      window.setTimeout(() => setShareCopiedName(null), 2000);
     };
 
     return (
@@ -278,11 +278,13 @@ export function SettingsTab({
                   </p>
                   <button
                     type="button"
-                    onClick={() => void copyText(url)}
+                    onClick={() => void copyText(url, c.name)}
                     className="btn-primary w-full text-sm"
                     disabled={!c.inviteToken}
                   >
-                    {shareCopied ? t("copied") : t("copyCaregiverInvite")}
+                    {shareCopiedName === c.name
+                      ? t("copied")
+                      : t("copyCaregiverInvite")}
                   </button>
                 </div>
               );
