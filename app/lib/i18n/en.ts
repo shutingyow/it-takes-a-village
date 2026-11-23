@@ -22,10 +22,7 @@ export const translations = {
   somethingElse: "Something else?",
   backToChoices: "← Back",
   openExistingTitle: "Paste your personal invite",
-  openExistingHint:
-    "Paste the invite link the parent sent you (it has your name locked in). This device will remember it.",
   openExistingPlaceholder: "https://…/tracker/…?invite=…",
-  openExistingAdvancedHint: "Ask for your own invite — not the shared village link.",
   openExistingButton: "Open village",
   openExistingInvalid:
     "That doesn’t look like a tracker link. Paste the full URL they shared.",

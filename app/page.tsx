@@ -416,12 +416,9 @@ export default function Home() {
           {t("backToChoices")}
         </button>
       )}
-      <div>
-        <h2 className="text-sm font-semibold text-foreground">
-          {t("openExistingTitle")}
-        </h2>
-        <p className="text-sm text-muted mt-1">{t("openExistingHint")}</p>
-      </div>
+      <h2 className="text-sm font-semibold text-foreground">
+        {t("openExistingTitle")}
+      </h2>
       <input
         type="text"
         value={openLinkInput}
@@ -439,7 +436,6 @@ export default function Home() {
         className="input-field font-mono text-sm"
         disabled={isOpening}
       />
-      <p className="text-xs text-muted">{t("openExistingAdvancedHint")}</p>
       <button
         type="button"
         onClick={handleOpenExisting}
