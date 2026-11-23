@@ -38,6 +38,8 @@ interface CaregiverLockScreenProps {
   ownedVillages?: OwnedVillageSummary[];
   ownedVillagesLoading?: boolean;
   onOpenOwnedVillage?: (secretLink: string) => void;
+  /** Prefer over raw `/` so callers can clear a bare lastVisited pin first. */
+  onGoHome?: () => void;
 }
 
 export function CaregiverLockScreen({
@@ -53,12 +55,25 @@ export function CaregiverLockScreen({
   ownedVillages = [],
   ownedVillagesLoading = false,
   onOpenOwnedVillage,
+  onGoHome,
 }: CaregiverLockScreenProps) {
   const { t } = useLanguage();
   const { isAuthenticated } = useConvexAuth();
   const { signOut } = useAuthActions();
   const [selected, setSelected] = useState("");
   const [signingOut, setSigningOut] = useState(false);
+
+  const goHomeClass =
+    "block w-full text-center rounded-xl border border-border bg-surface text-sm font-semibold py-3 text-foreground";
+  const goHomeLink = onGoHome ? (
+    <button type="button" onClick={onGoHome} className={goHomeClass}>
+      {t("goToHome")}
+    </button>
+  ) : (
+    <Link href="/" className={goHomeClass}>
+      {t("goToHome")}
+    </Link>
+  );
 
   const selectable = useMemo(() => {
     if (viewerIsOwner) return ownerLoggingCaregivers(caregivers);
@@ -117,12 +132,7 @@ export function CaregiverLockScreen({
                   </button>
                 ))
               ) : null}
-              <Link
-                href="/"
-                className="block w-full text-center rounded-xl border border-border bg-surface text-sm font-semibold py-3 text-foreground"
-              >
-                {t("goToHome")}
-              </Link>
+              {goHomeLink}
               <button
                 type="button"
                 onClick={() => void handleSignOut()}
@@ -133,14 +143,23 @@ export function CaregiverLockScreen({
               </button>
             </div>
           )}
-          {!isAuthenticated && (
-            <Link
-              href="/"
-              className="block w-full text-center text-sm font-semibold text-primary py-2"
-            >
-              {t("goToHome")}
-            </Link>
-          )}
+          {!isAuthenticated &&
+            (onGoHome ? (
+              <button
+                type="button"
+                onClick={onGoHome}
+                className="block w-full text-center text-sm font-semibold text-primary py-2"
+              >
+                {t("goToHome")}
+              </button>
+            ) : (
+              <Link
+                href="/"
+                className="block w-full text-center text-sm font-semibold text-primary py-2"
+              >
+                {t("goToHome")}
+              </Link>
+            ))}
         </div>
       </div>
     );
@@ -209,12 +228,7 @@ export function CaregiverLockScreen({
                     })}
                   </button>
                 ))}
-                <Link
-                  href="/"
-                  className="block w-full text-center rounded-xl border border-border bg-surface text-sm font-semibold py-3 text-foreground"
-                >
-                  {t("goToHome")}
-                </Link>
+                {goHomeLink}
                 <button
                   type="button"
                   onClick={() => void handleSignOut()}

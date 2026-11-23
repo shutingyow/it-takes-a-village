@@ -109,6 +109,12 @@ export function saveLastVisitedTracker(
   localStorage.setItem(LAST_TRACKER_KEY, JSON.stringify(entry));
 }
 
+/** Drop the pin so `/` does not bounce back into a dead tracker URL. */
+export function clearLastVisitedTracker(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(LAST_TRACKER_KEY);
+}
+
 export function lockedCaregiverKey(secretLink: string): string {
   return `lockedCaregiver:${secretLink}`;
 }
@@ -141,6 +147,18 @@ export function getLockedCaregiver(secretLink: string): string | null {
 export function getSavedInviteToken(secretLink: string): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(inviteTokenKey(secretLink));
+}
+
+/**
+ * Invite for auto-enter: lastVisited.inviteToken, else per-secret invite storage.
+ * Bare village pins (no invite) are not usable after personal-invite gating.
+ */
+export function resolveLastVisitedInvite(
+  last?: LastVisitedTracker | null
+): string | undefined {
+  if (!last?.secretLink) return undefined;
+  if (last.inviteToken) return last.inviteToken;
+  return getSavedInviteToken(last.secretLink) || undefined;
 }
 
 /** @deprecated Use getLockedCaregiver */

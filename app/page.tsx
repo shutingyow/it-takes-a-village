@@ -12,8 +12,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { TrackerCreatedSuccess } from "@/app/components/TrackerCreatedSuccess";
 import {
+  clearLastVisitedTracker,
   getLastVisitedTracker,
   parseTrackerLinkInput,
+  resolveLastVisitedInvite,
   saveLastVisitedTracker,
   trackerPath,
 } from "@/app/lib/trackerStorage";
@@ -122,6 +124,8 @@ export default function Home() {
 
   // Landing is a transition: owners and returning caregivers go straight in.
   // Stay here only for first-time create, sign-in, or paste-a-link.
+  // Never auto-open a bare village secret — that hits personal-invite and loops
+  // via "Go to home". Caregivers need lastVisited (or stored) invite token.
   useEffect(() => {
     if (authLoading) return;
     if (createdTracker || shareUrl) return;
@@ -130,26 +134,51 @@ export default function Home() {
 
     if (isAuthenticated) {
       if (myVillages === undefined) return;
-      if (myVillages.length === 0) return;
-      const last = lastVisited?.secretLink;
-      const match = last
-        ? myVillages.find((v) => v.secretLink === last)
-        : undefined;
-      const target = match ?? myVillages[0]!;
-      router.replace(
-        trackerPath(
-          target.secretLink,
-          match ? lastVisited?.inviteToken : undefined
-        )
-      );
+      if (myVillages.length > 0) {
+        const last = lastVisited?.secretLink;
+        const match = last
+          ? myVillages.find((v) => v.secretLink === last)
+          : undefined;
+        const target = match ?? myVillages[0]!;
+        // Owners enter as admin via viewerIsOwner — do not carry a guest invite.
+        router.replace(trackerPath(target.secretLink));
+        return;
+      }
+      // Signed in, no owned village: caregiver return path with invite only.
+      const invite = resolveLastVisitedInvite(lastVisited);
+      if (lastVisited && invite) {
+        if (savedTracker === undefined) return;
+        if (savedTracker === null) {
+          clearLastVisitedTracker();
+          setLastVisited(null);
+          return;
+        }
+        router.replace(trackerPath(lastVisited.secretLink, invite));
+        return;
+      }
+      if (lastVisited) {
+        clearLastVisitedTracker();
+        setLastVisited(null);
+      }
       return;
     }
 
-    if (!lastVisited || savedTracker === undefined) return;
-    if (savedTracker === null) return;
-    router.replace(
-      trackerPath(lastVisited.secretLink, lastVisited.inviteToken)
-    );
+    // Guest / caregiver: only auto-enter when we have a personal invite.
+    const invite = resolveLastVisitedInvite(lastVisited);
+    if (!lastVisited || !invite) {
+      if (lastVisited && !invite) {
+        clearLastVisitedTracker();
+        setLastVisited(null);
+      }
+      return;
+    }
+    if (savedTracker === undefined) return;
+    if (savedTracker === null) {
+      clearLastVisitedTracker();
+      setLastVisited(null);
+      return;
+    }
+    router.replace(trackerPath(lastVisited.secretLink, invite));
   }, [
     authLoading,
     createdTracker,
@@ -331,8 +360,12 @@ export default function Home() {
     );
   }
 
+  const guestInvite = resolveLastVisitedInvite(lastVisited);
   const canContinue =
-    !!lastVisited && savedTracker !== undefined && savedTracker !== null;
+    !!lastVisited &&
+    !!guestInvite &&
+    savedTracker !== undefined &&
+    savedTracker !== null;
 
   const isOpening = pendingOpenSecret !== null;
 
@@ -346,6 +379,11 @@ export default function Home() {
       myVillages !== undefined &&
       myVillages.length > 0 &&
       !showCreateForm) ||
+      (isAuthenticated &&
+        myVillages !== undefined &&
+        myVillages.length === 0 &&
+        canContinue &&
+        !showCreateForm) ||
       (!isAuthenticated && canContinue));
 
   const handleOpenExisting = () => {
@@ -631,7 +669,7 @@ export default function Home() {
           ) : isAuthenticated &&
             myVillages !== undefined &&
             myVillages.length === 0 ? (
-            /* First-time parent: create the village, then enter. */
+            /* First-time parent create, or signed-in caregiver paste invite. */
             <>
               <p className="text-sm text-muted text-center">
                 {t("myVillagesEmpty")}
@@ -647,6 +685,7 @@ export default function Home() {
                   {t("createVillageTitle")}
                 </button>
               )}
+              {!showCreateForm && renderCaregiverPaste()}
             </>
           ) : joinPath === "caregiver" ? (
             renderCaregiverPaste()

@@ -31,8 +31,10 @@ import { SleepModal } from "@/app/components/modals/SleepModal";
 import { MomentModal } from "@/app/components/modals/MomentModal";
 import { IconLink } from "@/app/components/icons";
 import {
+  clearLastVisitedTracker,
   clearLockedCaregiver,
   getLockedCaregiver,
+  getLastVisitedTracker,
   getSavedInviteToken,
   ownerLoggingCaregivers,
   setLockedCaregiver as saveLockedCaregiver,
@@ -79,7 +81,7 @@ function TrackerPageInner({
   const router = useRouter();
   const searchParams = useSearchParams();
   const appShell = useAppShell();
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const [activeTab, setActiveTab] = useState<TrackerTab>("home");
   /** Bump to remount a tab and clear nested sub-views (re-tap home behavior). */
   const [tabRootKeys, setTabRootKeys] = useState({
@@ -131,9 +133,11 @@ function TrackerPageInner({
       cancelled = true;
     };
   }, [secretLink, ensureMigrated]);
+  // Wait for ConvexAuth so viewerIsOwner is correct on first hydrate (owners
+  // must never flash / stick on "personal invite required").
   const tracker = useQuery(
     api.trackers.getBySecret,
-    inviteReady ? { secretLink, inviteToken } : "skip"
+    inviteReady && !authLoading ? { secretLink, inviteToken } : "skip"
   );
   const myVillages = useQuery(
     api.trackers.listMine,
@@ -162,7 +166,7 @@ function TrackerPageInner({
     // Don't pin a foreign village as "last visited" for signed-in parents who
     // already own a village — that recreates the Who-are-you loop after launch.
     // Caregivers (signed-in or not) with no owned villages should keep the pin
-    // so home can show “Open {baby}” like the admin path.
+    // so home can reopen with their personal invite.
     if (!tracker) return;
     if (
       isAuthenticated &&
@@ -182,20 +186,34 @@ function TrackerPageInner({
     ) {
       return;
     }
-    saveLastVisitedTracker(
-      secretLink,
-      tracker.babyName,
-      inviteToken ?? getSavedInviteToken(secretLink)
-    );
+    const resolvedInvite =
+      inviteToken ?? getSavedInviteToken(secretLink) ?? undefined;
+    // Bare village secret for a non-owner → do not pin (home ↔ invite loop).
+    if (!tracker.viewerIsOwner && !resolvedInvite) {
+      const last = getLastVisitedTracker();
+      if (last?.secretLink === secretLink && !last.inviteToken) {
+        clearLastVisitedTracker();
+      }
+      return;
+    }
+    saveLastVisitedTracker(secretLink, tracker.babyName, resolvedInvite);
   }, [secretLink, tracker, isAuthenticated, myVillages, inviteToken]);
 
   useEffect(() => {
     setHydrated(false);
   }, [secretLink]);
 
+  // listMine as defense-in-depth if getBySecret ever lags ownerUserId.
+  const ownsThisVillage =
+    Boolean(tracker?.viewerIsOwner) ||
+    Boolean(myVillages?.some((v) => v.secretLink === secretLink));
+
   useEffect(() => {
-    // Still waiting for Convex — keep loading spinner.
-    if (tracker === undefined) return;
+    // Still waiting for Convex / auth — keep loading spinner.
+    if (authLoading || tracker === undefined) return;
+    // Authenticated: wait for listMine before locking non-owner/invite paths so
+    // owners never hydrate into needsPersonalInvite.
+    if (isAuthenticated && myVillages === undefined) return;
     // Missing / invalid secret: mark hydrated so "not found" can render.
     // Depend on `tracker` itself — `tracker?._id` stays undefined for both
     // undefined and null, so the effect would never re-run on "not found".
@@ -206,9 +224,12 @@ function TrackerPageInner({
       return;
     }
 
+    const isOwner =
+      tracker.viewerIsOwner ||
+      Boolean(myVillages?.some((v) => v.secretLink === secretLink));
     const invitedName = tracker.inviteCaregiverName;
     // Personal invite → lock to that caregiver only (no picker).
-    if (invitedName && !tracker.viewerIsOwner) {
+    if (invitedName && !isOwner) {
       setLockedCaregiver(invitedName);
       saveLockedCaregiver(secretLink, invitedName, inviteToken);
       saveLastVisitedTracker(secretLink, tracker.babyName, inviteToken);
@@ -219,16 +240,12 @@ function TrackerPageInner({
 
     const saved = getLockedCaregiver(secretLink);
     // SSO owner → admin logging identity only (not the full caregiver list).
-    const selectable = tracker.viewerIsOwner
+    const selectable = isOwner
       ? ownerLoggingCaregivers(tracker.caregivers)
       : [];
     const validNames = selectable.map((c) => c.name);
     // Owner with a single admin name: skip the pick screen entirely.
-    if (
-      tracker.viewerIsOwner &&
-      selectable.length === 1 &&
-      selectable[0]
-    ) {
+    if (isOwner && selectable.length === 1 && selectable[0]) {
       const only = selectable[0].name;
       setLockedCaregiver(only);
       saveLockedCaregiver(secretLink, only);
@@ -236,10 +253,10 @@ function TrackerPageInner({
       setHydrated(true);
       return;
     }
-    if (tracker.viewerIsOwner && saved && validNames.includes(saved)) {
+    if (isOwner && saved && validNames.includes(saved)) {
       setLockedCaregiver(saved);
       setNeedsPick(false);
-    } else if (tracker.viewerIsOwner) {
+    } else if (isOwner) {
       if (saved) clearLockedCaregiver(secretLink);
       setLockedCaregiver(null);
       setNeedsPick(true);
@@ -248,9 +265,21 @@ function TrackerPageInner({
       if (saved) clearLockedCaregiver(secretLink);
       setLockedCaregiver(null);
       setNeedsPick(true);
+      // Bare pin would send "Go to home" straight back here.
+      const last = getLastVisitedTracker();
+      if (last?.secretLink === secretLink && !inviteToken) {
+        clearLastVisitedTracker();
+      }
     }
     setHydrated(true);
-  }, [secretLink, tracker, inviteToken]);
+  }, [
+    secretLink,
+    tracker,
+    inviteToken,
+    authLoading,
+    isAuthenticated,
+    myVillages,
+  ]);
 
   useEffect(() => {
     if (activeTab !== "profile") setProfileOpenView(null);
@@ -298,9 +327,9 @@ function TrackerPageInner({
   }, [activeTab]);
 
   // Signed in on someone else's link → go to your village (or home if several).
-  // Caregivers with no owned villages stay on the shared link.
+  // Caregivers with no owned villages stay on the shared / invite link.
   useEffect(() => {
-    if (!isAuthenticated || !tracker || tracker.viewerIsOwner) return;
+    if (authLoading || !isAuthenticated || !tracker || ownsThisVillage) return;
     if (tracker.ownerUserId === undefined) return; // claimable — stay
     if (myVillages === undefined) return; // still loading
     if (myVillages.length === 0) return;
@@ -308,7 +337,28 @@ function TrackerPageInner({
       myVillages.find((v) => v.secretLink === secretLink) ?? myVillages[0]!;
     if (mine.secretLink === secretLink) return;
     router.replace(`/tracker/${mine.secretLink}`);
-  }, [isAuthenticated, tracker, myVillages, secretLink, router]);
+  }, [
+    authLoading,
+    isAuthenticated,
+    tracker,
+    ownsThisVillage,
+    myVillages,
+    secretLink,
+    router,
+  ]);
+
+  const handleGoHome = () => {
+    // Prevent home → lastVisited → personal-invite bounce for bare secrets.
+    if (!ownsThisVillage && !inviteToken) {
+      clearLastVisitedTracker();
+    } else {
+      const last = getLastVisitedTracker();
+      if (last?.secretLink === secretLink && !last.inviteToken && !inviteToken) {
+        clearLastVisitedTracker();
+      }
+    }
+    router.replace("/");
+  };
 
   const handleViewAllHistory = () => {
     setProfileOpenView("history");
@@ -351,7 +401,10 @@ function TrackerPageInner({
   };
 
   const canClaim =
-    isAuthenticated && tracker != null && tracker.ownerUserId === undefined;
+    isAuthenticated &&
+    tracker != null &&
+    tracker.ownerUserId === undefined &&
+    !ownsThisVillage;
 
   const handleLogSelect = (type: LogType) => {
     setShowLogSheet(false);
@@ -384,7 +437,7 @@ function TrackerPageInner({
     (c) => c.name === lockedCaregiver
   );
 
-  if (tracker === undefined || !hydrated) {
+  if (authLoading || tracker === undefined || !hydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -449,10 +502,10 @@ function TrackerPageInner({
       <div className="min-h-screen flex flex-col bg-background safe-top">
         <CaregiverLockScreen
           caregivers={tracker.caregivers}
-          viewerIsOwner={tracker.viewerIsOwner}
+          viewerIsOwner={ownsThisVillage}
           inviteCaregiverName={tracker.inviteCaregiverName}
           needsPersonalInvite={
-            !tracker.viewerIsOwner && !tracker.inviteCaregiverName
+            !ownsThisVillage && !tracker.inviteCaregiverName
           }
           canClaim={canClaim}
           claiming={claiming}
@@ -462,6 +515,7 @@ function TrackerPageInner({
           ownedVillages={ownedVillages}
           ownedVillagesLoading={ownedVillagesLoading}
           onOpenOwnedVillage={(link) => router.replace(`/tracker/${link}`)}
+          onGoHome={handleGoHome}
         />
       </div>
     );
@@ -552,7 +606,7 @@ function TrackerPageInner({
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
             timezone={tracker.timezone}
-            canEditBirthDate={tracker.viewerIsOwner}
+            canEditBirthDate={ownsThisVillage}
             range="daily"
           />
         )}
@@ -564,7 +618,7 @@ function TrackerPageInner({
             secretLink={secretLink}
             selectedCaregiver={lockedCaregiver}
             timezone={tracker.timezone}
-            canEditBirthDate={tracker.viewerIsOwner}
+            canEditBirthDate={ownsThisVillage}
             range="weekly"
           />
         )}
@@ -576,7 +630,7 @@ function TrackerPageInner({
             openView={profileOpenView}
             birthDate={tracker.birthDate}
             sex={tracker.sex}
-            viewerIsOwner={tracker.viewerIsOwner}
+            viewerIsOwner={ownsThisVillage}
           />
         )}
         {activeTab === "settings" && (
@@ -599,7 +653,7 @@ function TrackerPageInner({
             reminderMode={tracker.reminderMode}
             reminderSchedule={tracker.reminderSchedule}
             pumpSchedule={tracker.pumpSchedule}
-            viewerIsOwner={tracker.viewerIsOwner}
+            viewerIsOwner={ownsThisVillage}
             onScrollToTop={() =>
               mainRef.current?.scrollTo({ top: 0, behavior: "auto" })
             }
