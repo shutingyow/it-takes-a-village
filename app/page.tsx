@@ -75,7 +75,6 @@ export default function Home() {
   );
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [joinPath, setJoinPath] = useState<JoinPath>("choose");
-  const [showSomethingElse, setShowSomethingElse] = useState(false);
 
   useEffect(() => {
     setLastVisited(getLastVisitedTracker());
@@ -90,12 +89,11 @@ export default function Home() {
     return () => window.clearTimeout(id);
   }, [isBackendReady]);
 
-  // After SSO, land on parent manage/create; after sign-out, return to join chooser.
+  // After SSO, parent path (create if needed); after sign-out, join chooser.
   useEffect(() => {
     if (authLoading) return;
     if (isAuthenticated) {
       setJoinPath("parent");
-      setShowSomethingElse(false);
     } else {
       setJoinPath("choose");
     }
@@ -347,7 +345,6 @@ export default function Home() {
   const goBackToChoices = () => {
     setError(null);
     setJoinPath("choose");
-    setShowSomethingElse(false);
   };
 
   const pathChoiceButtonClass =
