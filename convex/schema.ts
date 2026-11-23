@@ -85,6 +85,8 @@ export default defineSchema({
         v.object({
           name: v.string(),
           role: v.union(v.literal("admin"), v.literal("caregiver")),
+          /** Personal invite secret for this caregiver’s link. */
+          inviteToken: v.optional(v.string()),
         })
       )
     ),

@@ -2,22 +2,24 @@ const LAST_TRACKER_KEY = "lastVisitedTracker";
 
 export type LastVisitedTracker = {
   secretLink: string;
+  /** Personal invite token for this device’s caregiver identity. */
+  inviteToken?: string;
   babyName?: string;
   visitedAt: number;
 };
 
+export type ParsedTrackerLink = {
+  secretLink: string;
+  inviteToken?: string;
+};
+
 /**
- * Accept a full tracker URL, a /tracker/... path, or just the path segment
- * after /tracker/ (unguessable id). IDs are nanoid(16) URL-safe strings.
+ * Accept a full tracker URL (with optional ?invite=), a /tracker/... path,
+ * or just the path segment after /tracker/ (unguessable id).
  */
-export function parseTrackerSecretInput(raw: string): string | null {
+export function parseTrackerLinkInput(raw: string): ParsedTrackerLink | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
-
-  const fromPath = trimmed.match(/\/tracker\/([A-Za-z0-9_-]+)/i);
-  if (fromPath?.[1]) {
-    return fromPath[1];
-  }
 
   try {
     const url = new URL(
@@ -26,17 +28,51 @@ export function parseTrackerSecretInput(raw: string): string | null {
     const parts = url.pathname.split("/").filter(Boolean);
     const trackerIdx = parts.findIndex((p) => p.toLowerCase() === "tracker");
     if (trackerIdx >= 0 && parts[trackerIdx + 1]) {
-      return parts[trackerIdx + 1];
+      const invite =
+        url.searchParams.get("invite")?.trim() ||
+        url.searchParams.get("cg")?.trim() ||
+        undefined;
+      return {
+        secretLink: parts[trackerIdx + 1]!,
+        inviteToken: invite || undefined,
+      };
     }
   } catch {
     // not a URL
   }
 
+  const fromPath = trimmed.match(
+    /\/tracker\/([A-Za-z0-9_-]+)(?:\?([^#]*))?/i
+  );
+  if (fromPath?.[1]) {
+    let invite: string | undefined;
+    if (fromPath[2]) {
+      const params = new URLSearchParams(fromPath[2]);
+      invite =
+        params.get("invite")?.trim() || params.get("cg")?.trim() || undefined;
+    }
+    return { secretLink: fromPath[1], inviteToken: invite };
+  }
+
   if (/^[A-Za-z0-9_-]{10,32}$/.test(trimmed)) {
-    return trimmed;
+    return { secretLink: trimmed };
   }
 
   return null;
+}
+
+/** @deprecated Prefer parseTrackerLinkInput — invite tokens are ignored. */
+export function parseTrackerSecretInput(raw: string): string | null {
+  return parseTrackerLinkInput(raw)?.secretLink ?? null;
+}
+
+export function trackerPath(
+  secretLink: string,
+  inviteToken?: string | null
+): string {
+  const base = `/tracker/${secretLink}`;
+  if (!inviteToken) return base;
+  return `${base}?invite=${encodeURIComponent(inviteToken)}`;
 }
 
 export function getLastVisitedTracker(): LastVisitedTracker | null {
@@ -54,19 +90,31 @@ export function getLastVisitedTracker(): LastVisitedTracker | null {
 
 export function saveLastVisitedTracker(
   secretLink: string,
-  babyName?: string
+  babyName?: string,
+  inviteToken?: string | null
 ): void {
   if (typeof window === "undefined") return;
+  const prev = getLastVisitedTracker();
   const entry: LastVisitedTracker = {
     secretLink,
     babyName,
     visitedAt: Date.now(),
+    inviteToken:
+      inviteToken !== undefined && inviteToken !== null
+        ? inviteToken || undefined
+        : prev?.secretLink === secretLink
+          ? prev.inviteToken
+          : undefined,
   };
   localStorage.setItem(LAST_TRACKER_KEY, JSON.stringify(entry));
 }
 
 export function lockedCaregiverKey(secretLink: string): string {
   return `lockedCaregiver:${secretLink}`;
+}
+
+function inviteTokenKey(secretLink: string): string {
+  return `inviteToken:${secretLink}`;
 }
 
 /** @deprecated Use lockedCaregiverKey */
@@ -90,14 +138,26 @@ export function getLockedCaregiver(secretLink: string): string | null {
   return null;
 }
 
+export function getSavedInviteToken(secretLink: string): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(inviteTokenKey(secretLink));
+}
+
 /** @deprecated Use getLockedCaregiver */
 export function getSavedCaregiver(secretLink: string): string | null {
   return getLockedCaregiver(secretLink);
 }
 
-export function setLockedCaregiver(secretLink: string, caregiver: string): void {
+export function setLockedCaregiver(
+  secretLink: string,
+  caregiver: string,
+  inviteToken?: string | null
+): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(lockedCaregiverKey(secretLink), caregiver);
+  if (inviteToken) {
+    localStorage.setItem(inviteTokenKey(secretLink), inviteToken);
+  }
 }
 
 /** @deprecated Use setLockedCaregiver */
@@ -109,11 +169,13 @@ export function clearLockedCaregiver(secretLink: string): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(lockedCaregiverKey(secretLink));
   localStorage.removeItem(`caregiver:${secretLink}`);
+  localStorage.removeItem(inviteTokenKey(secretLink));
 }
 
 export type CaregiverInfo = {
   name: string;
   role: "admin" | "caregiver";
+  inviteToken?: string;
 };
 
 export function isAdminCaregiver(
@@ -132,4 +194,17 @@ export function ownerLoggingCaregivers(
 ): CaregiverInfo[] {
   const admins = caregivers.filter((c) => c.role === "admin");
   return admins.length > 0 ? admins : caregivers.slice(0, 1);
+}
+
+export function caregiverInviteUrl(
+  secretLink: string,
+  inviteToken: string,
+  origin?: string
+): string {
+  const base =
+    origin ??
+    (typeof window !== "undefined"
+      ? window.location.origin
+      : "https://takesavillage.co");
+  return `${base}${trackerPath(secretLink, inviteToken)}`;
 }

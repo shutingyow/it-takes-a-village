@@ -9,6 +9,7 @@ import {
 } from "../HomeCategoryGrid";
 import { HomeCategoryDetail } from "../HomeCategoryDetail";
 import { DueSoonCard } from "../DueSoonCard";
+import { GetAppBanner } from "../GetAppBanner";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 
@@ -90,6 +91,10 @@ export function HomeTab({
         photoStorageId={photoStorageId}
         villageFallback={villageFallback}
       />
+
+      <div className="px-4 pt-2">
+        <GetAppBanner compact />
+      </div>
 
       <div className="flex-1 flex flex-col min-h-0">
         <HomeCategoryGrid

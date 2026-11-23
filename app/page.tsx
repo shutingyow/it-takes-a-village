@@ -13,8 +13,9 @@ import { useEffect, useState } from "react";
 import { TrackerCreatedSuccess } from "@/app/components/TrackerCreatedSuccess";
 import {
   getLastVisitedTracker,
-  parseTrackerSecretInput,
+  parseTrackerLinkInput,
   saveLastVisitedTracker,
+  trackerPath,
 } from "@/app/lib/trackerStorage";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { cn } from "@/app/lib/utils";
@@ -71,6 +72,9 @@ export default function Home() {
   > | null>(null);
   const [openLinkInput, setOpenLinkInput] = useState("");
   const [pendingOpenSecret, setPendingOpenSecret] = useState<string | null>(
+    null
+  );
+  const [pendingOpenInvite, setPendingOpenInvite] = useState<string | null>(
     null
   );
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -132,13 +136,20 @@ export default function Home() {
         ? myVillages.find((v) => v.secretLink === last)
         : undefined;
       const target = match ?? myVillages[0]!;
-      router.replace(`/tracker/${target.secretLink}`);
+      router.replace(
+        trackerPath(
+          target.secretLink,
+          match ? lastVisited?.inviteToken : undefined
+        )
+      );
       return;
     }
 
     if (!lastVisited || savedTracker === undefined) return;
     if (savedTracker === null) return;
-    router.replace(`/tracker/${lastVisited.secretLink}`);
+    router.replace(
+      trackerPath(lastVisited.secretLink, lastVisited.inviteToken)
+    );
   }, [
     authLoading,
     createdTracker,
@@ -159,23 +170,28 @@ export default function Home() {
     if (pendingOpenTracker === null) {
       setError(t("openExistingNotFound"));
       setPendingOpenSecret(null);
+      setPendingOpenInvite(null);
       return;
     }
 
     saveLastVisitedTracker(
       pendingOpenSecret,
-      pendingOpenTracker.babyName ?? undefined
+      pendingOpenTracker.babyName ?? undefined,
+      pendingOpenInvite
     );
     setLastVisited(
       getLastVisitedTracker() ?? {
         secretLink: pendingOpenSecret,
+        inviteToken: pendingOpenInvite ?? undefined,
         babyName: pendingOpenTracker.babyName ?? undefined,
         visitedAt: Date.now(),
       }
     );
+    const invite = pendingOpenInvite;
     setPendingOpenSecret(null);
-    router.push(`/tracker/${pendingOpenSecret}`);
-  }, [pendingOpenSecret, pendingOpenTracker, router, t]);
+    setPendingOpenInvite(null);
+    router.push(trackerPath(pendingOpenSecret, invite));
+  }, [pendingOpenSecret, pendingOpenInvite, pendingOpenTracker, router, t]);
 
   const addCaregiverRow = () => {
     setCaregivers((prev) => [...prev, { name: "", role: "caregiver" }]);
@@ -334,12 +350,13 @@ export default function Home() {
 
   const handleOpenExisting = () => {
     setError(null);
-    const secret = parseTrackerSecretInput(openLinkInput);
-    if (!secret) {
+    const parsed = parseTrackerLinkInput(openLinkInput);
+    if (!parsed) {
       setError(t("openExistingInvalid"));
       return;
     }
-    setPendingOpenSecret(secret);
+    setPendingOpenInvite(parsed.inviteToken ?? null);
+    setPendingOpenSecret(parsed.secretLink);
   };
 
   const goBackToChoices = () => {

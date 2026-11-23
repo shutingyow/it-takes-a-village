@@ -21,11 +21,11 @@ export const translations = {
   joinPathParentDesc: "Sign in to create and manage your village",
   somethingElse: "Something else?",
   backToChoices: "← Back",
-  openExistingTitle: "Paste the link they shared with you",
+  openExistingTitle: "Paste your personal invite",
   openExistingHint:
-    "Paste the full tracker link. This device will remember it.",
-  openExistingPlaceholder: "https://…/tracker/…",
-  openExistingAdvancedHint: "Or just the part after /tracker/",
+    "Paste the invite link the parent sent you (it has your name locked in). This device will remember it.",
+  openExistingPlaceholder: "https://…/tracker/…?invite=…",
+  openExistingAdvancedHint: "Ask for your own invite — not the shared village link.",
   openExistingButton: "Open village",
   openExistingInvalid:
     "That doesn’t look like a tracker link. Paste the full URL they shared.",
@@ -112,7 +112,17 @@ export const translations = {
   myVillages: "My villages",
   myVillagesEmpty: "No villages yet. Create one below.",
   shareVillage: "Share link & QR",
-  shareVillageSettingsDesc: "Invite caregivers with a link or QR code",
+  shareVillageSettingsDesc: "Send each caregiver their own invite link",
+  shareNoCaregiversYet: "Add caregivers first, then send each person their link.",
+  copyCaregiverInvite: "Copy their invite link",
+  personalInviteRequiredTitle: "Use your personal invite",
+  personalInviteRequiredHint:
+    "Ask the parent to send your invite link. Shared village links no longer let anyone pick a name.",
+  getAppTitle: "Get the iPhone app",
+  getAppHint:
+    "Reminders and lock-screen timers work best in the app from the App Store.",
+  getAppCta: "Open App Store",
+  getAppDismiss: "Not now",
   openVillage: "Open",
   openYourVillage: "Open {name}",
   createVillageTitle: "Create a new village",
@@ -123,9 +133,11 @@ export const translations = {
   trackerReady: "{name}'s village is ready!",
   trackerCreated: "Your village is ready!",
   shareWithCaregivers:
-    "Invite caregivers next — copy the link and text it to them so they can log without signing in.",
+    "Each caregiver gets their own link — they open as themselves only.",
+  shareAfterCreateHint:
+    "Next: Settings → Share link & QR — send each caregiver their own invite.",
   copyLink: "Copy link",
-  copyLinkAndText: "Copy link & text caregivers",
+  copyLinkAndText: "Copy invite link",
   copied: "Copied!",
   openTracker: "Open my village",
   openMyVillage: "Open my village",

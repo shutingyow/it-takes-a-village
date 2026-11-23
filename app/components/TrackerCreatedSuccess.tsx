@@ -64,7 +64,7 @@ export function TrackerCreatedSuccess({
               ? t("trackerReady", { name: babyName })
               : t("trackerCreated")}
           </h1>
-          <p className="text-muted text-sm">{t("shareWithCaregivers")}</p>
+          <p className="text-muted text-sm">{t("shareAfterCreateHint")}</p>
         </div>
 
         <div className="flex justify-center mb-6">

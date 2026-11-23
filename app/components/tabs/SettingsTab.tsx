@@ -219,12 +219,13 @@ export function SettingsTab({
   }
 
   if (view === "share" && isAdmin) {
-    const copyShareLink = async () => {
+    const invitees = caregivers.filter((c) => c.role !== "admin");
+    const copyText = async (value: string) => {
       try {
-        await navigator.clipboard.writeText(trackerUrl);
+        await navigator.clipboard.writeText(value);
       } catch {
         const input = document.createElement("input");
-        input.value = trackerUrl;
+        input.value = value;
         document.body.appendChild(input);
         input.select();
         document.execCommand("copy");
@@ -247,23 +248,47 @@ export function SettingsTab({
         <p className="text-sm text-muted mb-4 -mt-2">
           {t("shareWithCaregivers")}
         </p>
-        <div className="flex justify-center mb-4">
-          <div className="bg-white p-4 rounded-xl border border-border">
-            <QRCodeSVG
-              value={trackerUrl}
-              size={160}
-              bgColor="#ffffff"
-              fgColor="#2c2a28"
-              level="M"
-            />
+        {invitees.length === 0 ? (
+          <p className="text-sm text-muted">{t("shareNoCaregiversYet")}</p>
+        ) : (
+          <div className="space-y-4">
+            {invitees.map((c) => {
+              const url = c.inviteToken
+                ? `${typeof window !== "undefined" ? window.location.origin : "https://takesavillage.co"}/tracker/${secretLink}?invite=${encodeURIComponent(c.inviteToken)}`
+                : trackerUrl;
+              return (
+                <div
+                  key={c.name}
+                  className="rounded-2xl border border-border bg-surface p-4 card-shadow space-y-3"
+                >
+                  <p className="font-semibold text-foreground">{c.name}</p>
+                  <div className="flex justify-center">
+                    <div className="bg-white p-3 rounded-xl border border-border">
+                      <QRCodeSVG
+                        value={url}
+                        size={120}
+                        bgColor="#ffffff"
+                        fgColor="#2c2a28"
+                        level="M"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted break-all font-mono">
+                    {url}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void copyText(url)}
+                    className="btn-primary w-full text-sm"
+                    disabled={!c.inviteToken}
+                  >
+                    {shareCopied ? t("copied") : t("copyCaregiverInvite")}
+                  </button>
+                </div>
+              );
+            })}
           </div>
-        </div>
-        <div className="bg-primary-light/60 rounded-xl px-4 py-3 text-sm text-foreground break-all font-mono mb-3">
-          {trackerUrl}
-        </div>
-        <button type="button" onClick={() => void copyShareLink()} className="btn-primary w-full">
-          {shareCopied ? t("copied") : t("copyLinkAndText")}
-        </button>
+        )}
       </div>
     );
   }

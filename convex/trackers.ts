@@ -5,12 +5,15 @@ import { nanoid } from "nanoid";
 import {
   caregiverValidator,
   countAdmins,
+  ensureCaregiverInviteTokens,
+  findCaregiverByInvite,
   getCaregivers,
   getTrackerBySecret,
   migrateCaregiverNames,
   normalizeTrackerForClient,
   verifyAdmin,
   verifyCaregiver,
+  withInviteToken,
 } from "./lib/caregivers";
 import {
   DEFAULT_NIGHT_FEED_INTERVAL_HOURS,
@@ -105,6 +108,11 @@ const trackerClientValidator = v.object({
   ...trackerReturnValidator.fields,
   /** True when the signed-in user owns this village (SSO admin). */
   viewerIsOwner: v.boolean(),
+  /**
+   * When opening with ?invite=, the only caregiver this device may log as.
+   * Absent for owners / bare village links.
+   */
+  inviteCaregiverName: v.optional(v.string()),
 });
 
 // Create a new tracker with a unique secret link (signed-in admin only)
@@ -138,7 +146,9 @@ export const create = mutation({
     }
 
     const caregivers = args.caregivers
-      .map((c) => ({ name: c.name.trim(), role: c.role }))
+      .map((c) =>
+        withInviteToken({ name: c.name.trim(), role: c.role })
+      )
       .filter((c) => c.name.length > 0);
 
     if (caregivers.length === 0) {
@@ -147,7 +157,10 @@ export const create = mutation({
     // Creator is always the SSO owner. Ensure the first listed caregiver is
     // labeled admin for lock-screen display; real admin power is ownerUserId.
     if (countAdmins(caregivers) === 0 && caregivers[0]) {
-      caregivers[0] = { ...caregivers[0], role: "admin" };
+      caregivers[0] = withInviteToken({
+        ...caregivers[0],
+        role: "admin",
+      });
     }
 
     const secretLink = nanoid(16);
@@ -182,7 +195,7 @@ export const listMine = query({
       .collect();
 
     return mine
-      .map(normalizeTrackerForClient)
+      .map((tracker) => normalizeTrackerForClient(tracker))
       .sort((a, b) => b.createdAt - a.createdAt);
   },
 });
@@ -224,7 +237,7 @@ export const claim = mutation({
   },
 });
 
-// Migrate legacy caregiverNames to caregivers (idempotent)
+// Migrate legacy caregiverNames + backfill per-caregiver invite tokens
 export const ensureMigrated = mutation({
   args: {
     secretLink: v.string(),
@@ -234,24 +247,20 @@ export const ensureMigrated = mutation({
     const tracker = await getTrackerBySecret(ctx, args.secretLink);
     if (!tracker) return null;
 
-    if (tracker.caregivers && tracker.caregivers.length > 0) {
-      return null;
-    }
-
-    if (tracker.caregiverNames && tracker.caregiverNames.length > 0) {
-      await ctx.db.patch(tracker._id, {
-        caregivers: migrateCaregiverNames(tracker.caregiverNames),
-      });
+    const next = ensureCaregiverInviteTokens(tracker);
+    if (next) {
+      await ctx.db.patch(tracker._id, { caregivers: next });
     }
 
     return null;
   },
 });
 
-// Get tracker by secret link
+// Get tracker by secret link (+ optional personal invite token)
 export const getBySecret = query({
   args: {
     secretLink: v.string(),
+    inviteToken: v.optional(v.string()),
   },
   returns: v.union(trackerClientValidator, v.null()),
   handler: async (ctx, args) => {
@@ -261,9 +270,16 @@ export const getBySecret = query({
     const viewerIsOwner = Boolean(
       userId && tracker.ownerUserId !== undefined && tracker.ownerUserId === userId
     );
+    const caregivers = getCaregivers(tracker);
+    const inviteCaregiver = args.inviteToken
+      ? findCaregiverByInvite(caregivers, args.inviteToken)
+      : undefined;
     return {
-      ...normalizeTrackerForClient(tracker),
+      ...normalizeTrackerForClient(tracker, {
+        includeInviteTokens: viewerIsOwner,
+      }),
       viewerIsOwner,
+      inviteCaregiverName: inviteCaregiver?.name,
     };
   },
 });
@@ -342,7 +358,7 @@ export const addCaregiver = mutation({
 
     const role = args.role ?? "caregiver";
     await ctx.db.patch(tracker._id, {
-      caregivers: [...caregivers, { name, role }],
+      caregivers: [...caregivers, withInviteToken({ name, role })],
     });
     return null;
   },

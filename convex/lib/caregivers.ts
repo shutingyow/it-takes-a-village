@@ -1,5 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import { nanoid } from "nanoid";
 import type { Doc, Id, TableNames } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
@@ -13,12 +14,28 @@ export const caregiverRoleValidator = v.union(
 export const caregiverValidator = v.object({
   name: v.string(),
   role: caregiverRoleValidator,
+  /** Per-person invite secret. Required for caregiver links; backfilled on migrate. */
+  inviteToken: v.optional(v.string()),
 });
 
 export type Caregiver = {
   name: string;
   role: "admin" | "caregiver";
+  inviteToken?: string;
 };
+
+export function newInviteToken(): string {
+  return nanoid(16);
+}
+
+export function withInviteToken(
+  caregiver: Omit<Caregiver, "inviteToken"> & { inviteToken?: string }
+): Caregiver {
+  return {
+    ...caregiver,
+    inviteToken: caregiver.inviteToken?.trim() || newInviteToken(),
+  };
+}
 
 /**
  * Legacy name lists → caregivers. First name is admin; real admin power for
@@ -28,10 +45,12 @@ export function assignRoles(names: string[]): Caregiver[] {
   const trimmed = names.map((n) => n.trim()).filter(Boolean);
   if (trimmed.length === 0) return [];
 
-  return trimmed.map((name, index) => ({
-    name,
-    role: index === 0 ? "admin" : "caregiver",
-  }));
+  return trimmed.map((name, index) =>
+    withInviteToken({
+      name,
+      role: index === 0 ? "admin" : "caregiver",
+    })
+  );
 }
 
 export function migrateCaregiverNames(names: string[]): Caregiver[] {
@@ -48,12 +67,42 @@ export function getCaregivers(tracker: Doc<"trackers">): Caregiver[] {
   return [];
 }
 
+/** Ensure every caregiver row has an inviteToken; returns null if unchanged. */
+export function ensureCaregiverInviteTokens(
+  tracker: Doc<"trackers">
+): Caregiver[] | null {
+  const raw =
+    tracker.caregivers && tracker.caregivers.length > 0
+      ? tracker.caregivers
+      : tracker.caregiverNames && tracker.caregiverNames.length > 0
+        ? migrateCaregiverNames(tracker.caregiverNames)
+        : [];
+  if (raw.length === 0) return null;
+
+  let changed = !(tracker.caregivers && tracker.caregivers.length > 0);
+  const next = raw.map((c) => {
+    if (c.inviteToken && c.inviteToken.length > 0) return c;
+    changed = true;
+    return withInviteToken(c);
+  });
+  return changed ? next : null;
+}
+
 export function caregiverNames(caregivers: Caregiver[]): string[] {
   return caregivers.map((c) => c.name);
 }
 
 export function countAdmins(caregivers: Caregiver[]): number {
   return caregivers.filter((c) => c.role === "admin").length;
+}
+
+export function findCaregiverByInvite(
+  caregivers: Caregiver[],
+  inviteToken: string
+): Caregiver | undefined {
+  const token = inviteToken.trim();
+  if (!token) return undefined;
+  return caregivers.find((c) => c.inviteToken === token);
 }
 
 export async function getTrackerBySecret(
@@ -161,7 +210,15 @@ export async function verifyAdmin(
   return { tracker, caregivers };
 }
 
-export function normalizeTrackerForClient(tracker: Doc<"trackers">) {
+/** Public caregiver rows never include invite tokens. */
+export function publicCaregivers(caregivers: Caregiver[]): Caregiver[] {
+  return caregivers.map(({ name, role }) => ({ name, role }));
+}
+
+export function normalizeTrackerForClient(
+  tracker: Doc<"trackers">,
+  opts?: { includeInviteTokens?: boolean }
+) {
   const caregivers = getCaregivers(tracker);
   return {
     _id: tracker._id,
@@ -173,7 +230,9 @@ export function normalizeTrackerForClient(tracker: Doc<"trackers">) {
     sex: tracker.sex,
     photoStorageId: tracker.photoStorageId,
     timezone: tracker.timezone,
-    caregivers,
+    caregivers: opts?.includeInviteTokens
+      ? caregivers
+      : publicCaregivers(caregivers),
     feedIntervalHours: tracker.feedIntervalHours,
     nightFeedIntervalEnabled: tracker.nightFeedIntervalEnabled,
     nightFeedIntervalHours: tracker.nightFeedIntervalHours,

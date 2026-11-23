@@ -10,8 +10,7 @@ import {
   ownerLoggingCaregivers,
   type CaregiverInfo,
 } from "../lib/trackerStorage";
-import { signInWithOAuth } from "../lib/oauthSignIn";
-import { EmailPasswordForm } from "./EmailPasswordForm";
+import { GetAppBanner } from "./GetAppBanner";
 import { IconUser } from "./icons";
 
 export type OwnedVillageSummary = {
@@ -22,16 +21,21 @@ export type OwnedVillageSummary = {
 interface CaregiverLockScreenProps {
   caregivers: CaregiverInfo[];
   onConfirm: (name: string) => void;
-  /** Village owner (SSO) locks to admin name(s) only; caregivers cannot pick admin. */
+  /** Village owner (SSO) locks to admin name(s) only. */
   viewerIsOwner?: boolean;
+  /**
+   * Personal invite resolved from ?invite= — only this name may log.
+   * When set for a guest, skip the picker entirely (parent auto-confirms).
+   */
+  inviteCaregiverName?: string | null;
+  /** Bare village link with no valid invite and not the owner. */
+  needsPersonalInvite?: boolean;
   /** Village has no owner yet — signed-in user can claim it. */
   canClaim?: boolean;
   claiming?: boolean;
   claimError?: string | null;
   onClaim?: () => void;
-  /** Villages owned by the signed-in user (for escape hatch when this link isn’t theirs). */
   ownedVillages?: OwnedVillageSummary[];
-  /** True while listMine is still loading. */
   ownedVillagesLoading?: boolean;
   onOpenOwnedVillage?: (secretLink: string) => void;
 }
@@ -40,6 +44,8 @@ export function CaregiverLockScreen({
   caregivers,
   onConfirm,
   viewerIsOwner = false,
+  inviteCaregiverName = null,
+  needsPersonalInvite = false,
   canClaim = false,
   claiming = false,
   claimError = null,
@@ -50,24 +56,17 @@ export function CaregiverLockScreen({
 }: CaregiverLockScreenProps) {
   const { t } = useLanguage();
   const { isAuthenticated } = useConvexAuth();
-  const { signIn, signOut } = useAuthActions();
+  const { signOut } = useAuthActions();
   const [selected, setSelected] = useState("");
-  const [authBusy, setAuthBusy] = useState<"apple" | "google" | null>(null);
   const [signingOut, setSigningOut] = useState(false);
 
   const selectable = useMemo(() => {
     if (viewerIsOwner) return ownerLoggingCaregivers(caregivers);
-    return caregivers.filter((c) => c.role !== "admin");
-  }, [caregivers, viewerIsOwner]);
-
-  const handleSignIn = async (provider: "apple" | "google") => {
-    setAuthBusy(provider);
-    try {
-      await signInWithOAuth(signIn, provider);
-    } finally {
-      setAuthBusy(null);
+    if (inviteCaregiverName) {
+      return caregivers.filter((c) => c.name === inviteCaregiverName);
     }
-  };
+    return [];
+  }, [caregivers, viewerIsOwner, inviteCaregiverName]);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -80,6 +79,72 @@ export function CaregiverLockScreen({
 
   const villageLabel = (babyName?: string) =>
     babyName?.trim() || t("yourTracker");
+
+  // Guest opened the village secret without a personal invite.
+  if (needsPersonalInvite && !viewerIsOwner) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background p-3 sm:p-4 overflow-y-auto">
+        <div className="max-w-sm w-full min-w-0 bg-surface rounded-2xl card-shadow p-5 sm:p-8 border border-border my-auto space-y-4">
+          <div className="text-center">
+            <div className="w-14 h-14 rounded-xl bg-primary-light flex items-center justify-center mx-auto mb-4 text-primary">
+              <IconUser size={28} />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-foreground mb-2">
+              {t("personalInviteRequiredTitle")}
+            </h1>
+            <p className="text-sm text-muted leading-snug">
+              {t("personalInviteRequiredHint")}
+            </p>
+          </div>
+          <GetAppBanner />
+          {isAuthenticated && (
+            <div className="space-y-2 pt-1">
+              {ownedVillagesLoading ? (
+                <p className="text-xs text-muted text-center">
+                  {t("findingYourVillage")}
+                </p>
+              ) : ownedVillages.length > 0 ? (
+                ownedVillages.map((village) => (
+                  <button
+                    key={village.secretLink}
+                    type="button"
+                    onClick={() => onOpenOwnedVillage?.(village.secretLink)}
+                    className="btn-primary text-sm py-3"
+                  >
+                    {t("openYourVillage", {
+                      name: villageLabel(village.babyName),
+                    })}
+                  </button>
+                ))
+              ) : null}
+              <Link
+                href="/"
+                className="block w-full text-center rounded-xl border border-border bg-surface text-sm font-semibold py-3 text-foreground"
+              >
+                {t("goToHome")}
+              </Link>
+              <button
+                type="button"
+                onClick={() => void handleSignOut()}
+                disabled={signingOut}
+                className="w-full text-xs font-semibold text-muted py-1 disabled:opacity-50"
+              >
+                {t("signOut")}
+              </button>
+            </div>
+          )}
+          {!isAuthenticated && (
+            <Link
+              href="/"
+              className="block w-full text-center text-sm font-semibold text-primary py-2"
+            >
+              {t("goToHome")}
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background p-3 sm:p-4 overflow-y-auto">
@@ -94,50 +159,19 @@ export function CaregiverLockScreen({
           <p className="text-sm text-muted">{t("pickCaregiver")}</p>
         </div>
 
-        {/* Parent path: sign in / claim before admin name appears */}
-        {!viewerIsOwner && (
+        {viewerIsOwner && (
+          <p className="text-xs text-primary font-medium mb-3 text-center">
+            {t("parentOwnerReady")}
+          </p>
+        )}
+
+        {/* Signed-in but not owner of this link — escape hatch */}
+        {isAuthenticated && !viewerIsOwner && (
           <div className="mb-5 rounded-xl border border-border bg-background/70 p-3 space-y-2">
             <p className="text-sm font-semibold text-foreground">
-              {isAuthenticated
-                ? t("parentUnlockTitleSignedIn")
-                : t("parentUnlockTitle")}
+              {t("parentUnlockTitleSignedIn")}
             </p>
-            {!isAuthenticated ? (
-              <div className="space-y-3 pt-1">
-                <p className="text-xs text-muted leading-snug">
-                  {t("parentUnlockHint")}
-                </p>
-                <EmailPasswordForm
-                  disabled={authBusy !== null}
-                  defaultFlow="signUp"
-                />
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs text-muted">{t("orContinueWith")}</span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-                <button
-                  type="button"
-                  disabled={authBusy !== null}
-                  onClick={() => void handleSignIn("apple")}
-                  className="w-full rounded-xl bg-[#111] text-white text-sm font-semibold py-3 disabled:opacity-50"
-                >
-                  {authBusy === "apple"
-                    ? t("signingIn")
-                    : t("signInWithApple")}
-                </button>
-                <button
-                  type="button"
-                  disabled={authBusy !== null}
-                  onClick={() => void handleSignIn("google")}
-                  className="w-full rounded-xl border border-border bg-surface text-sm font-semibold py-3 text-foreground disabled:opacity-50"
-                >
-                  {authBusy === "google"
-                    ? t("signingIn")
-                    : t("signInWithGoogle")}
-                </button>
-              </div>
-            ) : canClaim && onClaim ? (
+            {canClaim && onClaim ? (
               <div className="space-y-2 pt-1">
                 <p className="text-xs text-foreground">{t("claimVillageHint")}</p>
                 {claimError && (
@@ -194,18 +228,12 @@ export function CaregiverLockScreen({
           </div>
         )}
 
-        {viewerIsOwner && (
-          <p className="text-xs text-primary font-medium mb-3 text-center">
-            {t("parentOwnerReady")}
-          </p>
-        )}
-
         <div className="space-y-2 mb-6">
           {selectable.length === 0 ? (
             <p className="text-sm text-muted text-center py-4">
               {viewerIsOwner
                 ? t("noCaregiverNamesYet")
-                : t("adminPickLockedHint")}
+                : t("personalInviteRequiredHint")}
             </p>
           ) : (
             selectable.map((caregiver) => (

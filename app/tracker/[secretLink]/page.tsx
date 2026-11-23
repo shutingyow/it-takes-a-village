@@ -33,9 +33,11 @@ import { IconLink } from "@/app/components/icons";
 import {
   clearLockedCaregiver,
   getLockedCaregiver,
+  getSavedInviteToken,
   ownerLoggingCaregivers,
   setLockedCaregiver as saveLockedCaregiver,
   saveLastVisitedTracker,
+  trackerPath,
   type CaregiverInfo,
 } from "@/app/lib/trackerStorage";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
@@ -107,7 +109,32 @@ function TrackerPageInner({
   const ensureMigrated = useMutation(api.trackers.ensureMigrated);
   const claimTracker = useMutation(api.trackers.claim);
   useSyncActiveFeedSession(secretLink, lockedCaregiver);
-  const tracker = useQuery(api.trackers.getBySecret, { secretLink });
+  const [inviteReady, setInviteReady] = useState(false);
+  const inviteFromUrl =
+    searchParams.get("invite")?.trim() ||
+    searchParams.get("cg")?.trim() ||
+    null;
+  const inviteToken =
+    inviteFromUrl || getSavedInviteToken(secretLink) || undefined;
+  // Backfill invite tokens before resolving ?invite= (otherwise tokens are minted after the lookup).
+  useEffect(() => {
+    let cancelled = false;
+    setInviteReady(false);
+    void ensureMigrated({ secretLink })
+      .then(() => {
+        if (!cancelled) setInviteReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setInviteReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [secretLink, ensureMigrated]);
+  const tracker = useQuery(
+    api.trackers.getBySecret,
+    inviteReady ? { secretLink, inviteToken } : "skip"
+  );
   const myVillages = useQuery(
     api.trackers.listMine,
     isAuthenticated ? {} : "skip"
@@ -130,10 +157,6 @@ function TrackerPageInner({
       ? { secretLink, actingCaregiverName: lockedCaregiver }
       : "skip"
   );
-
-  useEffect(() => {
-    void ensureMigrated({ secretLink });
-  }, [secretLink, ensureMigrated]);
 
   useEffect(() => {
     // Don't pin a foreign village as "last visited" for signed-in parents who
@@ -159,8 +182,12 @@ function TrackerPageInner({
     ) {
       return;
     }
-    saveLastVisitedTracker(secretLink, tracker.babyName);
-  }, [secretLink, tracker, isAuthenticated, myVillages]);
+    saveLastVisitedTracker(
+      secretLink,
+      tracker.babyName,
+      inviteToken ?? getSavedInviteToken(secretLink)
+    );
+  }, [secretLink, tracker, isAuthenticated, myVillages, inviteToken]);
 
   useEffect(() => {
     setHydrated(false);
@@ -178,11 +205,23 @@ function TrackerPageInner({
       setHydrated(true);
       return;
     }
+
+    const invitedName = tracker.inviteCaregiverName;
+    // Personal invite → lock to that caregiver only (no picker).
+    if (invitedName && !tracker.viewerIsOwner) {
+      setLockedCaregiver(invitedName);
+      saveLockedCaregiver(secretLink, invitedName, inviteToken);
+      saveLastVisitedTracker(secretLink, tracker.babyName, inviteToken);
+      setNeedsPick(false);
+      setHydrated(true);
+      return;
+    }
+
     const saved = getLockedCaregiver(secretLink);
     // SSO owner → admin logging identity only (not the full caregiver list).
     const selectable = tracker.viewerIsOwner
       ? ownerLoggingCaregivers(tracker.caregivers)
-      : tracker.caregivers.filter((c) => c.role !== "admin");
+      : [];
     const validNames = selectable.map((c) => c.name);
     // Owner with a single admin name: skip the pick screen entirely.
     if (
@@ -197,16 +236,21 @@ function TrackerPageInner({
       setHydrated(true);
       return;
     }
-    if (saved && validNames.includes(saved)) {
+    if (tracker.viewerIsOwner && saved && validNames.includes(saved)) {
       setLockedCaregiver(saved);
       setNeedsPick(false);
+    } else if (tracker.viewerIsOwner) {
+      if (saved) clearLockedCaregiver(secretLink);
+      setLockedCaregiver(null);
+      setNeedsPick(true);
     } else {
+      // Guest without a valid personal invite — block the old shared picker.
       if (saved) clearLockedCaregiver(secretLink);
       setLockedCaregiver(null);
       setNeedsPick(true);
     }
     setHydrated(true);
-  }, [secretLink, tracker]);
+  }, [secretLink, tracker, inviteToken]);
 
   useEffect(() => {
     if (activeTab !== "profile") setProfileOpenView(null);
@@ -226,8 +270,8 @@ function TrackerPageInner({
     consumedLogQuery.current = token;
     setShowLogSheet(false);
     setActiveLogModal(logDeepLinkToModal(path));
-    router.replace(`/tracker/${secretLink}`, { scroll: false });
-  }, [lockedCaregiver, searchParams, secretLink, router]);
+    router.replace(trackerPath(secretLink, inviteToken), { scroll: false });
+  }, [lockedCaregiver, searchParams, secretLink, router, inviteToken]);
 
   useEffect(() => {
     const refresh = () => {
@@ -286,7 +330,7 @@ function TrackerPageInner({
 
   const handleConfirmCaregiver = (name: string) => {
     setLockedCaregiver(name);
-    saveLockedCaregiver(secretLink, name);
+    saveLockedCaregiver(secretLink, name, inviteToken);
     setNeedsPick(false);
   };
 
@@ -406,6 +450,10 @@ function TrackerPageInner({
         <CaregiverLockScreen
           caregivers={tracker.caregivers}
           viewerIsOwner={tracker.viewerIsOwner}
+          inviteCaregiverName={tracker.inviteCaregiverName}
+          needsPersonalInvite={
+            !tracker.viewerIsOwner && !tracker.inviteCaregiverName
+          }
           canClaim={canClaim}
           claiming={claiming}
           claimError={claimError}
