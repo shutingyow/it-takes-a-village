@@ -90,10 +90,12 @@ struct FeedLiveActivityLiveActivity: Widget {
         .padding(.vertical, 12)
     }
 
-    /// Counts *up* from last event (past date + `.timer`).
+    /// Counts *up* from last event. Prefer `timerInterval` so a future/corrupt
+    /// date cannot render as a ~31-year countdown (Apple 2001 reference gap).
     @ViewBuilder
     private func sinceText(from lastAt: Date, font: Font) -> some View {
-        Text(lastAt, style: .timer)
+        let start = min(lastAt, Date())
+        Text(timerInterval: start...Date.distantFuture, countsDown: false)
             .font(font)
             .multilineTextAlignment(.trailing)
             .monospacedDigit()

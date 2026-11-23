@@ -171,16 +171,24 @@ function sendApnsOnSession(opts: {
   });
 }
 
-/** ContentState.dueAt is Unix seconds (Double) — see FeedCountdownAttributes. */
+/**
+ * ContentState.dueAt is Unix seconds (Double) — see FeedCountdownAttributes.
+ * Never subtract Apple's 2001 reference offset (978307200): that produced the
+ * Lock Screen ~271752h feed timer when paired with Date(timeIntervalSince1970:).
+ */
 function contentState(opts: {
   title: string;
   subtitle: string;
   dueAtMs: number;
 }) {
+  const ms =
+    opts.dueAtMs > 0 && opts.dueAtMs < 1_000_000_000_000
+      ? opts.dueAtMs * 1000
+      : opts.dueAtMs;
   return {
     title: opts.title,
     subtitle: opts.subtitle,
-    dueAt: opts.dueAtMs / 1000,
+    dueAt: ms / 1000,
   };
 }
 

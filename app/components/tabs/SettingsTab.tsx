@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -126,6 +126,9 @@ export function SettingsTab({
   const { signIn, signOut } = useAuthActions();
   const [view, setView] = useState<SettingsView>("menu");
   const [shareCopiedName, setShareCopiedName] = useState<string | null>(null);
+  const shareCopiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const trackerUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/tracker/${secretLink}`
@@ -231,8 +234,14 @@ export function SettingsTab({
         document.execCommand("copy");
         document.body.removeChild(input);
       }
+      if (shareCopiedTimerRef.current) {
+        clearTimeout(shareCopiedTimerRef.current);
+      }
       setShareCopiedName(caregiverName);
-      window.setTimeout(() => setShareCopiedName(null), 2000);
+      shareCopiedTimerRef.current = setTimeout(() => {
+        setShareCopiedName(null);
+        shareCopiedTimerRef.current = null;
+      }, 2000);
     };
 
     return (

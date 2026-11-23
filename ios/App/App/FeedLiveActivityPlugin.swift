@@ -131,6 +131,29 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
+            // Corrupt epoch on an existing session (classic ~271752h timer) —
+            // end and recreate instead of updating in place.
+            let corrupt = matches.contains {
+                !FeedCountdownTime.isSaneRawDueAt($0.contentState.dueAt)
+            }
+            if corrupt {
+                for activity in matches {
+                    await activity.end(
+                        ActivityContent(state: activity.contentState, staleDate: nil),
+                        dismissalPolicy: .immediate
+                    )
+                }
+                do {
+                    let activity = try Self.requestActivityReturning(kind: kind, state: state)
+                    await Self.endExtras(matchingKind: kind, keepingId: activity.id)
+                    Self.observePushToken(activity: activity, plugin: self)
+                    call.resolve(["activityId": activity.id])
+                } catch {
+                    call.reject("Failed to replace Live Activity: \(error.localizedDescription)")
+                }
+                return
+            }
+
             // dueAt is the last-event time (often hours ago). Stale relative to
             // that date would mark long gaps as immediately outdated.
             let content = ActivityContent(
@@ -308,7 +331,7 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         return FeedCountdownAttributes.ContentState(
             title: title,
             subtitle: subtitle,
-            dueAt: dueAtMs / 1000.0
+            dueAt: FeedCountdownTime.unixSeconds(fromMs: dueAtMs)
         )
     }
 }
@@ -345,7 +368,7 @@ enum FeedLiveActivityRemote {
             let state = FeedCountdownAttributes.ContentState(
                 title: title,
                 subtitle: subtitle,
-                dueAt: lastFeedAtMs / 1000.0
+                dueAt: FeedCountdownTime.unixSeconds(fromMs: lastFeedAtMs)
             )
             await upsert(kind: kind, state: state, startIfMissing: isKindEnabled(kind))
         } else {
@@ -374,7 +397,7 @@ enum FeedLiveActivityRemote {
         let state = FeedCountdownAttributes.ContentState(
             title: title.isEmpty ? defaultTitle(for: kind) : title,
             subtitle: subtitle,
-            dueAt: dueAtMs / 1000.0
+            dueAt: FeedCountdownTime.unixSeconds(fromMs: dueAtMs)
         )
         await upsert(kind: kind, state: state, startIfMissing: isKindEnabled(kind))
     }
@@ -385,13 +408,28 @@ enum FeedLiveActivityRemote {
         state: FeedCountdownAttributes.ContentState,
         startIfMissing: Bool
     ) async {
-        let matches = Activity<FeedCountdownAttributes>.activities.filter {
+        var matches = Activity<FeedCountdownAttributes>.activities.filter {
             $0.attributes.kind == kind
         }
         let content = ActivityContent(
             state: state,
             staleDate: Date().addingTimeInterval(24 * 60 * 60)
         )
+
+        // Corrupt epoch (~271752h timer) — end and recreate so Lock Screen
+        // does not keep a stuck ActivityKit session.
+        let corrupt = matches.contains {
+            !FeedCountdownTime.isSaneRawDueAt($0.contentState.dueAt)
+        }
+        if corrupt {
+            for activity in matches {
+                await activity.end(
+                    ActivityContent(state: activity.contentState, staleDate: nil),
+                    dismissalPolicy: .immediate
+                )
+            }
+            matches = []
+        }
 
         if !matches.isEmpty {
             for activity in matches {

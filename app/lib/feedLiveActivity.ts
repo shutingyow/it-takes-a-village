@@ -168,6 +168,20 @@ function withKindLock<T>(
   return next;
 }
 
+/**
+ * Live Activity dueAt must be epoch ms. Reject future / ancient stamps that
+ * produce the classic ~271752h (Apple 2001 reference-date) Lock Screen timer.
+ */
+function normalizeLastAtMs(lastAt: number | null): number | null {
+  if (lastAt === null || !Number.isFinite(lastAt) || lastAt <= 0) return null;
+  // Seconds mistaken for ms (~1.7e9) vs true ms (~1.7e12).
+  const ms = lastAt < 1_000_000_000_000 ? lastAt * 1000 : lastAt;
+  const now = Date.now();
+  if (ms > now + 60_000) return null;
+  if (ms < now - 90 * 24 * 60 * 60 * 1000) return null;
+  return ms;
+}
+
 /** Register callback for ActivityKit push tokens (Convex registration). */
 export function setLiveActivityPushTokenHandler(
   handler: PushTokenHandler | null
@@ -241,8 +255,8 @@ async function syncLiveActivityUnlocked(opts: {
     return "unsupported";
   }
 
-  const lastAt = opts.lastAt;
-  if (lastAt === null || lastAt > Date.now() + 60_000) {
+  const lastAtMs = normalizeLastAtMs(opts.lastAt);
+  if (lastAtMs === null) {
     await endLiveActivityUnlocked(opts.kind);
     return "skipped";
   }
@@ -251,7 +265,7 @@ async function syncLiveActivityUnlocked(opts: {
     kind: opts.kind,
     title: opts.title,
     subtitle: opts.subtitle,
-    dueAtMs: lastAt,
+    dueAtMs: lastAtMs,
   };
 
   const existing = readStoredId(opts.kind);
