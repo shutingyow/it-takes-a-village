@@ -94,7 +94,7 @@ export const zh: Translations = {
   signUpHint: "先创建家长账户，然后即可认领或创建村庄。",
   emailPasswordAlreadyExists: "该邮箱已有账户 — 请改用登录",
   emailPasswordInvalidEmail: "请输入有效邮箱",
-  parentOwnerReady: "你是本村主人。请在下方选择名字。",
+  parentOwnerReady: "你是本村主人。将以管理员身份继续。",
   parentSignedInNotOwner:
     "你已登录，但此链接属于其他账户。请打开下方你的村庄，或返回首页。",
   parentSignedInNoVillages:

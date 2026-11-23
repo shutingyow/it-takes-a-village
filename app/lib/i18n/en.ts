@@ -102,7 +102,7 @@ export const translations = {
   signUpHint: "Creates your parent account. Then you can claim or create a village.",
   emailPasswordAlreadyExists: "That email already has an account — try Sign in",
   emailPasswordInvalidEmail: "Enter a valid email address",
-  parentOwnerReady: "You’re the village owner. Pick your name below.",
+  parentOwnerReady: "You’re the village owner. Continue as admin.",
   parentSignedInNotOwner:
     "You’re signed in, but this link belongs to another account. Open one of your villages below, or go home.",
   parentSignedInNoVillages:

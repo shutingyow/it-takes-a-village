@@ -122,3 +122,14 @@ export function isAdminCaregiver(
 ): boolean {
   return caregivers.some((c) => c.name === name && c.role === "admin");
 }
+
+/**
+ * Names the SSO village owner may lock to for logging.
+ * Owners use admin caregiver identities only — not the full caregiver list.
+ */
+export function ownerLoggingCaregivers(
+  caregivers: CaregiverInfo[]
+): CaregiverInfo[] {
+  const admins = caregivers.filter((c) => c.role === "admin");
+  return admins.length > 0 ? admins : caregivers.slice(0, 1);
+}

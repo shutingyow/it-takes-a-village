@@ -33,10 +33,11 @@ import { IconLink } from "@/app/components/icons";
 import {
   clearLockedCaregiver,
   getLockedCaregiver,
+  ownerLoggingCaregivers,
   setLockedCaregiver as saveLockedCaregiver,
+  saveLastVisitedTracker,
   type CaregiverInfo,
 } from "@/app/lib/trackerStorage";
-import { saveLastVisitedTracker } from "@/app/lib/trackerStorage";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { ReminderScheduler } from "@/app/components/ReminderScheduler";
 import { FeedTimerBanner } from "@/app/components/FeedTimerBanner";
@@ -178,11 +179,12 @@ function TrackerPageInner({
       return;
     }
     const saved = getLockedCaregiver(secretLink);
+    // SSO owner → admin logging identity only (not the full caregiver list).
     const selectable = tracker.viewerIsOwner
-      ? tracker.caregivers
+      ? ownerLoggingCaregivers(tracker.caregivers)
       : tracker.caregivers.filter((c) => c.role !== "admin");
     const validNames = selectable.map((c) => c.name);
-    // Owner with a single name: skip the pick screen.
+    // Owner with a single admin name: skip the pick screen entirely.
     if (
       tracker.viewerIsOwner &&
       selectable.length === 1 &&

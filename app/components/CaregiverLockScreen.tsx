@@ -6,7 +6,10 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { cn } from "../lib/utils";
 import { useLanguage } from "../lib/i18n/LanguageProvider";
-import type { CaregiverInfo } from "../lib/trackerStorage";
+import {
+  ownerLoggingCaregivers,
+  type CaregiverInfo,
+} from "../lib/trackerStorage";
 import { signInWithOAuth } from "../lib/oauthSignIn";
 import { EmailPasswordForm } from "./EmailPasswordForm";
 import { IconUser } from "./icons";
@@ -19,7 +22,7 @@ export type OwnedVillageSummary = {
 interface CaregiverLockScreenProps {
   caregivers: CaregiverInfo[];
   onConfirm: (name: string) => void;
-  /** Village owner (SSO) may pick admin names; caregivers cannot. */
+  /** Village owner (SSO) locks to admin name(s) only; caregivers cannot pick admin. */
   viewerIsOwner?: boolean;
   /** Village has no owner yet — signed-in user can claim it. */
   canClaim?: boolean;
@@ -53,7 +56,7 @@ export function CaregiverLockScreen({
   const [signingOut, setSigningOut] = useState(false);
 
   const selectable = useMemo(() => {
-    if (viewerIsOwner) return caregivers;
+    if (viewerIsOwner) return ownerLoggingCaregivers(caregivers);
     return caregivers.filter((c) => c.role !== "admin");
   }, [caregivers, viewerIsOwner]);
 
