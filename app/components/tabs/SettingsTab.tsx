@@ -14,11 +14,13 @@ import type { TranslationKey } from "@/app/lib/i18n/en";
 import {
   IconChevronRight,
   IconExport,
+  IconLink,
   IconReminders,
   IconSettings,
   IconUsers,
   IconWarning,
 } from "../icons";
+import { QRCodeSVG } from "qrcode.react";
 import type { CaregiverInfo } from "@/app/lib/trackerStorage";
 import { Capacitor } from "@capacitor/core";
 import { signInWithOAuth } from "@/app/lib/oauthSignIn";
@@ -51,7 +53,8 @@ export type SettingsView =
   | "account"
   | "export"
   | "reminders"
-  | "caregivers";
+  | "caregivers"
+  | "share";
 
 interface SettingsTabProps {
   secretLink: string;
@@ -122,6 +125,11 @@ export function SettingsTab({
   const { isAuthenticated } = useConvexAuth();
   const { signIn, signOut } = useAuthActions();
   const [view, setView] = useState<SettingsView>("menu");
+  const [shareCopied, setShareCopied] = useState(false);
+  const trackerUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/tracker/${secretLink}`
+      : `https://takesavillage.co/tracker/${secretLink}`;
   const [showSupplyModal, setShowSupplyModal] = useState(false);
   const [newCaregiverName, setNewCaregiverName] = useState("");
   const [adminError, setAdminError] = useState<string | null>(null);
@@ -207,6 +215,56 @@ export function SettingsTab({
         pumpSchedule={pumpSchedule}
         onBack={() => setView("menu")}
       />
+    );
+  }
+
+  if (view === "share" && isAdmin) {
+    const copyShareLink = async () => {
+      try {
+        await navigator.clipboard.writeText(trackerUrl);
+      } catch {
+        const input = document.createElement("input");
+        input.value = trackerUrl;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+      }
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2000);
+    };
+
+    return (
+      <div className="p-4">
+        <button
+          type="button"
+          onClick={() => setView("menu")}
+          className="mb-3 text-sm font-semibold text-terracotta flex items-center gap-1"
+        >
+          {t("backToSettings")}
+        </button>
+        <p className="section-label">{t("shareVillage")}</p>
+        <p className="text-sm text-muted mb-4 -mt-2">
+          {t("shareWithCaregivers")}
+        </p>
+        <div className="flex justify-center mb-4">
+          <div className="bg-white p-4 rounded-xl border border-border">
+            <QRCodeSVG
+              value={trackerUrl}
+              size={160}
+              bgColor="#ffffff"
+              fgColor="#2c2a28"
+              level="M"
+            />
+          </div>
+        </div>
+        <div className="bg-primary-light/60 rounded-xl px-4 py-3 text-sm text-foreground break-all font-mono mb-3">
+          {trackerUrl}
+        </div>
+        <button type="button" onClick={() => void copyShareLink()} className="btn-primary w-full">
+          {shareCopied ? t("copied") : t("copyLinkAndText")}
+        </button>
+      </div>
     );
   }
 
@@ -565,6 +623,13 @@ export function SettingsTab({
       icon: <IconWarning size={20} className="text-warning" />,
       label: t("supplyAlerts"),
       description: t("supplyAlertsDesc"),
+    },
+    {
+      id: "share",
+      icon: <IconLink size={20} className="text-terracotta" />,
+      label: t("shareVillage"),
+      description: t("shareVillageSettingsDesc"),
+      adminOnly: true,
     },
     {
       id: "caregivers",

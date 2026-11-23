@@ -112,6 +112,7 @@ export const translations = {
   myVillages: "My villages",
   myVillagesEmpty: "No villages yet. Create one below.",
   shareVillage: "Share link & QR",
+  shareVillageSettingsDesc: "Invite caregivers with a link or QR code",
   openVillage: "Open",
   openYourVillage: "Open {name}",
   createVillageTitle: "Create a new village",

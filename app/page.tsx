@@ -118,16 +118,26 @@ export default function Home() {
     pendingOpenSecret ? { secretLink: pendingOpenSecret } : "skip"
   );
 
-  // Caregivers / guests: skip the chooser and open their village.
-  // Village owners keep this landing for share / create.
+  // Landing is a transition: owners and returning caregivers go straight in.
+  // Stay here only for first-time create, sign-in, or paste-a-link.
   useEffect(() => {
     if (authLoading) return;
-    if (createdTracker || shareUrl || showCreateForm || showSomethingElse) return;
+    if (createdTracker || shareUrl) return;
     if (pendingOpenSecret) return;
-    if (isAuthenticated && myVillages === undefined) return;
-    const ownsVillage =
-      isAuthenticated && myVillages !== undefined && myVillages.length > 0;
-    if (ownsVillage) return;
+    if (showCreateForm && isAuthenticated) return;
+
+    if (isAuthenticated) {
+      if (myVillages === undefined) return;
+      if (myVillages.length === 0) return;
+      const last = lastVisited?.secretLink;
+      const match = last
+        ? myVillages.find((v) => v.secretLink === last)
+        : undefined;
+      const target = match ?? myVillages[0]!;
+      router.replace(`/tracker/${target.secretLink}`);
+      return;
+    }
+
     if (!lastVisited || savedTracker === undefined) return;
     if (savedTracker === null) return;
     router.replace(`/tracker/${lastVisited.secretLink}`);
@@ -136,7 +146,6 @@ export default function Home() {
     createdTracker,
     shareUrl,
     showCreateForm,
-    showSomethingElse,
     pendingOpenSecret,
     isAuthenticated,
     myVillages,
@@ -308,33 +317,22 @@ export default function Home() {
     );
   }
 
-  const continueLabel =
-    savedTracker?.babyName ?? lastVisited?.babyName ?? t("yourTracker");
-
   const canContinue =
     !!lastVisited && savedTracker !== undefined && savedTracker !== null;
 
-  /** Avoid flashing parent/caregiver chooser while last village loads. */
-  const lastVisitedLoading =
-    !!lastVisited && savedTracker === undefined && !isAuthenticated;
-
   const isOpening = pendingOpenSecret !== null;
 
-  const renderOpenLastVillage = () => {
-    if (!lastVisited || !canContinue) return null;
-    return (
-      <button
-        type="button"
-        onClick={() => router.push(`/tracker/${lastVisited.secretLink}`)}
-        className="btn-primary w-full text-left px-4 py-4"
-      >
-        <p className="text-xs font-medium text-white/80 mb-1">
-          {t("openVillage")}
-        </p>
-        <p className="text-base font-semibold text-white">{continueLabel}</p>
-      </button>
-    );
-  };
+  /** True while we know we’ll auto-enter a village (transition UI). */
+  const isAutoEntering =
+    !createdTracker &&
+    !shareUrl &&
+    !pendingOpenSecret &&
+    !authLoading &&
+    ((isAuthenticated &&
+      myVillages !== undefined &&
+      myVillages.length > 0 &&
+      !showCreateForm) ||
+      (!isAuthenticated && canContinue));
 
   const handleOpenExisting = () => {
     setError(null);
@@ -456,24 +454,6 @@ export default function Home() {
       </h2>
       <button
         type="button"
-        disabled={!canContinue}
-        onClick={() => {
-          if (!lastVisited || !canContinue) return;
-          router.push(`/tracker/${lastVisited.secretLink}`);
-        }}
-        className={pathChoiceButtonClass}
-      >
-        <p className="text-sm font-semibold text-foreground">
-          {t("joinPathReturning")}
-        </p>
-        <p className="text-sm text-muted mt-1">
-          {canContinue
-            ? t("joinPathReturningDesc")
-            : t("joinPathReturningUnavailable")}
-        </p>
-      </button>
-      <button
-        type="button"
         onClick={() => {
           setError(null);
           setJoinPath("caregiver");
@@ -580,100 +560,6 @@ export default function Home() {
     </div>
   );
 
-  const renderMyVillages = () => {
-    if (myVillages === undefined) {
-      return (
-        <p className="text-sm text-muted text-center">{t("loadingTracker")}</p>
-      );
-    }
-
-    if (myVillages.length === 0) {
-      return (
-        <p className="text-sm text-muted text-center">{t("myVillagesEmpty")}</p>
-      );
-    }
-
-    // One village: a single primary open action for the admin.
-    if (myVillages.length === 1) {
-      const village = myVillages[0]!;
-      const label = village.babyName?.trim() || t("yourTracker");
-      const url = `${typeof window !== "undefined" ? window.location.origin : ""}/tracker/${village.secretLink}`;
-      return (
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => router.push(`/tracker/${village.secretLink}`)}
-            className="btn-primary w-full text-left px-4 py-4"
-          >
-            <p className="text-xs font-medium text-white/80 mb-1">
-              {t("openVillage")}
-            </p>
-            <p className="text-base font-semibold text-white">{label}</p>
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              setShareUrl({
-                url,
-                babyName: village.babyName ?? undefined,
-              })
-            }
-            className="w-full text-sm font-semibold text-muted py-2"
-          >
-            {t("shareVillage")}
-          </button>
-        </div>
-      );
-    }
-
-    return (
-      <div className="rounded-xl border border-border p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">
-          {t("myVillages")}
-        </h2>
-        <ul className="space-y-2">
-          {myVillages.map((village) => {
-            const label = village.babyName?.trim() || t("yourTracker");
-            const url = `${typeof window !== "undefined" ? window.location.origin : ""}/tracker/${village.secretLink}`;
-            return (
-              <li
-                key={village._id}
-                className="rounded-xl bg-background/80 border border-border px-3 py-3"
-              >
-                <p className="font-semibold text-foreground text-sm mb-2">
-                  {label}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      router.push(`/tracker/${village.secretLink}`)
-                    }
-                    className="flex-1 rounded-lg bg-primary text-white text-sm font-semibold py-2"
-                  >
-                    {t("openVillage")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShareUrl({
-                        url,
-                        babyName: village.babyName ?? undefined,
-                      })
-                    }
-                    className="flex-1 rounded-lg border border-border text-sm font-semibold py-2 text-foreground"
-                  >
-                    {t("shareVillage")}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-dvh overflow-y-auto overscroll-y-contain bg-background px-4 pb-8 relative safe-top">
       {/* Below status bar / battery — not absolute under the Dynamic Island */}
@@ -724,92 +610,29 @@ export default function Home() {
             </div>
           )}
 
-          {/* Signed-in owners: My villages. Caregivers / returning guests: Open {baby}. */}
-          {authLoading || lastVisitedLoading ? (
-            <p className="text-sm text-muted text-center">{t("loadingTracker")}</p>
-          ) : isAuthenticated ? (
+          {authLoading || isAutoEntering ? (
+            <p className="text-sm text-muted text-center">
+              {isAutoEntering ? t("openingTracker") : t("loadingTracker")}
+            </p>
+          ) : isAuthenticated &&
+            myVillages !== undefined &&
+            myVillages.length === 0 ? (
+            /* First-time parent: create the village, then enter. */
             <>
-              {myVillages !== undefined &&
-              myVillages.length === 0 &&
-              canContinue
-                ? renderOpenLastVillage()
-                : renderMyVillages()}
-              <button
-                type="button"
-                onClick={() => setShowCreateForm((v) => !v)}
-                className="w-full text-sm font-semibold text-primary py-2"
-              >
-                {showCreateForm ? t("cancel") : t("createVillageTitle")}
-              </button>
-              {showCreateForm && renderCreateForm()}
-              <div>
+              <p className="text-sm text-muted text-center">
+                {t("myVillagesEmpty")}
+              </p>
+              {showCreateForm ? (
+                renderCreateForm()
+              ) : (
                 <button
                   type="button"
-                  onClick={() => setShowSomethingElse((v) => !v)}
-                  className="w-full text-sm font-semibold text-muted py-1"
+                  onClick={() => setShowCreateForm(true)}
+                  className="btn-primary"
                 >
-                  {t("somethingElse")}
+                  {t("createVillageTitle")}
                 </button>
-                {showSomethingElse && (
-                  <div className="mt-3">{renderCaregiverPaste()}</div>
-                )}
-              </div>
-            </>
-          ) : canContinue && joinPath === "choose" && !showSomethingElse ? (
-            /* Returning caregiver/guest: same Open {baby} entry as admin */
-            <>
-              {renderOpenLastVillage()}
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowSomethingElse(true)}
-                  className="w-full text-sm font-semibold text-muted py-2"
-                >
-                  {t("somethingElse")}
-                </button>
-              </div>
-            </>
-          ) : canContinue && joinPath === "choose" && showSomethingElse ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowSomethingElse(false)}
-                className="text-sm font-semibold text-primary"
-              >
-                {t("backToChoices")}
-              </button>
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError(null);
-                    setJoinPath("caregiver");
-                  }}
-                  className={pathChoiceButtonClass}
-                >
-                  <p className="text-sm font-semibold text-foreground">
-                    {t("joinPathCaregiver")}
-                  </p>
-                  <p className="text-sm text-muted mt-1">
-                    {t("joinPathCaregiverDesc")}
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError(null);
-                    setJoinPath("parent");
-                  }}
-                  className={pathChoiceButtonClass}
-                >
-                  <p className="text-sm font-semibold text-foreground">
-                    {t("joinPathParent")}
-                  </p>
-                  <p className="text-sm text-muted mt-1">
-                    {t("joinPathParentDesc")}
-                  </p>
-                </button>
-              </div>
+              )}
             </>
           ) : joinPath === "caregiver" ? (
             renderCaregiverPaste()

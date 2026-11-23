@@ -104,6 +104,7 @@ export const zh: Translations = {
   myVillages: "我的村庄",
   myVillagesEmpty: "还没有村庄，请在下方创建。",
   shareVillage: "分享链接与二维码",
+  shareVillageSettingsDesc: "用链接或二维码邀请照护者",
   openVillage: "打开",
   openYourVillage: "打开 {name}",
   createVillageTitle: "创建新村庄",
