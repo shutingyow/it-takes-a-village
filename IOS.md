@@ -49,13 +49,13 @@ On **iOS**, OAuth opens an in-app browser sheet and returns to the Capacitor app
 
 1. **Google Cloud** → create **Web application** OAuth client  
    - Authorized JavaScript origins: `https://takesavillage.co` and `https://it-takes-a-village.vercel.app` (and `http://localhost:3000` for local)  
-   - Authorized redirect URI: the Google row above (must be `.convex.site`, **not** `.cloud` and **not** your Vercel URL)  
+   - Authorized redirect URI: the Google row above (`api.takesavillage.co`, **not** `.cloud` and **not** your Vercel URL). Keep legacy `*.convex.site` only until cutover is confirmed.  
    - Then:
      ```bash
      npx convex env set AUTH_GOOGLE_ID '<client-id>.apps.googleusercontent.com' --prod
      npx convex env set AUTH_GOOGLE_SECRET '<client-secret>' --prod
      ```
-2. **Apple Developer** — App ID `com.ittakesavillage.app` + Sign in with Apple; **Services ID** (this is `AUTH_APPLE_ID`); Key `.p8` → generate JWT as `AUTH_APPLE_SECRET` ([guide](https://labs.convex.dev/auth/config/oauth/apple)). Return URL = Apple row above. Domains = `zealous-hound-234.convex.site`.
+2. **Apple Developer** — App ID `com.ittakesavillage.app` + Sign in with Apple; **Services ID** (this is `AUTH_APPLE_ID`); Key `.p8` → generate JWT as `AUTH_APPLE_SECRET` ([guide](https://labs.convex.dev/auth/config/oauth/apple)). Return URL = Apple row above. Domains = `api.takesavillage.co` (legacy `zealous-hound-234.convex.site` only if still needed).
      ```bash
      npx convex env set AUTH_APPLE_ID '<Services-ID>' --prod
      npx convex env set AUTH_APPLE_SECRET '<jwt-secret>' --prod
@@ -146,7 +146,7 @@ The web app schedules **on-device** feed / pump reminders via `@capacitor/local-
 | Browser / Safari tab while page stays open | iOS Safari tabs are unreliable for background alerts |
 | Reschedule when a feed/pump is logged (while app open) | |
 
-**Apple Push (APNs) — Live Activity updates.** When another caregiver logs a milk feed, Convex sends (1) an ActivityKit `liveactivity` update to every village `last-feed` push token and (2) a silent `feed_changed` wake so native `AppDelegate` can update or restart the Lock Screen timer without opening the app. Timer delivery mode still registers a device push token for that silent wake.
+**Apple Push (APNs) — Live Activity updates.** When another caregiver logs a milk feed, pump, or sleep change, Convex sends (1) an ActivityKit `liveactivity` update to every village kind push token and (2) a silent wake so native `AppDelegate` can update or restart the Lock Screen timer without opening the app. Timer delivery mode still registers a device push token for that silent wake. APNs **requires HTTP/2** — `convex/apns.ts` uses `node:http2` (Node `fetch`/undici is HTTP/1.1 and fails against `api.push.apple.com`).
 
 1. Apple Developer → Keys → Apple Push Notifications service (`.p8`)
 2. Xcode App target → Signing & Capabilities → **Push Notifications** (and Live Activities)

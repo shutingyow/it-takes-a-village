@@ -56,8 +56,17 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   callbacks: {
     // Allow Capacitor to return to the app via custom URL scheme after OAuth
     // instead of landing on SITE_URL in Safari.
+    //
+    // Important: this runs on the OAuth callback *outside* Convex Auth's
+    // try/catch. Throwing here surfaces as a bare
+    // `{"code":"[Request ID] Server Error"}` page on api.takesavillage.co.
     async redirect({ redirectTo }) {
       const site = (process.env.SITE_URL ?? "").replace(/\/$/, "");
+      const allowedOrigins = [
+        site,
+        "https://it-takes-a-village.vercel.app",
+      ].filter(Boolean);
+
       if (redirectTo.startsWith(NATIVE_AUTH_SCHEME)) {
         return redirectTo;
       }
@@ -67,10 +76,23 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         }
         return `${site}${redirectTo}`;
       }
-      if (site && redirectTo.startsWith(site)) {
-        return redirectTo;
+      for (const origin of allowedOrigins) {
+        if (
+          redirectTo === origin ||
+          redirectTo.startsWith(`${origin}/`) ||
+          redirectTo.startsWith(`${origin}?`)
+        ) {
+          return redirectTo;
+        }
       }
-      throw new Error(`Invalid redirectTo: ${redirectTo}`);
+      // Fall back instead of throwing — opaque Server Error pages are worse.
+      console.error(
+        `Invalid redirectTo "${redirectTo}", falling back to SITE_URL`,
+      );
+      if (!site) {
+        throw new Error("SITE_URL is not configured");
+      }
+      return site;
     },
   },
 });
