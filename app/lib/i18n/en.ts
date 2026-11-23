@@ -17,7 +17,7 @@ export const translations = {
   joinPathReturningUnavailable: "No recent village saved on this device",
   joinPathCaregiver: "I’m a caregiver — I have a link",
   joinPathCaregiverDesc: "Paste the shared link. No sign-in needed.",
-  joinPathParent: "I’m a parent — create a village",
+  joinPathParent: "I’m an admin of a village",
   joinPathParentDesc: "Sign in to create and manage your village",
   somethingElse: "Something else?",
   backToChoices: "← Back",

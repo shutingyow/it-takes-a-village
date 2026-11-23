@@ -15,7 +15,7 @@ export const zh: Translations = {
   joinPathReturningUnavailable: "此设备还没有保存过村庄",
   joinPathCaregiver: "我是照护者 — 我有链接",
   joinPathCaregiverDesc: "粘贴分享链接即可，无需登录。",
-  joinPathParent: "我是家长 — 创建村庄",
+  joinPathParent: "我是村庄管理员",
   joinPathParentDesc: "登录后创建并管理你的村庄",
   somethingElse: "其他方式？",
   backToChoices: "← 返回",
