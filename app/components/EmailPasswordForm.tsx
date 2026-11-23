@@ -165,10 +165,6 @@ export function EmailPasswordForm({
         </p>
       ) : null}
 
-      {flow === "signUp" ? (
-        <p className="text-xs text-muted leading-snug">{t("signUpHint")}</p>
-      ) : null}
-
       <button
         type="submit"
         disabled={locked}

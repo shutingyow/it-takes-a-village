@@ -459,12 +459,9 @@ export default function Home() {
           {t("backToChoices")}
         </button>
       )}
-      <div>
-        <h2 className="text-sm font-semibold text-foreground">
-          {t("signInToCreate")}
-        </h2>
-        <p className="text-sm text-muted mt-1">{t("signInHint")}</p>
-      </div>
+      <h2 className="text-sm font-semibold text-foreground">
+        {t("signInToCreate")}
+      </h2>
       <EmailPasswordForm
         disabled={signingInProvider !== null}
         defaultFlow="signUp"
