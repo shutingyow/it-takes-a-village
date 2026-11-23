@@ -1,5 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import {
   requireOwnedEntry,
   verifyCaregiver,
@@ -9,6 +12,41 @@ import {
   assertPositive,
 } from "./lib/entryValidation";
 import { deleteStorageIds } from "./lib/storageCleanup";
+
+async function schedulePumpPush(
+  ctx: MutationCtx,
+  trackerId: Id<"trackers">
+) {
+  const tracker = await ctx.db.get(trackerId);
+  const last = await ctx.db
+    .query("pumpEntries")
+    .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", trackerId))
+    .order("desc")
+    .first();
+  const baby = tracker?.babyName?.trim();
+  const title = baby ? `${baby} · Last pump` : "Last pump";
+  if (!last) {
+    await ctx.scheduler.runAfter(0, internal.apns.notifyLiveActivityUpdate, {
+      trackerId,
+      kind: "last-pump",
+      event: "end",
+      title,
+      subtitle: "No pump yet",
+      dueAtMs: Date.now(),
+      silentWake: true,
+    });
+    return;
+  }
+  await ctx.scheduler.runAfter(0, internal.apns.notifyLiveActivityUpdate, {
+    trackerId,
+    kind: "last-pump",
+    event: "update",
+    title,
+    subtitle: "Time since last pump",
+    dueAtMs: last.timestamp,
+    silentWake: true,
+  });
+}
 
 export const create = mutation({
   args: {
@@ -34,7 +72,7 @@ export const create = mutation({
     if (args.amount > 500) {
       throw new Error("Pump amount looks too high (max 500 ml)");
     }
-    return await ctx.db.insert("pumpEntries", {
+    const id = await ctx.db.insert("pumpEntries", {
       trackerId: tracker._id,
       caregiverName: args.actingCaregiverName.trim(),
       amount: args.amount,
@@ -43,6 +81,8 @@ export const create = mutation({
       notes: args.notes,
       photoIds: args.photoIds,
     });
+    await schedulePumpPush(ctx, tracker._id);
+    return id;
   },
 });
 
@@ -127,6 +167,7 @@ export const update = mutation({
       notes: args.notes,
       photoIds: args.photoIds,
     });
+    await schedulePumpPush(ctx, existing.trackerId);
     return null;
   },
 });
@@ -148,6 +189,7 @@ export const remove = mutation({
     );
     await deleteStorageIds(ctx, entry.photoIds);
     await ctx.db.delete(args.entryId);
+    await schedulePumpPush(ctx, entry.trackerId);
     return null;
   },
 });

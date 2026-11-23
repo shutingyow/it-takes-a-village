@@ -1,22 +1,28 @@
 "use node";
 
+import { once } from "node:events";
+import http2 from "node:http2";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 /**
- * Push Live Activity + silent wakes when a milk feed changes.
+ * Push Live Activity + silent wakes when a milk feed / pump / sleep changes.
  * No-ops if APNs env is not configured (web-only / pre-key setups).
  *
  * Env (Convex dashboard):
  * - APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC (com.ittakesavillage.app)
- * - APNS_PRIVATE_KEY (PKCS8 .p8 contents, newlines OK as \n)
+ * - APNS_PRIVATE_KEY (PKCS8 .p8 contents, newlines OK as \n; PEM headers optional)
  * - APNS_PRODUCTION = "true" for App Store / TestFlight production APNs
  *
  * Cross-caregiver path (timer delivery mode):
- * 1. ActivityKit `liveactivity` update to every village last-feed push token
- * 2. Silent `background` wake with lastFeedAt so native AppDelegate can
- *    update/restart the Lock Screen timer without opening the app
+ * 1. ActivityKit `liveactivity` update to every village kind push token
+ * 2. Silent `background` wake so native AppDelegate can update/restart the
+ *    Lock Screen timer without opening the app
+ *
+ * IMPORTANT: APNs requires HTTP/2. Node's built-in `fetch` (undici) speaks
+ * HTTP/1.1 by default and fails with `TypeError: fetch failed` against
+ * api.push.apple.com — always use `node:http2` here.
  */
 
 type ApnsConfig = {
@@ -87,7 +93,30 @@ async function createApnsJwt(config: ApnsConfig): Promise<string> {
 
 type SendResult = "ok" | "gone" | "error";
 
-async function sendApns(opts: {
+type ApnsSession = {
+  client: http2.ClientHttp2Session;
+  host: string;
+};
+
+async function openApnsSession(config: ApnsConfig): Promise<ApnsSession> {
+  const host = config.production
+    ? "api.push.apple.com"
+    : "api.sandbox.push.apple.com";
+  const client = http2.connect(`https://${host}`);
+  client.on("error", (err) => {
+    console.warn("APNs HTTP/2 session error", err);
+  });
+  if (!client.connecting && client.closed) {
+    throw new Error("APNs HTTP/2 session closed immediately");
+  }
+  if (client.connecting) {
+    await once(client, "connect");
+  }
+  return { client, host };
+}
+
+function sendApnsOnSession(opts: {
+  session: ApnsSession;
   config: ApnsConfig;
   jwt: string;
   deviceToken: string;
@@ -95,30 +124,51 @@ async function sendApns(opts: {
   pushType: "liveactivity" | "background";
   topicSuffix?: string;
 }): Promise<SendResult> {
-  const host = opts.config.production
-    ? "api.push.apple.com"
-    : "api.sandbox.push.apple.com";
   const topic = opts.topicSuffix
     ? `${opts.config.topic}.${opts.topicSuffix}`
     : opts.config.topic;
-  const url = `https://${host}/3/device/${opts.deviceToken}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
+  const path = `/3/device/${opts.deviceToken}`;
+  const body = JSON.stringify(opts.payload);
+
+  return new Promise((resolve) => {
+    let status = 0;
+    let responseBody = "";
+    const req = opts.session.client.request({
+      ":method": "POST",
+      ":path": path,
       authorization: `bearer ${opts.jwt}`,
       "apns-topic": topic,
       "apns-push-type": opts.pushType,
       "apns-priority": opts.pushType === "background" ? "5" : "10",
       "content-type": "application/json",
-    },
-    body: JSON.stringify(opts.payload),
+      "content-length": Buffer.byteLength(body),
+    });
+
+    req.setEncoding("utf8");
+    req.on("response", (headers) => {
+      status = Number(headers[":status"] ?? 0);
+    });
+    req.on("data", (chunk) => {
+      responseBody += chunk;
+    });
+    req.on("end", () => {
+      if (status >= 200 && status < 300) {
+        resolve("ok");
+        return;
+      }
+      console.warn("APNs send failed", status, responseBody, opts.pushType);
+      if (status === 410) {
+        resolve("gone");
+        return;
+      }
+      resolve("error");
+    });
+    req.on("error", (err) => {
+      console.warn("APNs request error", err, opts.pushType);
+      resolve("error");
+    });
+    req.end(body);
   });
-  if (res.ok) return "ok";
-  const body = await res.text();
-  console.warn("APNs send failed", res.status, body, opts.pushType);
-  // 410 Unregistered — drop dead ActivityKit / device tokens.
-  if (res.status === 410) return "gone";
-  return "error";
 }
 
 /** ContentState.dueAt is Unix seconds (Double) — see FeedCountdownAttributes. */
@@ -145,83 +195,97 @@ export const notifyFeedChanged = internalAction({
     const config = readApnsConfig();
     if (!config) return null;
 
-    const jwt = await createApnsJwt(config);
-    // Only update feed Live Activities — pump/nap timers have their own kind.
-    const regs = await ctx.runQuery(internal.apnsHelpers.listLiveActivities, {
-      trackerId: args.trackerId,
-      kind: "last-feed",
-    });
-    const devices = await ctx.runQuery(internal.apnsHelpers.listDeviceTokens, {
-      trackerId: args.trackerId,
-    });
-
-    const title = args.babyName?.trim()
-      ? `${args.babyName.trim()} · Last feed`
-      : "Last feed";
-    const subtitle =
-      args.lastFeedAt == null
-        ? "No milk feed yet"
-        : "Time since last feed";
-    const dueAtMs = args.lastFeedAt ?? Date.now();
-    const state = contentState({ title, subtitle, dueAtMs });
-
-    // Update since-last feed on every village device that has a running LA
-    // (or end when no milk feed). Ongoing feed sessions are pushed separately
-    // via notifyLiveActivityUpdate.
-    for (const reg of regs) {
-      const result = await sendApns({
-        config,
-        jwt,
-        deviceToken: reg.pushToken,
-        pushType: "liveactivity",
-        topicSuffix: "push-type.liveactivity",
-        payload: {
-          aps: {
-            timestamp: Math.floor(Date.now() / 1000),
-            event: args.lastFeedAt == null ? "end" : "update",
-            "content-state": state,
-            "attributes-type": "FeedCountdownAttributes",
-          },
-        },
-      });
-      if (result === "gone") {
-        await ctx.runMutation(
-          internal.apnsHelpers.deleteLiveActivityByActivityId,
-          { activityId: reg.activityId }
-        );
-      }
+    let session: ApnsSession;
+    try {
+      session = await openApnsSession(config);
+    } catch (err) {
+      console.warn("APNs HTTP/2 connect failed", err);
+      return null;
     }
 
-    // Silent wake: native AppDelegate updates/restarts the feed LA even when
-    // ActivityKit push tokens are missing or stale (timer delivery mode).
-    for (const device of devices) {
-      const result = await sendApns({
-        config,
-        jwt,
-        deviceToken: device.token,
-        pushType: "background",
-        payload: {
-          aps: {
-            "content-available": 1,
-          },
-          trackerId: args.trackerId,
-          reason: "feed_changed",
-          lastFeedAt: args.lastFeedAt,
-        },
+    try {
+      const jwt = await createApnsJwt(config);
+      // Only update feed Live Activities — pump/nap timers have their own kind.
+      const regs = await ctx.runQuery(internal.apnsHelpers.listLiveActivities, {
+        trackerId: args.trackerId,
+        kind: "last-feed",
       });
-      if (result === "gone") {
-        await ctx.runMutation(internal.apnsHelpers.deleteDeviceTokenByDevice, {
-          trackerId: args.trackerId,
-          deviceId: device.deviceId,
+      const devices = await ctx.runQuery(internal.apnsHelpers.listDeviceTokens, {
+        trackerId: args.trackerId,
+      });
+
+      const title = args.babyName?.trim()
+        ? `${args.babyName.trim()} · Last feed`
+        : "Last feed";
+      const subtitle =
+        args.lastFeedAt == null
+          ? "No milk feed yet"
+          : "Time since last feed";
+      const dueAtMs = args.lastFeedAt ?? Date.now();
+      const state = contentState({ title, subtitle, dueAtMs });
+
+      // Update since-last feed on every village device that has a running LA
+      // (or end when no milk feed). Ongoing feed sessions are pushed separately
+      // via notifyLiveActivityUpdate.
+      for (const reg of regs) {
+        const result = await sendApnsOnSession({
+          session,
+          config,
+          jwt,
+          deviceToken: reg.pushToken,
+          pushType: "liveactivity",
+          topicSuffix: "push-type.liveactivity",
+          payload: {
+            aps: {
+              timestamp: Math.floor(Date.now() / 1000),
+              event: args.lastFeedAt == null ? "end" : "update",
+              "content-state": state,
+              "attributes-type": "FeedCountdownAttributes",
+            },
+          },
         });
+        if (result === "gone") {
+          await ctx.runMutation(
+            internal.apnsHelpers.deleteLiveActivityByActivityId,
+            { activityId: reg.activityId }
+          );
+        }
       }
+
+      // Silent wake: native AppDelegate updates/restarts the feed LA even when
+      // ActivityKit push tokens are missing or stale (timer delivery mode).
+      for (const device of devices) {
+        const result = await sendApnsOnSession({
+          session,
+          config,
+          jwt,
+          deviceToken: device.token,
+          pushType: "background",
+          payload: {
+            aps: {
+              "content-available": 1,
+            },
+            trackerId: args.trackerId,
+            reason: "feed_changed",
+            lastFeedAt: args.lastFeedAt,
+          },
+        });
+        if (result === "gone") {
+          await ctx.runMutation(internal.apnsHelpers.deleteDeviceTokenByDevice, {
+            trackerId: args.trackerId,
+            deviceId: device.deviceId,
+          });
+        }
+      }
+    } finally {
+      session.client.close();
     }
 
     return null;
   },
 });
 
-/** Update or end a Live Activity kind (feed ongoing, nap/sleep, etc.). */
+/** Update or end a Live Activity kind (feed ongoing, nap/sleep, pump, etc.). */
 export const notifyLiveActivityUpdate = internalAction({
   args: {
     trackerId: v.id("trackers"),
@@ -237,70 +301,87 @@ export const notifyLiveActivityUpdate = internalAction({
     const config = readApnsConfig();
     if (!config) return null;
 
-    const jwt = await createApnsJwt(config);
-    const regs = await ctx.runQuery(internal.apnsHelpers.listLiveActivities, {
-      trackerId: args.trackerId,
-      kind: args.kind,
-    });
-
-    const state = contentState({
-      title: args.title,
-      subtitle: args.subtitle,
-      dueAtMs: args.dueAtMs,
-    });
-
-    for (const reg of regs) {
-      const result = await sendApns({
-        config,
-        jwt,
-        deviceToken: reg.pushToken,
-        pushType: "liveactivity",
-        topicSuffix: "push-type.liveactivity",
-        payload: {
-          aps: {
-            timestamp: Math.floor(Date.now() / 1000),
-            event: args.event,
-            "content-state": state,
-            "attributes-type": "FeedCountdownAttributes",
-          },
-        },
-      });
-      if (result === "gone") {
-        await ctx.runMutation(
-          internal.apnsHelpers.deleteLiveActivityByActivityId,
-          { activityId: reg.activityId }
-        );
-      }
+    let session: ApnsSession;
+    try {
+      session = await openApnsSession(config);
+    } catch (err) {
+      console.warn("APNs HTTP/2 connect failed", err);
+      return null;
     }
 
-    if (args.silentWake) {
-      const devices = await ctx.runQuery(internal.apnsHelpers.listDeviceTokens, {
+    try {
+      const jwt = await createApnsJwt(config);
+      const regs = await ctx.runQuery(internal.apnsHelpers.listLiveActivities, {
         trackerId: args.trackerId,
+        kind: args.kind,
       });
-      for (const device of devices) {
-        const result = await sendApns({
+
+      const state = contentState({
+        title: args.title,
+        subtitle: args.subtitle,
+        dueAtMs: args.dueAtMs,
+      });
+
+      for (const reg of regs) {
+        const result = await sendApnsOnSession({
+          session,
           config,
           jwt,
-          deviceToken: device.token,
-          pushType: "background",
+          deviceToken: reg.pushToken,
+          pushType: "liveactivity",
+          topicSuffix: "push-type.liveactivity",
           payload: {
-            aps: { "content-available": 1 },
-            trackerId: args.trackerId,
-            reason: "live_activity_update",
-            kind: args.kind,
-            event: args.event,
-            title: args.title,
-            subtitle: args.subtitle,
-            dueAtMs: args.dueAtMs,
+            aps: {
+              timestamp: Math.floor(Date.now() / 1000),
+              event: args.event,
+              "content-state": state,
+              "attributes-type": "FeedCountdownAttributes",
+            },
           },
         });
         if (result === "gone") {
-          await ctx.runMutation(internal.apnsHelpers.deleteDeviceTokenByDevice, {
-            trackerId: args.trackerId,
-            deviceId: device.deviceId,
-          });
+          await ctx.runMutation(
+            internal.apnsHelpers.deleteLiveActivityByActivityId,
+            { activityId: reg.activityId }
+          );
         }
       }
+
+      if (args.silentWake) {
+        const devices = await ctx.runQuery(internal.apnsHelpers.listDeviceTokens, {
+          trackerId: args.trackerId,
+        });
+        for (const device of devices) {
+          const result = await sendApnsOnSession({
+            session,
+            config,
+            jwt,
+            deviceToken: device.token,
+            pushType: "background",
+            payload: {
+              aps: { "content-available": 1 },
+              trackerId: args.trackerId,
+              reason: "live_activity_update",
+              kind: args.kind,
+              event: args.event,
+              title: args.title,
+              subtitle: args.subtitle,
+              dueAtMs: args.dueAtMs,
+            },
+          });
+          if (result === "gone") {
+            await ctx.runMutation(
+              internal.apnsHelpers.deleteDeviceTokenByDevice,
+              {
+                trackerId: args.trackerId,
+                deviceId: device.deviceId,
+              }
+            );
+          }
+        }
+      }
+    } finally {
+      session.client.close();
     }
 
     return null;

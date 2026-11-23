@@ -366,6 +366,8 @@ export const update = mutation({
     const durationMinutes = existing.durationMinutes;
     const nextPhotoIds =
       args.photoIds !== undefined ? args.photoIds : existing.photoIds;
+    const wasActive = existing.endTime === undefined;
+    const nowActive = args.endTime === undefined;
     await ctx.db.replace(args.entryId, {
       trackerId: existing.trackerId,
       caregiverName: existing.caregiverName,
@@ -376,6 +378,16 @@ export const update = mutation({
       notes: args.notes,
       ...(nextPhotoIds !== undefined ? { photoIds: nextPhotoIds } : {}),
     });
+    // Push when this row is/was the live timer — not when editing old completed rows.
+    if (wasActive || nowActive) {
+      await scheduleSleepLivePush(ctx, existing.trackerId, {
+        active: nowActive,
+        type: args.type,
+        startTime: args.startTime,
+        endTime: args.endTime,
+        caregiverName: existing.caregiverName,
+      });
+    }
     return null;
   },
 });
@@ -410,9 +422,10 @@ export const logNap = mutation({
       }
     }
     const notes = cleanNotes(args.notes);
-    return await ctx.db.insert("sleepEntries", {
+    const caregiverName = args.actingCaregiverName.trim();
+    const id = await ctx.db.insert("sleepEntries", {
       trackerId: tracker._id,
-      caregiverName: args.actingCaregiverName.trim(),
+      caregiverName,
       type: "nap",
       startTime: args.startTime,
       ...(resolved.endTime !== undefined ? { endTime: resolved.endTime } : {}),
@@ -421,6 +434,14 @@ export const logNap = mutation({
         : {}),
       ...(notes !== undefined ? { notes } : {}),
     });
+    await scheduleSleepLivePush(ctx, tracker._id, {
+      active: resolved.endTime === undefined,
+      type: "nap",
+      startTime: args.startTime,
+      endTime: resolved.endTime,
+      caregiverName,
+    });
+    return id;
   },
 });
 
@@ -454,6 +475,8 @@ export const updateNap = mutation({
       args.durationMinutes
     );
     const notes = cleanNotes(args.notes);
+    const wasActive = existing.endTime === undefined;
+    const nowActive = resolved.endTime === undefined;
     await ctx.db.replace(args.entryId, {
       trackerId: existing.trackerId,
       caregiverName: existing.caregiverName,
@@ -466,6 +489,15 @@ export const updateNap = mutation({
       ...(notes !== undefined ? { notes } : {}),
       ...(existing.photoIds !== undefined ? { photoIds: existing.photoIds } : {}),
     });
+    if (wasActive || nowActive) {
+      await scheduleSleepLivePush(ctx, existing.trackerId, {
+        active: nowActive,
+        type: "nap",
+        startTime: args.startTime,
+        endTime: resolved.endTime,
+        caregiverName: existing.caregiverName,
+      });
+    }
     return null;
   },
 });
