@@ -24,6 +24,8 @@ import { cn } from "@/app/lib/utils";
 import { IconReminders } from "@/app/components/icons";
 import { LanguageToggle } from "@/app/components/LanguageToggle";
 import { signInWithOAuth } from "@/app/lib/oauthSignIn";
+import { BootBlank } from "@/app/components/BootBlank";
+import { useMarkAppReady } from "@/app/lib/appReady";
 import { EmailPasswordForm } from "@/app/components/EmailPasswordForm";
 import { detectDeviceTimezone } from "@/app/lib/utils";
 
@@ -82,8 +84,12 @@ export default function Home() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [joinPath, setJoinPath] = useState<JoinPath>("choose");
 
+  /** localStorage is read after mount; until then we can't tell returning users. */
+  const [storageLoaded, setStorageLoaded] = useState(false);
+
   useEffect(() => {
     setLastVisited(getLastVisitedTracker());
+    setStorageLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -127,7 +133,7 @@ export default function Home() {
   // Never auto-open a bare village secret — that hits personal-invite and loops
   // via "Go to home". Caregivers need lastVisited (or stored) invite token.
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || !storageLoaded) return;
     if (createdTracker || shareUrl) return;
     if (pendingOpenSecret) return;
     if (showCreateForm && isAuthenticated) return;
@@ -181,6 +187,7 @@ export default function Home() {
     router.replace(trackerPath(lastVisited.secretLink, invite));
   }, [
     authLoading,
+    storageLoaded,
     createdTracker,
     shareUrl,
     showCreateForm,
@@ -339,6 +346,58 @@ export default function Home() {
     }
   };
 
+  const guestInvite = resolveLastVisitedInvite(lastVisited);
+  const canContinue =
+    !!lastVisited &&
+    !!guestInvite &&
+    savedTracker !== undefined &&
+    savedTracker !== null;
+
+  const isOpening = pendingOpenSecret !== null;
+
+  /** True while we know we’ll auto-enter a village. */
+  const isAutoEntering =
+    !createdTracker &&
+    !shareUrl &&
+    !pendingOpenSecret &&
+    !authLoading &&
+    ((isAuthenticated &&
+      myVillages !== undefined &&
+      myVillages.length > 0 &&
+      !showCreateForm) ||
+      (isAuthenticated &&
+        myVillages !== undefined &&
+        myVillages.length === 0 &&
+        canContinue &&
+        !showCreateForm) ||
+      (!isAuthenticated && canContinue));
+
+  /**
+   * Cold start: stay blank (splash on native) until we know whether this is a
+   * returning user. Never paint join / sign-in while auth, listMine, or the
+   * saved-tracker lookup is still pending.
+   */
+  const savedTrackerPending =
+    !!lastVisited &&
+    !!guestInvite &&
+    savedTracker === undefined &&
+    (!isAuthenticated || myVillages?.length === 0);
+  const isDeciding =
+    !createdTracker &&
+    !shareUrl &&
+    !pendingOpenSecret &&
+    (!storageLoaded ||
+      authLoading ||
+      (isAuthenticated && myVillages === undefined) ||
+      savedTrackerPending ||
+      isAutoEntering);
+
+  useMarkAppReady(!isDeciding);
+
+  if (isDeciding) {
+    return <BootBlank />;
+  }
+
   if (createdTracker) {
     return (
       <TrackerCreatedSuccess
@@ -359,32 +418,6 @@ export default function Home() {
       />
     );
   }
-
-  const guestInvite = resolveLastVisitedInvite(lastVisited);
-  const canContinue =
-    !!lastVisited &&
-    !!guestInvite &&
-    savedTracker !== undefined &&
-    savedTracker !== null;
-
-  const isOpening = pendingOpenSecret !== null;
-
-  /** True while we know we’ll auto-enter a village (transition UI). */
-  const isAutoEntering =
-    !createdTracker &&
-    !shareUrl &&
-    !pendingOpenSecret &&
-    !authLoading &&
-    ((isAuthenticated &&
-      myVillages !== undefined &&
-      myVillages.length > 0 &&
-      !showCreateForm) ||
-      (isAuthenticated &&
-        myVillages !== undefined &&
-        myVillages.length === 0 &&
-        canContinue &&
-        !showCreateForm) ||
-      (!isAuthenticated && canContinue));
 
   const handleOpenExisting = () => {
     setError(null);
@@ -655,11 +688,7 @@ export default function Home() {
             </div>
           )}
 
-          {authLoading || isAutoEntering ? (
-            <p className="text-sm text-muted text-center">
-              {isAutoEntering ? t("openingTracker") : t("loadingTracker")}
-            </p>
-          ) : isAuthenticated &&
+          {isAuthenticated &&
             myVillages !== undefined &&
             myVillages.length === 0 ? (
             /* First-time parent create, or signed-in caregiver paste invite. */

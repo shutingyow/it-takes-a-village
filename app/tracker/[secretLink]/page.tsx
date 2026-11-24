@@ -50,6 +50,8 @@ import { isFeedTimerRecording } from "@/app/lib/feedTimer";
 import { isPumpTimerRecording } from "@/app/lib/pumpTimer";
 import { useSyncActiveFeedSession } from "@/app/lib/useSyncActiveFeedSession";
 import { useAppShell } from "@/app/lib/appShell";
+import { useMarkAppReady } from "@/app/lib/appReady";
+import { BootBlank } from "@/app/components/BootBlank";
 
 type LogType = "feed" | "diaper" | "pump" | "activity" | "nap" | "moment";
 
@@ -60,11 +62,7 @@ export default function TrackerPage({
 }) {
   return (
     <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="w-8 h-8 rounded-full border-2 border-accent-diaper border-t-transparent animate-spin" />
-        </div>
-      }
+      fallback={<BootBlank />}
     >
       <TrackerPageInner params={params} />
     </Suspense>
@@ -111,17 +109,25 @@ function TrackerPageInner({
   const ensureMigrated = useMutation(api.trackers.ensureMigrated);
   const claimTracker = useMutation(api.trackers.claim);
   useSyncActiveFeedSession(secretLink, lockedCaregiver);
-  const [inviteReady, setInviteReady] = useState(false);
   const inviteFromUrl =
     searchParams.get("invite")?.trim() ||
     searchParams.get("cg")?.trim() ||
     null;
   const inviteToken =
     inviteFromUrl || getSavedInviteToken(secretLink) || undefined;
-  // Backfill invite tokens before resolving ?invite= (otherwise tokens are minted after the lookup).
+  // Gate getBySecret only for a fresh URL invite that isn't stored yet.
+  // Owners / returning caregivers must not wait on ensureMigrated.
+  const [inviteReady, setInviteReady] = useState(() => {
+    if (!inviteFromUrl) return true;
+    return inviteFromUrl === getSavedInviteToken(secretLink);
+  });
   useEffect(() => {
     let cancelled = false;
-    setInviteReady(false);
+    const needsGate =
+      Boolean(inviteFromUrl) &&
+      inviteFromUrl !== getSavedInviteToken(secretLink);
+    if (!needsGate) setInviteReady(true);
+    else setInviteReady(false);
     void ensureMigrated({ secretLink })
       .then(() => {
         if (!cancelled) setInviteReady(true);
@@ -132,7 +138,7 @@ function TrackerPageInner({
     return () => {
       cancelled = true;
     };
-  }, [secretLink, ensureMigrated]);
+  }, [secretLink, ensureMigrated, inviteFromUrl]);
   // Wait for ConvexAuth so viewerIsOwner is correct on first hydrate (owners
   // must never flash / stick on "personal invite required").
   const tracker = useQuery(
@@ -433,19 +439,16 @@ function TrackerPageInner({
     setActiveTab(tab);
   };
 
+  const isBooting = authLoading || tracker === undefined || !hydrated;
+  // Splash stays up (native) until this screen has real content to show.
+  useMarkAppReady(!isBooting);
+
   const lockedInfo: CaregiverInfo | undefined = tracker?.caregivers.find(
     (c) => c.name === lockedCaregiver
   );
 
-  if (authLoading || tracker === undefined || !hydrated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-accent-diaper border-t-transparent animate-spin" />
-          <p className="text-muted text-sm">{t("loadingTracker")}</p>
-        </div>
-      </div>
-    );
+  if (isBooting) {
+    return <BootBlank />;
   }
 
   if (tracker === null) {
@@ -588,6 +591,7 @@ function TrackerPageInner({
         <ReminderScheduler
           selectedCaregiver={lockedCaregiver}
           secretLink={secretLink}
+          babyName={tracker.babyName}
           feedIntervalHours={tracker.feedIntervalHours}
           notifyBeforeMinutes={tracker.notifyBeforeMinutes}
           feedRemindersEnabled={tracker.feedRemindersEnabled}

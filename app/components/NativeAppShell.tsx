@@ -4,8 +4,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useLanguage } from "@/app/lib/i18n/LanguageProvider";
 import { configureNativeChrome } from "@/app/lib/appShell";
+import { whenAppReady } from "@/app/lib/appReady";
 
 const LIVE_ORIGIN = "https://takesavillage.co";
+const SPLASH_MAX_HOLD_MS = 6000;
 
 function isAllowedHttpUrl(url: string): boolean {
   try {
@@ -62,17 +64,22 @@ export function NativeAppShell({ children }: { children: ReactNode }) {
       }, 80);
     };
 
+    // Hold splash until a screen has decided auth + redirect (failsafe 6s).
+    // Separate from the setup below so keyboard/network listeners aren't delayed.
     void (async () => {
-      await configureNativeChrome("light");
-
       try {
         const { SplashScreen } = await import("@capacitor/splash-screen");
+        await whenAppReady(SPLASH_MAX_HOLD_MS);
         if (!cancelled) {
           await SplashScreen.hide({ fadeOutDuration: 280 });
         }
       } catch {
         // ignore
       }
+    })();
+
+    void (async () => {
+      await configureNativeChrome("light");
 
       try {
         const { Network } = await import("@capacitor/network");
