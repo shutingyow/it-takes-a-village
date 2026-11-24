@@ -27,6 +27,8 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "endActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endAll", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setKindEnabled", returnType: CAPPluginReturnPromise),
+        // Tokens from silent-wake Activity.request (no WebView listener yet).
+        CAPPluginMethod(name: "drainPendingPushTokens", returnType: CAPPluginReturnPromise),
     ]
 
     private static let knownKinds: Set<String> = ["last-feed", "last-pump", "last-nap", "next-feed"]
@@ -56,6 +58,12 @@ public class FeedLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         let enabled = call.getBool("enabled") ?? false
         FeedLiveActivityRemote.setKindEnabled(kind, enabled: enabled)
         call.resolve()
+    }
+
+    /// JS drains tokens captured while the WebView was asleep (silent wake).
+    @objc func drainPendingPushTokens(_ call: CAPPluginCall) {
+        let tokens = FeedLiveActivityRemote.drainPendingPushTokens()
+        call.resolve(["tokens": tokens])
     }
 
     @objc func startActivity(_ call: CAPPluginCall) {
@@ -344,6 +352,8 @@ enum FeedLiveActivityRemote {
         "ittav.liveActivity.\(kind).enabled"
     }
 
+    private static let pendingTokensKey = "ittav.liveActivity.pendingPushTokens"
+
     static func setKindEnabled(_ kind: String, enabled: Bool) {
         defaults.set(enabled, forKey: enabledKey(kind))
     }
@@ -354,6 +364,28 @@ enum FeedLiveActivityRemote {
             return kind == "last-feed"
         }
         return defaults.bool(forKey: enabledKey(kind))
+    }
+
+    static func storePendingPushToken(activityId: String, pushToken: String, kind: String) {
+        var list = defaults.array(forKey: pendingTokensKey) as? [[String: String]] ?? []
+        list.removeAll { $0["activityId"] == activityId }
+        list.append([
+            "activityId": activityId,
+            "pushToken": pushToken,
+            "kind": kind,
+        ])
+        // Cap so a runaway observer cannot balloon UserDefaults.
+        if list.count > 12 {
+            list = Array(list.suffix(12))
+        }
+        defaults.set(list, forKey: pendingTokensKey)
+    }
+
+    /// Called from JS on foreground to register silent-wake tokens with Convex.
+    static func drainPendingPushTokens() -> [[String: String]] {
+        let list = defaults.array(forKey: pendingTokensKey) as? [[String: String]] ?? []
+        defaults.removeObject(forKey: pendingTokensKey)
+        return list
     }
 
     /// Silent `feed_changed` from Convex — reset since-last feed timer.
@@ -434,19 +466,39 @@ enum FeedLiveActivityRemote {
         if !matches.isEmpty {
             for activity in matches {
                 await activity.update(content)
+                // Refresh stored push token so Convex can target this session
+                // after a silent wake (JS may not be listening yet).
+                observeAndStorePushToken(activity: activity)
             }
             return
         }
 
         guard startIfMissing else { return }
         do {
-            _ = try Activity.request(
+            let activity = try Activity.request(
                 attributes: FeedCountdownAttributes(kind: kind),
                 content: content,
                 pushType: .token
             )
+            observeAndStorePushToken(activity: activity)
         } catch {
             NSLog("FeedLiveActivityRemote start failed: %@", error.localizedDescription)
+        }
+    }
+
+    @available(iOS 16.2, *)
+    private static func observeAndStorePushToken(
+        activity: Activity<FeedCountdownAttributes>
+    ) {
+        Task {
+            for await tokenData in activity.pushTokenUpdates {
+                let hex = tokenData.map { String(format: "%02x", $0) }.joined()
+                storePendingPushToken(
+                    activityId: activity.id,
+                    pushToken: hex,
+                    kind: activity.attributes.kind
+                )
+            }
         }
     }
 

@@ -18,6 +18,7 @@ import {
 } from "@/app/lib/deviceNotifications";
 import { syncDevicePushRegistration } from "@/app/lib/devicePush";
 import {
+  drainNativePendingPushTokens,
   getLiveActivityKindEnabled,
   getOrCreateDeviceId,
   setLiveActivityPushTokenHandler,
@@ -32,6 +33,8 @@ import { isFeedTimerRecording } from "@/app/lib/feedTimer";
 interface ReminderSchedulerProps {
   selectedCaregiver: string;
   secretLink: string;
+  /** Prefixed on Lock Screen titles to match APNs cross-caregiver updates. */
+  babyName?: string;
   feedIntervalHours?: number;
   notifyBeforeMinutes?: number;
   feedRemindersEnabled?: boolean;
@@ -65,6 +68,7 @@ interface ReminderSchedulerProps {
 export function ReminderScheduler({
   selectedCaregiver,
   secretLink,
+  babyName,
   feedIntervalHours,
   notifyBeforeMinutes: notifyBeforeProp,
   feedRemindersEnabled = true,
@@ -85,6 +89,7 @@ export function ReminderScheduler({
   const [now, setNow] = useState(() => Date.now());
   // Re-check opt-in / feed-timer when returning to the tab (settings may have changed).
   const [optInTick, setOptInTick] = useState(0);
+  const babyPrefix = babyName?.trim() ? `${babyName.trim()} · ` : "";
 
   useEffect(() => {
     setLiveActivityPushTokenHandler(({ activityId, pushToken, kind }) => {
@@ -97,6 +102,8 @@ export function ReminderScheduler({
         kind: kind ?? "last-feed",
       });
     });
+    // Register tokens ActivityKit issued during silent wake (no JS listener).
+    void drainNativePendingPushTokens();
     return () => setLiveActivityPushTokenHandler(null);
   }, [secretLink, selectedCaregiver, upsertLiveActivity]);
 
@@ -133,7 +140,10 @@ export function ReminderScheduler({
     if (Capacitor.isNativePlatform()) {
       void import("@capacitor/app").then(({ App }) => {
         void App.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) onFocus();
+          if (isActive) {
+            void drainNativePendingPushTokens();
+            onFocus();
+          }
         }).then((handle) => {
           removeAppState = () => {
             void handle.remove();
@@ -338,7 +348,7 @@ export function ReminderScheduler({
         kind: "last-feed",
         enabled: timerOn && getLiveActivityKindEnabled("last-feed"),
         lastAt: feedStartedAt,
-        title: t("liveActivityFeedOngoingTitle"),
+        title: `${babyPrefix}${t("liveActivityFeedOngoingTitle")}`,
         subtitle: t("liveActivityFeedOngoingSubtitle", {
           time: formatTime(feedStartedAt),
           name: activeFeed?.caregiverName ?? "",
@@ -350,7 +360,7 @@ export function ReminderScheduler({
         kind: "last-feed",
         enabled: timerOn && getLiveActivityKindEnabled("last-feed"),
         lastAt: lastMilkFeedAt,
-        title: t("liveActivityLastFeedTitle"),
+        title: `${babyPrefix}${t("liveActivityLastFeedTitle")}`,
         subtitle: lastMilkFeedAt
           ? t("liveActivityLastFeedSubtitle", {
               time: formatTime(lastMilkFeedAt),
@@ -364,7 +374,7 @@ export function ReminderScheduler({
       kind: "last-pump",
       enabled: timerOn && getLiveActivityKindEnabled("last-pump"),
       lastAt: lastPumpAt,
-      title: t("liveActivityLastPumpTitle"),
+      title: `${babyPrefix}${t("liveActivityLastPumpTitle")}`,
       subtitle: lastPumpAt
         ? t("liveActivityLastPumpSubtitle", {
             time: formatTime(lastPumpAt),
@@ -381,7 +391,7 @@ export function ReminderScheduler({
         kind: "last-nap",
         enabled: timerOn && getLiveActivityKindEnabled("last-nap"),
         lastAt: activeSleep.startTime,
-        title: sleepTitle,
+        title: `${babyPrefix}${sleepTitle}`,
         subtitle: t("liveActivitySleepOngoingSubtitle", {
           time: formatTime(activeSleep.startTime),
           name: activeSleep.caregiverName,
@@ -395,7 +405,7 @@ export function ReminderScheduler({
         kind: "last-nap",
         enabled: timerOn && getLiveActivityKindEnabled("last-nap"),
         lastAt: lastSleepEnd,
-        title: t("liveActivityLastNapTitle"),
+        title: `${babyPrefix}${t("liveActivityLastNapTitle")}`,
         subtitle: lastSleepEnd
           ? t("liveActivityLastNapSubtitle", {
               time: formatTime(lastSleepEnd),
@@ -409,6 +419,7 @@ export function ReminderScheduler({
     recentSleep,
     activeSleep,
     activeFeed,
+    babyPrefix,
     t,
     optInTick,
   ]);
