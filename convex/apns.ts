@@ -93,6 +93,25 @@ async function createApnsJwt(config: ApnsConfig): Promise<string> {
 
 type SendResult = "ok" | "gone" | "error";
 
+/** APNs reasons that mean this token must never be used again. */
+function isGoneReason(status: number, body: string): boolean {
+  if (status === 410) return true;
+  if (status !== 400 && status !== 403) return false;
+  try {
+    const parsed = JSON.parse(body) as { reason?: string };
+    const reason = parsed.reason ?? "";
+    return (
+      reason === "BadDeviceToken" ||
+      reason === "Unregistered" ||
+      reason === "ExpiredToken" ||
+      reason === "DeviceTokenNotForTopic" ||
+      reason === "TopicDisallowed"
+    );
+  } catch {
+    return false;
+  }
+}
+
 type ApnsSession = {
   client: http2.ClientHttp2Session;
   host: string;
@@ -157,7 +176,9 @@ function sendApnsOnSession(opts: {
         return;
       }
       console.warn("APNs send failed", status, responseBody, opts.pushType);
-      if (status === 410) {
+      // BadDeviceToken / Unregistered / 410 — drop so we stop hammering
+      // dead TF tokens and silent-wake can re-register on next app open.
+      if (isGoneReason(status, responseBody)) {
         resolve("gone");
         return;
       }

@@ -37,6 +37,10 @@ interface FeedLiveActivityPlugin {
     kind: LiveActivityKind;
     enabled: boolean;
   }): Promise<void>;
+  /** Tokens captured natively during silent wake (no JS listener). */
+  drainPendingPushTokens?(): Promise<{
+    tokens: Array<{ activityId: string; pushToken: string; kind?: string }>;
+  }>;
   addListener?(
     eventName: "liveActivityPushToken",
     listenerFunc: (data: {
@@ -148,6 +152,12 @@ type PushTokenHandler = (data: {
 
 let pushTokenHandler: PushTokenHandler | null = null;
 let listenerAttached = false;
+/** Tokens that arrived before ReminderScheduler mounted its Convex upsert. */
+const pendingPushTokens: Array<{
+  activityId: string;
+  pushToken: string;
+  kind?: string;
+}> = [];
 
 /** Serialize sync/end per kind so ReminderScheduler re-runs cannot race. */
 const kindChains: Record<LiveActivityKind, Promise<unknown>> = {
@@ -187,6 +197,50 @@ export function setLiveActivityPushTokenHandler(
   handler: PushTokenHandler | null
 ): void {
   pushTokenHandler = handler;
+  if (!handler || pendingPushTokens.length === 0) return;
+  // Flush tokens that raced ahead of ReminderScheduler mount — otherwise
+  // cross-caregiver APNs has nothing to target until the next LA restart.
+  const queued = pendingPushTokens.splice(0, pendingPushTokens.length);
+  for (const data of queued) {
+    handler(data);
+  }
+}
+
+function ingestPushToken(data: {
+  activityId: string;
+  pushToken: string;
+  kind?: string;
+}): void {
+  if (!data.activityId || !data.pushToken) return;
+  if (pushTokenHandler) {
+    pushTokenHandler(data);
+    return;
+  }
+  const idx = pendingPushTokens.findIndex(
+    (p) => p.activityId === data.activityId
+  );
+  if (idx >= 0) pendingPushTokens[idx] = data;
+  else pendingPushTokens.push(data);
+}
+
+/**
+ * Pull ActivityKit tokens stored by native silent-wake handlers and register
+ * them via the same path as live listener events.
+ */
+export async function drainNativePendingPushTokens(): Promise<void> {
+  if (!isNativePlatform()) return;
+  if (!Capacitor.isPluginAvailable("FeedLiveActivity")) return;
+  if (typeof FeedLiveActivityNative.drainPendingPushTokens !== "function") {
+    return;
+  }
+  try {
+    const { tokens } = await FeedLiveActivityNative.drainPendingPushTokens();
+    for (const data of tokens ?? []) {
+      ingestPushToken(data);
+    }
+  } catch (err) {
+    console.warn("drainPendingPushTokens failed", err);
+  }
 }
 
 async function ensurePushTokenListener(): Promise<void> {
@@ -198,7 +252,7 @@ async function ensurePushTokenListener(): Promise<void> {
     await FeedLiveActivityNative.addListener(
       "liveActivityPushToken",
       (data) => {
-        pushTokenHandler?.(data);
+        ingestPushToken(data);
       }
     );
   } catch (err) {

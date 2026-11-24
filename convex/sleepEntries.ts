@@ -8,29 +8,32 @@ import { isMilkFeed } from "./lib/feeds";
 
 const MAX_DURATION_MINUTES = 24 * 60;
 
+/**
+ * Push the village's sleep Live Activity from the DB state *after* a write.
+ * Deriving state (instead of trusting the caller's args) means create /
+ * edit / delete of any row — including retro logs and deleting the live
+ * session — never leaves a stale "Sleeping" or "Awake since" timer.
+ */
 async function scheduleSleepLivePush(
   ctx: MutationCtx,
-  trackerId: Id<"trackers">,
-  opts: {
-    active: boolean;
-    type: "nap" | "night";
-    startTime: number;
-    endTime?: number;
-    caregiverName: string;
-  }
+  trackerId: Id<"trackers">
 ) {
   const tracker = await ctx.db.get(trackerId);
   const baby = tracker?.babyName?.trim();
-  if (opts.active) {
-    const sleeping = opts.type === "nap" ? "Napping" : "Sleeping";
+  const active = await getActiveSleepForTracker(ctx, trackerId);
+  if (active) {
+    const sleeping = active.type === "nap" ? "Napping" : "Sleeping";
+    // Prefer caregiver in subtitle (no server timezone). dueAtMs drives the timer.
     const title = baby ? `${baby} · ${sleeping}` : sleeping;
     await ctx.scheduler.runAfter(0, internal.apns.notifyLiveActivityUpdate, {
       trackerId,
       kind: "last-nap",
       event: "update",
       title,
-      subtitle: `Started by ${opts.caregiverName}`,
-      dueAtMs: opts.startTime,
+      subtitle: active.caregiverName
+        ? `In progress · ${active.caregiverName}`
+        : "In progress",
+      dueAtMs: active.startTime,
       silentWake: true,
     });
     // Keep feed since-last on the lock screen while sleeping — only an
@@ -38,18 +41,42 @@ async function scheduleSleepLivePush(
     return;
   }
 
+  // Same pick as the client: latest-started row that has ended.
+  const recentSleep = await ctx.db
+    .query("sleepEntries")
+    .withIndex("by_tracker_and_start", (q) => q.eq("trackerId", trackerId))
+    .order("desc")
+    .take(10);
+  const lastEnd =
+    recentSleep.find((e) => e.endTime !== undefined)?.endTime ?? null;
+
+  if (lastEnd === null) {
+    await ctx.scheduler.runAfter(0, internal.apns.notifyLiveActivityUpdate, {
+      trackerId,
+      kind: "last-nap",
+      event: "end",
+      title: baby ? `${baby} · Awake since` : "Awake since",
+      subtitle: "No sleep yet",
+      dueAtMs: Date.now(),
+      silentWake: true,
+    });
+    return;
+  }
+
   // Replace in-progress sleep with since-last (awake) from the end timestamp.
-  const endAt = opts.endTime ?? Date.now();
-  const title = baby ? `${baby} · Awake since` : "Awake since";
+  // Always silent-wake: ActivityKit tokens alone miss force-quit devices.
   await ctx.scheduler.runAfter(0, internal.apns.notifyLiveActivityUpdate, {
     trackerId,
     kind: "last-nap",
     event: "update",
-    title,
-    subtitle: "Nap ended",
-    dueAtMs: endAt,
+    title: baby ? `${baby} · Awake since` : "Awake since",
+    subtitle: "Time since nap ended",
+    dueAtMs: lastEnd,
     silentWake: true,
   });
+
+  // An ongoing feed session owns the feed timer — don't overwrite it.
+  if (tracker?.activeFeedSession) return;
 
   const recent = await ctx.db
     .query("feedEntries")
@@ -177,12 +204,7 @@ export const start = mutation({
       notes: args.notes,
       photoIds: args.photoIds,
     });
-    await scheduleSleepLivePush(ctx, tracker._id, {
-      active: true,
-      type: args.type,
-      startTime: args.startTime,
-      caregiverName,
-    });
+    await scheduleSleepLivePush(ctx, tracker._id);
     return id;
   },
 });
@@ -216,13 +238,7 @@ export const end = mutation({
       patch.photoIds = merged;
     }
     await ctx.db.patch(args.entryId, patch);
-    await scheduleSleepLivePush(ctx, tracker._id, {
-      active: false,
-      type: existing.type,
-      startTime: existing.startTime,
-      endTime: args.endTime,
-      caregiverName: args.actingCaregiverName.trim(),
-    });
+    await scheduleSleepLivePush(ctx, tracker._id);
     return null;
   },
 });
@@ -263,7 +279,7 @@ export const create = mutation({
       throw new Error("This overlaps with an active sleep session");
     }
 
-    return await ctx.db.insert("sleepEntries", {
+    const id = await ctx.db.insert("sleepEntries", {
       trackerId: tracker._id,
       caregiverName: args.actingCaregiverName.trim(),
       type: args.type,
@@ -272,6 +288,8 @@ export const create = mutation({
       notes: args.notes,
       photoIds: args.photoIds,
     });
+    await scheduleSleepLivePush(ctx, tracker._id);
+    return id;
   },
 });
 
@@ -366,8 +384,6 @@ export const update = mutation({
     const durationMinutes = existing.durationMinutes;
     const nextPhotoIds =
       args.photoIds !== undefined ? args.photoIds : existing.photoIds;
-    const wasActive = existing.endTime === undefined;
-    const nowActive = args.endTime === undefined;
     await ctx.db.replace(args.entryId, {
       trackerId: existing.trackerId,
       caregiverName: existing.caregiverName,
@@ -378,16 +394,7 @@ export const update = mutation({
       notes: args.notes,
       ...(nextPhotoIds !== undefined ? { photoIds: nextPhotoIds } : {}),
     });
-    // Push when this row is/was the live timer — not when editing old completed rows.
-    if (wasActive || nowActive) {
-      await scheduleSleepLivePush(ctx, existing.trackerId, {
-        active: nowActive,
-        type: args.type,
-        startTime: args.startTime,
-        endTime: args.endTime,
-        caregiverName: existing.caregiverName,
-      });
-    }
+    await scheduleSleepLivePush(ctx, existing.trackerId);
     return null;
   },
 });
@@ -434,13 +441,7 @@ export const logNap = mutation({
         : {}),
       ...(notes !== undefined ? { notes } : {}),
     });
-    await scheduleSleepLivePush(ctx, tracker._id, {
-      active: resolved.endTime === undefined,
-      type: "nap",
-      startTime: args.startTime,
-      endTime: resolved.endTime,
-      caregiverName,
-    });
+    await scheduleSleepLivePush(ctx, tracker._id);
     return id;
   },
 });
@@ -475,8 +476,6 @@ export const updateNap = mutation({
       args.durationMinutes
     );
     const notes = cleanNotes(args.notes);
-    const wasActive = existing.endTime === undefined;
-    const nowActive = resolved.endTime === undefined;
     await ctx.db.replace(args.entryId, {
       trackerId: existing.trackerId,
       caregiverName: existing.caregiverName,
@@ -489,15 +488,7 @@ export const updateNap = mutation({
       ...(notes !== undefined ? { notes } : {}),
       ...(existing.photoIds !== undefined ? { photoIds: existing.photoIds } : {}),
     });
-    if (wasActive || nowActive) {
-      await scheduleSleepLivePush(ctx, existing.trackerId, {
-        active: nowActive,
-        type: "nap",
-        startTime: args.startTime,
-        endTime: resolved.endTime,
-        caregiverName: existing.caregiverName,
-      });
-    }
+    await scheduleSleepLivePush(ctx, existing.trackerId);
     return null;
   },
 });
@@ -589,6 +580,7 @@ export const remove = mutation({
     );
     await deleteStorageIds(ctx, existing.photoIds);
     await ctx.db.delete(args.entryId);
+    await scheduleSleepLivePush(ctx, existing.trackerId);
     return null;
   },
 });
