@@ -4,8 +4,6 @@ import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { requireOwnedEntry, verifyCaregiver } from "./lib/caregivers";
 import { deleteStorageIds } from "./lib/storageCleanup";
-import { isMilkFeed } from "./lib/feeds";
-
 const MAX_DURATION_MINUTES = 24 * 60;
 
 /**
@@ -75,21 +73,9 @@ async function scheduleSleepLivePush(
     silentWake: true,
   });
 
-  // An ongoing feed session owns the feed timer — don't overwrite it.
-  if (tracker?.activeFeedSession) return;
-
-  const recent = await ctx.db
-    .query("feedEntries")
-    .withIndex("by_tracker_and_time", (q) => q.eq("trackerId", trackerId))
-    .order("desc")
-    .take(40);
-  const lastMilk = recent.find((f) => isMilkFeed(f.type));
-  // Restore since-last feed + silent-wake devices to resync local state.
-  await ctx.scheduler.runAfter(0, internal.apns.notifyFeedChanged, {
-    trackerId,
-    lastFeedAt: lastMilk?.timestamp ?? null,
-    babyName: tracker?.babyName,
-  });
+  // Do not push feed_changed here: sleep has its own "last-nap" activity, and
+  // a feed_changed silent wake cancels every pending feed/diaper reminder on
+  // every device. Logging or editing a nap must not wipe those.
 }
 
 function cleanNotes(notes: string | undefined): string | undefined {
