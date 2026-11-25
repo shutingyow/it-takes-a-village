@@ -112,11 +112,16 @@ export default function Home() {
   }, [isAuthenticated, authLoading]);
 
   // Empty account → open create so parents aren’t hunting for the CTA.
+  // Skip when a saved caregiver invite exists: the auto-enter effect below
+  // bails while the create form is open, which would strand a signed-in
+  // caregiver on "create village" if savedTracker resolves after listMine.
   useEffect(() => {
-    if (isAuthenticated && myVillages !== undefined && myVillages.length === 0) {
-      setShowCreateForm(true);
-    }
-  }, [isAuthenticated, myVillages]);
+    if (!storageLoaded) return;
+    if (!isAuthenticated || myVillages === undefined) return;
+    if (myVillages.length !== 0) return;
+    if (resolveLastVisitedInvite(lastVisited)) return;
+    setShowCreateForm(true);
+  }, [isAuthenticated, myVillages, storageLoaded, lastVisited]);
 
   const savedTracker = useQuery(
     api.trackers.getBySecret,

@@ -100,6 +100,8 @@ export function ReminderScheduler({
         pushToken,
         deviceId: getOrCreateDeviceId(),
         kind: kind ?? "last-feed",
+      }).catch((err) => {
+        console.warn("upsertLiveActivity failed", err);
       });
     });
     // Register tokens ActivityKit issued during silent wake (no JS listener).
